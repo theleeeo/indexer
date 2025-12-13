@@ -72,16 +72,15 @@ func (FilterOp) EnumDescriptor() ([]byte, []int) {
 }
 
 type SearchRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Always filter by tenant for safety
-	TenantId string `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	// Optional full text query
-	Query   string    `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	Filters []*Filter `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Index   string                 `protobuf:"bytes,1,opt,name=index,proto3" json:"index,omitempty"`
+	Query   string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	Filters []*Filter              `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
 	// Pagination (simple from/size)
 	Page          int32   `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`                         // 0-based
 	PageSize      int32   `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // default 25, max 100
 	Sort          []*Sort `protobuf:"bytes,6,rep,name=sort,proto3" json:"sort,omitempty"`
+	IncludeSource bool    `protobuf:"varint,7,opt,name=include_source,json=includeSource,proto3" json:"include_source,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -116,9 +115,9 @@ func (*SearchRequest) Descriptor() ([]byte, []int) {
 	return file_searcher_searcher_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SearchRequest) GetTenantId() string {
+func (x *SearchRequest) GetIndex() string {
 	if x != nil {
-		return x.TenantId
+		return x.Index
 	}
 	return ""
 }
@@ -156,6 +155,13 @@ func (x *SearchRequest) GetSort() []*Sort {
 		return x.Sort
 	}
 	return nil
+}
+
+func (x *SearchRequest) GetIncludeSource() bool {
+	if x != nil {
+		return x.IncludeSource
+	}
+	return false
 }
 
 type SearchHit struct {
@@ -409,14 +415,15 @@ var File_searcher_searcher_proto protoreflect.FileDescriptor
 
 const file_searcher_searcher_proto_rawDesc = "" +
 	"\n" +
-	"\x17searcher/searcher.proto\x12\vsearcher.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xc9\x01\n" +
-	"\rSearchRequest\x12\x1b\n" +
-	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
+	"\x17searcher/searcher.proto\x12\vsearcher.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xe9\x01\n" +
+	"\rSearchRequest\x12\x14\n" +
+	"\x05index\x18\x01 \x01(\tR\x05index\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12-\n" +
 	"\afilters\x18\x03 \x03(\v2\x13.searcher.v1.FilterR\afilters\x12\x12\n" +
 	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x05 \x01(\x05R\bpageSize\x12%\n" +
-	"\x04sort\x18\x06 \x03(\v2\x11.searcher.v1.SortR\x04sort\"b\n" +
+	"\x04sort\x18\x06 \x03(\v2\x11.searcher.v1.SortR\x04sort\x12%\n" +
+	"\x0einclude_source\x18\a \x01(\bR\rincludeSource\"b\n" +
 	"\tSearchHit\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
 	"\x05score\x18\x02 \x01(\x01R\x05score\x12/\n" +
@@ -437,11 +444,9 @@ const file_searcher_searcher_proto_rawDesc = "" +
 	"\bFilterOp\x12\x19\n" +
 	"\x15FILTER_OP_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fFILTER_OP_EQ\x10\x01\x12\x10\n" +
-	"\fFILTER_OP_IN\x10\x022\xd6\x01\n" +
-	"\bSearcher\x12B\n" +
-	"\aSearchA\x12\x1a.searcher.v1.SearchRequest\x1a\x1b.searcher.v1.SearchResponse\x12B\n" +
-	"\aSearchB\x12\x1a.searcher.v1.SearchRequest\x1a\x1b.searcher.v1.SearchResponse\x12B\n" +
-	"\aSearchC\x12\x1a.searcher.v1.SearchRequest\x1a\x1b.searcher.v1.SearchResponseB\x8f\x01\n" +
+	"\fFILTER_OP_IN\x10\x022R\n" +
+	"\rSearchService\x12A\n" +
+	"\x06Search\x12\x1a.searcher.v1.SearchRequest\x1a\x1b.searcher.v1.SearchResponseB\x8f\x01\n" +
 	"\x0fcom.searcher.v1B\rSearcherProtoP\x01Z indexer/gen/searcher/v1;searcher\xa2\x02\x03SXX\xaa\x02\vSearcher.V1\xca\x02\vSearcher\\V1\xe2\x02\x17Searcher\\V1\\GPBMetadata\xea\x02\fSearcher::V1b\x06proto3"
 
 var (
@@ -473,14 +478,10 @@ var file_searcher_searcher_proto_depIdxs = []int32{
 	6, // 2: searcher.v1.SearchHit.source:type_name -> google.protobuf.Struct
 	2, // 3: searcher.v1.SearchResponse.hits:type_name -> searcher.v1.SearchHit
 	0, // 4: searcher.v1.Filter.op:type_name -> searcher.v1.FilterOp
-	1, // 5: searcher.v1.Searcher.SearchA:input_type -> searcher.v1.SearchRequest
-	1, // 6: searcher.v1.Searcher.SearchB:input_type -> searcher.v1.SearchRequest
-	1, // 7: searcher.v1.Searcher.SearchC:input_type -> searcher.v1.SearchRequest
-	3, // 8: searcher.v1.Searcher.SearchA:output_type -> searcher.v1.SearchResponse
-	3, // 9: searcher.v1.Searcher.SearchB:output_type -> searcher.v1.SearchResponse
-	3, // 10: searcher.v1.Searcher.SearchC:output_type -> searcher.v1.SearchResponse
-	8, // [8:11] is the sub-list for method output_type
-	5, // [5:8] is the sub-list for method input_type
+	1, // 5: searcher.v1.SearchService.Search:input_type -> searcher.v1.SearchRequest
+	3, // 6: searcher.v1.SearchService.Search:output_type -> searcher.v1.SearchResponse
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
 	5, // [5:5] is the sub-list for extension extendee
 	0, // [0:5] is the sub-list for field type_name

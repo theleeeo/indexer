@@ -19,175 +19,99 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Searcher_SearchA_FullMethodName = "/searcher.v1.Searcher/SearchA"
-	Searcher_SearchB_FullMethodName = "/searcher.v1.Searcher/SearchB"
-	Searcher_SearchC_FullMethodName = "/searcher.v1.Searcher/SearchC"
+	SearchService_Search_FullMethodName = "/searcher.v1.SearchService/Search"
 )
 
-// SearcherClient is the client API for Searcher service.
+// SearchServiceClient is the client API for SearchService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type SearcherClient interface {
-	SearchA(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
-	SearchB(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
-	SearchC(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+type SearchServiceClient interface {
+	Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
 }
 
-type searcherClient struct {
+type searchServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewSearcherClient(cc grpc.ClientConnInterface) SearcherClient {
-	return &searcherClient{cc}
+func NewSearchServiceClient(cc grpc.ClientConnInterface) SearchServiceClient {
+	return &searchServiceClient{cc}
 }
 
-func (c *searcherClient) SearchA(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+func (c *searchServiceClient) Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SearchResponse)
-	err := c.cc.Invoke(ctx, Searcher_SearchA_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, SearchService_Search_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *searcherClient) SearchB(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SearchResponse)
-	err := c.cc.Invoke(ctx, Searcher_SearchB_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *searcherClient) SearchC(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(SearchResponse)
-	err := c.cc.Invoke(ctx, Searcher_SearchC_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// SearcherServer is the server API for Searcher service.
-// All implementations should embed UnimplementedSearcherServer
+// SearchServiceServer is the server API for SearchService service.
+// All implementations should embed UnimplementedSearchServiceServer
 // for forward compatibility.
-type SearcherServer interface {
-	SearchA(context.Context, *SearchRequest) (*SearchResponse, error)
-	SearchB(context.Context, *SearchRequest) (*SearchResponse, error)
-	SearchC(context.Context, *SearchRequest) (*SearchResponse, error)
+type SearchServiceServer interface {
+	Search(context.Context, *SearchRequest) (*SearchResponse, error)
 }
 
-// UnimplementedSearcherServer should be embedded to have
+// UnimplementedSearchServiceServer should be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedSearcherServer struct{}
+type UnimplementedSearchServiceServer struct{}
 
-func (UnimplementedSearcherServer) SearchA(context.Context, *SearchRequest) (*SearchResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SearchA not implemented")
+func (UnimplementedSearchServiceServer) Search(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Search not implemented")
 }
-func (UnimplementedSearcherServer) SearchB(context.Context, *SearchRequest) (*SearchResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SearchB not implemented")
-}
-func (UnimplementedSearcherServer) SearchC(context.Context, *SearchRequest) (*SearchResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SearchC not implemented")
-}
-func (UnimplementedSearcherServer) testEmbeddedByValue() {}
+func (UnimplementedSearchServiceServer) testEmbeddedByValue() {}
 
-// UnsafeSearcherServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to SearcherServer will
+// UnsafeSearchServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SearchServiceServer will
 // result in compilation errors.
-type UnsafeSearcherServer interface {
-	mustEmbedUnimplementedSearcherServer()
+type UnsafeSearchServiceServer interface {
+	mustEmbedUnimplementedSearchServiceServer()
 }
 
-func RegisterSearcherServer(s grpc.ServiceRegistrar, srv SearcherServer) {
-	// If the following call pancis, it indicates UnimplementedSearcherServer was
+func RegisterSearchServiceServer(s grpc.ServiceRegistrar, srv SearchServiceServer) {
+	// If the following call pancis, it indicates UnimplementedSearchServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Searcher_ServiceDesc, srv)
+	s.RegisterService(&SearchService_ServiceDesc, srv)
 }
 
-func _Searcher_SearchA_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _SearchService_Search_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SearchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(SearcherServer).SearchA(ctx, in)
+		return srv.(SearchServiceServer).Search(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Searcher_SearchA_FullMethodName,
+		FullMethod: SearchService_Search_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SearcherServer).SearchA(ctx, req.(*SearchRequest))
+		return srv.(SearchServiceServer).Search(ctx, req.(*SearchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Searcher_SearchB_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SearchRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SearcherServer).SearchB(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Searcher_SearchB_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SearcherServer).SearchB(ctx, req.(*SearchRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Searcher_SearchC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(SearchRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SearcherServer).SearchC(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: Searcher_SearchC_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SearcherServer).SearchC(ctx, req.(*SearchRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-// Searcher_ServiceDesc is the grpc.ServiceDesc for Searcher service.
+// SearchService_ServiceDesc is the grpc.ServiceDesc for SearchService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Searcher_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "searcher.v1.Searcher",
-	HandlerType: (*SearcherServer)(nil),
+var SearchService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "searcher.v1.SearchService",
+	HandlerType: (*SearchServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "SearchA",
-			Handler:    _Searcher_SearchA_Handler,
-		},
-		{
-			MethodName: "SearchB",
-			Handler:    _Searcher_SearchB_Handler,
-		},
-		{
-			MethodName: "SearchC",
-			Handler:    _Searcher_SearchC_Handler,
+			MethodName: "Search",
+			Handler:    _SearchService_Search_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

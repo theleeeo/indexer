@@ -6,26 +6,23 @@ import "google/protobuf/struct.proto";
 
 option go_package = "indexer/gen/searcher/v1;searcher";
 
-service Searcher{
-  rpc SearchA(SearchRequest) returns (SearchResponse);
-  rpc SearchB(SearchRequest) returns (SearchResponse);
-  rpc SearchC(SearchRequest) returns (SearchResponse);
+service SearchService{
+  rpc Search(SearchRequest) returns (SearchResponse);
 }
 
 message SearchRequest {
-  // Always filter by tenant for safety
-  string          tenant_id = 1;
+  string          index          = 1;
 
-  // Optional full text query
-  string          query     = 2;
-
-  repeated Filter filters   = 3;
+  string          query          = 2;
+  repeated Filter filters        = 3;
 
   // Pagination (simple from/size)
-  int32           page      = 4; // 0-based
-  int32           page_size = 5; // default 25, max 100
+  int32           page           = 4; // 0-based
+  int32           page_size      = 5; // default 25, max 100
 
-  repeated Sort   sort      = 6;
+  repeated Sort   sort           = 6;
+
+  bool            include_source = 7;
 }
 
 message SearchHit {

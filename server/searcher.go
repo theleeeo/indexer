@@ -6,11 +6,13 @@ import (
 	"indexer/es"
 	"indexer/gen/searcher"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type SearcherServer struct {
-	searcher.UnimplementedSearcherServer
+	searcher.UnimplementedSearchServiceServer
 
 	es *es.Client
 }
@@ -21,23 +23,22 @@ func NewSearcher(esClient *es.Client) *SearcherServer {
 	}
 }
 
-func (s *SearcherServer) SearchA(ctx context.Context, req *searcher.SearchRequest) (*searcher.SearchResponse, error) {
-	return s.search(ctx, AIndex, req, defaultSearchFieldsA())
-}
-
-func (s *SearcherServer) SearchB(ctx context.Context, req *searcher.SearchRequest) (*searcher.SearchResponse, error) {
-	return s.search(ctx, BIndex, req, defaultSearchFieldsB())
-}
-
-func (s *SearcherServer) SearchC(ctx context.Context, req *searcher.SearchRequest) (*searcher.SearchResponse, error) {
-	return s.search(ctx, CIndex, req, defaultSearchFieldsC())
+func (s *SearcherServer) Search(ctx context.Context, req *searcher.SearchRequest) (*searcher.SearchResponse, error) {
+	switch req.Index {
+	case "":
+		return nil, status.Error(codes.InvalidArgument, "index is required")
+	case "a":
+		return s.search(ctx, AIndex, req, defaultSearchFieldsA())
+	case "b":
+		return s.search(ctx, BIndex, req, defaultSearchFieldsB())
+	case "c":
+		return s.search(ctx, CIndex, req, defaultSearchFieldsC())
+	default:
+		return nil, status.Errorf(codes.FailedPrecondition, "unknown index %q", req.Index)
+	}
 }
 
 func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *searcher.SearchRequest, searchFields []string) (*searcher.SearchResponse, error) {
-	if req == nil || req.TenantId == "" {
-		return nil, fmt.Errorf("tenant_id is required")
-	}
-
 	pageSize := int(req.PageSize)
 	if pageSize <= 0 {
 		pageSize = 25
@@ -56,9 +57,9 @@ func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *sea
 	}
 
 	// Always tenant filter
-	boolQ["filter"] = append(boolQ["filter"].([]any), map[string]any{
-		"term": map[string]any{"tenant_id": req.TenantId},
-	})
+	// boolQ["filter"] = append(boolQ["filter"].([]any), map[string]any{
+	// 	"term": map[string]any{"tenant_id": req.TenantId},
+	// })
 
 	// Full-text query (optional)
 	if req.Query != "" {

@@ -50,7 +50,7 @@ func main() {
 
 	g := grpc.NewServer()
 	indexer.RegisterIndexerServer(g, idxSrv)
-	searcher.RegisterSearcherServer(g, searchSrv)
+	searcher.RegisterSearchServiceServer(g, searchSrv)
 	reflection.Register(g)
 
 	log.Printf("indexer listening on %s", grpcAddr)
