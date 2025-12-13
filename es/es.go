@@ -37,7 +37,6 @@ func New(cfg Config) (*Client, error) {
 func (c *Client) UpsertJSON(ctx context.Context, indexAlias, docID string, doc any) error {
 	body, err := json.Marshal(doc)
 	if err != nil {
-		log.Printf("UpsertJSON: failed to marshal doc (id=%s, index=%s): %v", docID, indexAlias, err)
 		return err
 	}
 
@@ -49,14 +48,12 @@ func (c *Client) UpsertJSON(ctx context.Context, indexAlias, docID string, doc a
 		c.es.Index.WithRefresh("false"),
 	)
 	if err != nil {
-		log.Printf("UpsertJSON: ES index error (id=%s, index=%s): %v", docID, indexAlias, err)
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		log.Printf("UpsertJSON: ES index response error (id=%s, index=%s): %s %s", docID, indexAlias, res.Status(), string(b))
 		return fmt.Errorf("es index error: %s %s", res.Status(), string(b))
 	}
 	log.Printf("UpsertJSON: indexed doc (id=%s, index=%s)", docID, indexAlias)
@@ -71,18 +68,15 @@ func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 		c.es.Delete.WithRefresh("false"),
 	)
 	if err != nil {
-		log.Printf("Delete: ES delete error (id=%s, index=%s): %v", docID, indexAlias, err)
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode == 404 {
-		log.Printf("Delete: doc not found (already deleted) (id=%s, index=%s)", docID, indexAlias)
 		return nil
 	}
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		log.Printf("Delete: ES delete response error (id=%s, index=%s): %s %s", docID, indexAlias, res.Status(), string(b))
 		return fmt.Errorf("es delete error: %s %s", res.Status(), string(b))
 	}
 	log.Printf("Delete: deleted doc (id=%s, index=%s)", docID, indexAlias)
@@ -97,7 +91,6 @@ type BulkItem struct {
 
 func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 	if len(items) == 0 {
-		log.Printf("BulkUpsert: no items to upsert")
 		return nil
 	}
 
@@ -107,11 +100,9 @@ func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 	for _, it := range items {
 		meta := map[string]any{"index": map[string]any{"_index": it.Index, "_id": it.ID}}
 		if err := enc.Encode(meta); err != nil {
-			log.Printf("BulkUpsert: failed to encode meta for doc (id=%s, index=%s): %v", it.ID, it.Index, err)
 			return err
 		}
 		if err := enc.Encode(it.Doc); err != nil {
-			log.Printf("BulkUpsert: failed to encode doc (id=%s, index=%s): %v", it.ID, it.Index, err)
 			return err
 		}
 	}
@@ -125,14 +116,12 @@ func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 		c.es.Bulk.WithRefresh("false"),
 	)
 	if err != nil {
-		log.Printf("BulkUpsert: ES bulk error: %v", err)
 		return err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		log.Printf("BulkUpsert: ES bulk response error: %s %s", res.Status(), string(b))
 		return fmt.Errorf("es bulk error: %s %s", res.Status(), string(b))
 	}
 	log.Printf("BulkUpsert: upserted %d docs", len(items))
