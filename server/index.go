@@ -39,14 +39,6 @@ func (s *IndexerServer) Publish(ctx context.Context, ev *index.ChangeEvent) (*in
 	if ev == nil {
 		return &index.PublishResponse{Accepted: 0}, nil
 	}
-	if ev.EventId == "" {
-		return nil, fmt.Errorf("event_id is required")
-	}
-
-	// best-effort idempotency (caller should still retry on transient errors)
-	if s.st.SeenRecently(ev.EventId, s.dedupTTL) {
-		return &index.PublishResponse{Accepted: 1}, nil
-	}
 
 	if err := s.applyOne(ctx, ev); err != nil {
 		return nil, err
@@ -60,11 +52,7 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, batch *index.ChangeBat
 	}
 	var accepted int64
 	for _, ev := range batch.Events {
-		if ev == nil || ev.EventId == "" {
-			continue
-		}
-		if s.st.SeenRecently(ev.EventId, s.dedupTTL) {
-			accepted++
+		if ev == nil {
 			continue
 		}
 		if err := s.applyOne(ctx, ev); err != nil {

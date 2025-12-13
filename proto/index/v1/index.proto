@@ -21,9 +21,6 @@ message ChangeBatch {
 }
 
 message ChangeEvent {
-  // Used for idempotency / de-dup on the indexer side.
-  string        event_id            = 1;
-
   // For debugging/ordering only (don’t rely on strict ordering).
   int64         occurred_at_unix_ms = 2;
 

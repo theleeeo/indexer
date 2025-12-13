@@ -164,8 +164,6 @@ func (x *ChangeBatch) GetEvents() []*ChangeEvent {
 
 type ChangeEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Used for idempotency / de-dup on the indexer side.
-	EventId string `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
 	// For debugging/ordering only (don’t rely on strict ordering).
 	OccurredAtUnixMs int64 `protobuf:"varint,2,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
 	// Types that are valid to be assigned to Payload:
@@ -212,13 +210,6 @@ func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ChangeEvent.ProtoReflect.Descriptor instead.
 func (*ChangeEvent) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *ChangeEvent) GetEventId() string {
-	if x != nil {
-		return x.EventId
-	}
-	return ""
 }
 
 func (x *ChangeEvent) GetOccurredAtUnixMs() int64 {
@@ -988,9 +979,8 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\x0fPublishResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\x03R\baccepted\"<\n" +
 	"\vChangeBatch\x12-\n" +
-	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\xc8\x04\n" +
-	"\vChangeEvent\x12\x19\n" +
-	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12-\n" +
+	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\xad\x04\n" +
+	"\vChangeEvent\x12-\n" +
 	"\x13occurred_at_unix_ms\x18\x02 \x01(\x03R\x10occurredAtUnixMs\x12.\n" +
 	"\ba_upsert\x18\x03 \x01(\v2\x11.index.v1.AUpsertH\x00R\aaUpsert\x12.\n" +
 	"\ba_delete\x18\x04 \x01(\v2\x11.index.v1.ADeleteH\x00R\aaDelete\x12.\n" +

@@ -57,9 +57,6 @@ type Store struct {
 	// reverse relations (for fan-out reindex)
 	bToAs map[string]map[string]struct{}
 	cToAs map[string]map[string]struct{}
-
-	// naive event de-dup (in-memory TTL)
-	seenEvent map[string]time.Time
 }
 
 func New() *Store {
@@ -67,12 +64,11 @@ func New() *Store {
 		resources: map[ResourceKey]struct{}{},
 		relations: map[ResourceKey][]ResourceKey{},
 
-		a:         map[string]*AProj{},
-		b:         map[string]*BProj{},
-		c:         map[string]*CProj{},
-		bToAs:     map[string]map[string]struct{}{},
-		cToAs:     map[string]map[string]struct{}{},
-		seenEvent: map[string]time.Time{},
+		a:     map[string]*AProj{},
+		b:     map[string]*BProj{},
+		c:     map[string]*CProj{},
+		bToAs: map[string]map[string]struct{}{},
+		cToAs: map[string]map[string]struct{}{},
 	}
 }
 
@@ -162,25 +158,6 @@ func (s *Store) DeleteRelation(resource, resourceID, relatedResource, relatedRes
 		}
 	}
 	s.relations[rk] = newRelated
-}
-
-func (s *Store) SeenRecently(eventID string, ttl time.Duration) bool {
-	now := time.Now()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// cleanup occasionally (cheap)
-	for k, t := range s.seenEvent {
-		if now.Sub(t) > ttl {
-			delete(s.seenEvent, k)
-		}
-	}
-
-	if t, ok := s.seenEvent[eventID]; ok && now.Sub(t) <= ttl {
-		return true
-	}
-	s.seenEvent[eventID] = now
-	return false
 }
 
 type RelUpdates struct {
