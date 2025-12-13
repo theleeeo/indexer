@@ -39,8 +39,8 @@ func (s *IndexerServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*
 	if ev == nil {
 		return &indexer.PublishResponse{Accepted: 0}, nil
 	}
-	if ev.EventId == "" || ev.TenantId == "" {
-		return nil, fmt.Errorf("event_id and tenant_id are required")
+	if ev.EventId == "" {
+		return nil, fmt.Errorf("event_id is required")
 	}
 
 	// best-effort idempotency (caller should still retry on transient errors)
@@ -60,7 +60,7 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, batch *indexer.ChangeB
 	}
 	var accepted int64
 	for _, ev := range batch.Events {
-		if ev == nil || ev.EventId == "" || ev.TenantId == "" {
+		if ev == nil || ev.EventId == "" {
 			continue
 		}
 		if s.st.SeenRecently(ev.EventId, s.dedupTTL) {
@@ -78,31 +78,31 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, batch *indexer.ChangeB
 func (s *IndexerServer) applyOne(ctx context.Context, ev *indexer.ChangeEvent) error {
 	switch p := ev.Payload.(type) {
 	case *indexer.ChangeEvent_AUpsert:
-		return s.handleAUpsert(ctx, ev.TenantId, p.AUpsert)
+		return s.handleAUpsert(ctx, p.AUpsert)
 	case *indexer.ChangeEvent_ADelete:
-		return s.handleADelete(ctx, ev.TenantId, p.ADelete)
+		return s.handleADelete(ctx, p.ADelete)
 	case *indexer.ChangeEvent_BUpsert:
-		return s.handleBUpsert(ctx, ev.TenantId, p.BUpsert)
+		return s.handleBUpsert(ctx, p.BUpsert)
 	case *indexer.ChangeEvent_BDelete:
-		return s.handleBDelete(ctx, ev.TenantId, p.BDelete)
+		return s.handleBDelete(ctx, p.BDelete)
 	case *indexer.ChangeEvent_CUpsert:
-		return s.handleCUpsert(ctx, ev.TenantId, p.CUpsert)
+		return s.handleCUpsert(ctx, p.CUpsert)
 	case *indexer.ChangeEvent_CDelete:
-		return s.handleCDelete(ctx, ev.TenantId, p.CDelete)
+		return s.handleCDelete(ctx, p.CDelete)
 	default:
 		return fmt.Errorf("unknown payload")
 	}
 }
 
-func (s *IndexerServer) handleAUpsert(ctx context.Context, tenant string, a *indexer.AUpsert) error {
+func (s *IndexerServer) handleAUpsert(ctx context.Context, a *indexer.AUpsert) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
 
-	bKeysToRefresh, cKeysToRefresh := s.st.UpsertA(tenant, a.AId, a.Status, a.BId, a.CIds)
+	bKeysToRefresh, cKeysToRefresh := s.st.UpsertA(a.AId, a.Status, a.BId, a.CIds)
 
 	// upsert A doc
-	if err := s.reindexAByKey(ctx, store.Key(tenant, a.AId)); err != nil {
+	if err := s.reindexAByKey(ctx, a.AId); err != nil {
 		return err
 	}
 
@@ -120,14 +120,14 @@ func (s *IndexerServer) handleAUpsert(ctx context.Context, tenant string, a *ind
 	return nil
 }
 
-func (s *IndexerServer) handleADelete(ctx context.Context, tenant string, a *indexer.ADelete) error {
+func (s *IndexerServer) handleADelete(ctx context.Context, a *indexer.ADelete) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
-	bKeysToRefresh, cKeysToRefresh := s.st.DeleteA(tenant, a.AId)
+	bKeysToRefresh, cKeysToRefresh := s.st.DeleteA(a.AId)
 
 	// delete from a_search
-	if err := s.es.Delete(ctx, AIndex, store.Key(tenant, a.AId)); err != nil {
+	if err := s.es.Delete(ctx, AIndex, a.AId); err != nil {
 		return err
 	}
 
@@ -144,67 +144,67 @@ func (s *IndexerServer) handleADelete(ctx context.Context, tenant string, a *ind
 	return nil
 }
 
-func (s *IndexerServer) handleBUpsert(ctx context.Context, tenant string, b *indexer.BUpsert) error {
+func (s *IndexerServer) handleBUpsert(ctx context.Context, b *indexer.BUpsert) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
-	s.st.UpsertB(tenant, b.BId, b.Name)
+	s.st.UpsertB(b.BId, b.Name)
 
 	// upsert B doc
-	if err := s.reindexBByKey(ctx, store.Key(tenant, b.BId)); err != nil {
+	if err := s.reindexBByKey(ctx, b.BId); err != nil {
 		return err
 	}
 
 	// fan-out: any A referencing this B needs reindex (because b.name changed)
-	aKeys := s.st.AffectedAsByB(tenant, b.BId)
+	aKeys := s.st.AffectedAsByB(b.BId)
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleBDelete(ctx context.Context, tenant string, b *indexer.BDelete) error {
+func (s *IndexerServer) handleBDelete(ctx context.Context, b *indexer.BDelete) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
-	s.st.DeleteB(tenant, b.BId)
+	s.st.DeleteB(b.BId)
 
 	// delete B doc
-	if err := s.es.Delete(ctx, BIndex, store.Key(tenant, b.BId)); err != nil {
+	if err := s.es.Delete(ctx, BIndex, b.BId); err != nil {
 		return err
 	}
 
 	// fan-out: A docs referencing this B should drop B inline
-	aKeys := s.st.AffectedAsByB(tenant, b.BId)
+	aKeys := s.st.AffectedAsByB(b.BId)
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleCUpsert(ctx context.Context, tenant string, c *indexer.CUpsert) error {
+func (s *IndexerServer) handleCUpsert(ctx context.Context, c *indexer.CUpsert) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}
-	s.st.UpsertC(tenant, c.CId, c.Type, c.State)
+	s.st.UpsertC(c.CId, c.Type, c.State)
 
 	// upsert C doc
-	if err := s.reindexCByKey(ctx, store.Key(tenant, c.CId)); err != nil {
+	if err := s.reindexCByKey(ctx, c.CId); err != nil {
 		return err
 	}
 
 	// fan-out: any A that includes this C needs reindex (because c fields changed)
-	aKeys := s.st.AffectedAsByC(tenant, c.CId)
+	aKeys := s.st.AffectedAsByC(c.CId)
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleCDelete(ctx context.Context, tenant string, c *indexer.CDelete) error {
+func (s *IndexerServer) handleCDelete(ctx context.Context, c *indexer.CDelete) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}
-	s.st.DeleteC(tenant, c.CId)
+	s.st.DeleteC(c.CId)
 
 	// delete C doc
-	if err := s.es.Delete(ctx, CIndex, store.Key(tenant, c.CId)); err != nil {
+	if err := s.es.Delete(ctx, CIndex, c.CId); err != nil {
 		return err
 	}
 
 	// fan-out: A docs that had this C should drop it inline
-	aKeys := s.st.AffectedAsByC(tenant, c.CId)
+	aKeys := s.st.AffectedAsByC(c.CId)
 	return s.bulkReindexA(ctx, aKeys)
 }
 
@@ -216,7 +216,7 @@ func (s *IndexerServer) reindexAByKey(ctx context.Context, aKey string) error {
 
 	var bProj *store.BProj
 	if aProj.BID != "" {
-		bProj = s.st.SnapshotB(store.Key(aProj.TenantID, aProj.BID))
+		bProj = s.st.SnapshotB(aProj.BID)
 	}
 
 	cs := make([]*store.CProj, 0, len(aProj.CIDs))
@@ -262,7 +262,7 @@ func (s *IndexerServer) bulkReindexA(ctx context.Context, aKeys []string) error 
 
 		var bProj *store.BProj
 		if aProj.BID != "" {
-			bProj = s.st.SnapshotB(store.Key(aProj.TenantID, aProj.BID))
+			bProj = s.st.SnapshotB(aProj.BID)
 		}
 
 		cs := make([]*store.CProj, 0, len(aProj.CIDs))

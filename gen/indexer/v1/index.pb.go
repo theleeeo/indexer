@@ -114,8 +114,7 @@ type ChangeEvent struct {
 	// Used for idempotency / de-dup on the indexer side.
 	EventId string `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
 	// For debugging/ordering only (don’t rely on strict ordering).
-	OccurredAtUnixMs int64  `protobuf:"varint,2,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
-	TenantId         string `protobuf:"bytes,3,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	OccurredAtUnixMs int64 `protobuf:"varint,2,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*ChangeEvent_AUpsert
@@ -171,13 +170,6 @@ func (x *ChangeEvent) GetOccurredAtUnixMs() int64 {
 		return x.OccurredAtUnixMs
 	}
 	return 0
-}
-
-func (x *ChangeEvent) GetTenantId() string {
-	if x != nil {
-		return x.TenantId
-	}
-	return ""
 }
 
 func (x *ChangeEvent) GetPayload() isChangeEvent_Payload {
@@ -246,27 +238,27 @@ type isChangeEvent_Payload interface {
 }
 
 type ChangeEvent_AUpsert struct {
-	AUpsert *AUpsert `protobuf:"bytes,4,opt,name=a_upsert,json=aUpsert,proto3,oneof"`
+	AUpsert *AUpsert `protobuf:"bytes,3,opt,name=a_upsert,json=aUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_ADelete struct {
-	ADelete *ADelete `protobuf:"bytes,5,opt,name=a_delete,json=aDelete,proto3,oneof"`
+	ADelete *ADelete `protobuf:"bytes,4,opt,name=a_delete,json=aDelete,proto3,oneof"`
 }
 
 type ChangeEvent_BUpsert struct {
-	BUpsert *BUpsert `protobuf:"bytes,6,opt,name=b_upsert,json=bUpsert,proto3,oneof"`
+	BUpsert *BUpsert `protobuf:"bytes,5,opt,name=b_upsert,json=bUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_BDelete struct {
-	BDelete *BDelete `protobuf:"bytes,7,opt,name=b_delete,json=bDelete,proto3,oneof"`
+	BDelete *BDelete `protobuf:"bytes,6,opt,name=b_delete,json=bDelete,proto3,oneof"`
 }
 
 type ChangeEvent_CUpsert struct {
-	CUpsert *CUpsert `protobuf:"bytes,8,opt,name=c_upsert,json=cUpsert,proto3,oneof"`
+	CUpsert *CUpsert `protobuf:"bytes,7,opt,name=c_upsert,json=cUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_CDelete struct {
-	CDelete *CDelete `protobuf:"bytes,9,opt,name=c_delete,json=cDelete,proto3,oneof"`
+	CDelete *CDelete `protobuf:"bytes,8,opt,name=c_delete,json=cDelete,proto3,oneof"`
 }
 
 func (*ChangeEvent_AUpsert) isChangeEvent_Payload() {}
@@ -604,17 +596,16 @@ const file_indexer_v1_index_proto_rawDesc = "" +
 	"\x0fPublishResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\x03R\baccepted\">\n" +
 	"\vChangeBatch\x12/\n" +
-	"\x06events\x18\x01 \x03(\v2\x17.indexer.v1.ChangeEventR\x06events\"\xab\x03\n" +
+	"\x06events\x18\x01 \x03(\v2\x17.indexer.v1.ChangeEventR\x06events\"\x8e\x03\n" +
 	"\vChangeEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12-\n" +
-	"\x13occurred_at_unix_ms\x18\x02 \x01(\x03R\x10occurredAtUnixMs\x12\x1b\n" +
-	"\ttenant_id\x18\x03 \x01(\tR\btenantId\x120\n" +
-	"\ba_upsert\x18\x04 \x01(\v2\x13.indexer.v1.AUpsertH\x00R\aaUpsert\x120\n" +
-	"\ba_delete\x18\x05 \x01(\v2\x13.indexer.v1.ADeleteH\x00R\aaDelete\x120\n" +
-	"\bb_upsert\x18\x06 \x01(\v2\x13.indexer.v1.BUpsertH\x00R\abUpsert\x120\n" +
-	"\bb_delete\x18\a \x01(\v2\x13.indexer.v1.BDeleteH\x00R\abDelete\x120\n" +
-	"\bc_upsert\x18\b \x01(\v2\x13.indexer.v1.CUpsertH\x00R\acUpsert\x120\n" +
-	"\bc_delete\x18\t \x01(\v2\x13.indexer.v1.CDeleteH\x00R\acDeleteB\t\n" +
+	"\x13occurred_at_unix_ms\x18\x02 \x01(\x03R\x10occurredAtUnixMs\x120\n" +
+	"\ba_upsert\x18\x03 \x01(\v2\x13.indexer.v1.AUpsertH\x00R\aaUpsert\x120\n" +
+	"\ba_delete\x18\x04 \x01(\v2\x13.indexer.v1.ADeleteH\x00R\aaDelete\x120\n" +
+	"\bb_upsert\x18\x05 \x01(\v2\x13.indexer.v1.BUpsertH\x00R\abUpsert\x120\n" +
+	"\bb_delete\x18\x06 \x01(\v2\x13.indexer.v1.BDeleteH\x00R\abDelete\x120\n" +
+	"\bc_upsert\x18\a \x01(\v2\x13.indexer.v1.CUpsertH\x00R\acUpsert\x120\n" +
+	"\bc_delete\x18\b \x01(\v2\x13.indexer.v1.CDeleteH\x00R\acDeleteB\t\n" +
 	"\apayload\"\\\n" +
 	"\aAUpsert\x12\x11\n" +
 	"\x04a_id\x18\x01 \x01(\tR\x03aId\x12\x16\n" +

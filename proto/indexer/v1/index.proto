@@ -24,17 +24,16 @@ message ChangeEvent {
   // For debugging/ordering only (don’t rely on strict ordering).
   int64   occurred_at_unix_ms = 2;
 
-  string  tenant_id           = 3;
 
   oneof payload {
-    AUpsert a_upsert            = 4;
-    ADelete a_delete            = 5;
+    AUpsert a_upsert            = 3;
+    ADelete a_delete            = 4;
 
-    BUpsert b_upsert            = 6;
-    BDelete b_delete            = 7;
+    BUpsert b_upsert            = 5;
+    BDelete b_delete            = 6;
 
-    CUpsert c_upsert            = 8;
-    CDelete c_delete            = 9;
+    CUpsert c_upsert            = 7;
+    CDelete c_delete            = 8;
   }
 }
 

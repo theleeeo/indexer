@@ -6,40 +6,37 @@ import (
 )
 
 type AProj struct {
-	TenantID string
-	AID      string
-	Status   string
-	BID      string
-	CIDs     map[string]struct{}
-	Updated  time.Time
+	AID     string
+	Status  string
+	BID     string
+	CIDs    map[string]struct{}
+	Updated time.Time
 }
 
 type BProj struct {
-	TenantID string
-	BID      string
-	Name     string
-	Updated  time.Time
+	BID     string
+	Name    string
+	Updated time.Time
 }
 
 type CProj struct {
-	TenantID string
-	CID      string
-	Type     string
-	State    string
-	Updated  time.Time
+	CID     string
+	Type    string
+	State   string
+	Updated time.Time
 }
 
 type Store struct {
 	mu sync.RWMutex
 
 	// projections
-	a map[string]*AProj // key: tenant|a_id
-	b map[string]*BProj // key: tenant|b_id
-	c map[string]*CProj // key: tenant|c_id
+	a map[string]*AProj
+	b map[string]*BProj
+	c map[string]*CProj
 
 	// reverse relations (for fan-out reindex)
-	bToAs map[string]map[string]struct{} // key: tenant|b_id -> set(tenant|a_id)
-	cToAs map[string]map[string]struct{} // key: tenant|c_id -> set(tenant|a_id)
+	bToAs map[string]map[string]struct{}
+	cToAs map[string]map[string]struct{}
 
 	// naive event de-dup (in-memory TTL)
 	seenEvent map[string]time.Time
@@ -55,8 +52,6 @@ func New() *Store {
 		seenEvent: map[string]time.Time{},
 	}
 }
-
-func Key(tenant, id string) string { return tenant + "|" + id }
 
 func (s *Store) SeenRecently(eventID string, ttl time.Duration) bool {
 	now := time.Now()
@@ -87,67 +82,60 @@ type RelUpdates struct {
 	AsAffectedByCChange []string
 }
 
-func (s *Store) UpsertA(tenant, aID, status, bID string, cIDs []string) (bKeysToRefresh, cKeysToRefresh []string) {
+func (s *Store) UpsertA(aID, status, bID string, cIDs []string) (bKeysToRefresh, cKeysToRefresh []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	aKey := Key(tenant, aID)
-	prev := s.a[aKey]
+	prev := s.a[aID]
 
 	newC := map[string]struct{}{}
 	for _, cid := range cIDs {
 		if cid == "" {
 			continue
 		}
-		newC[Key(tenant, cid)] = struct{}{}
+		newC[cid] = struct{}{}
 	}
 
 	var prevBKey string
 	prevC := map[string]struct{}{}
 	if prev != nil {
-		prevBKey = Key(tenant, prev.BID)
+		prevBKey = prev.BID
 		for k := range prev.CIDs {
 			prevC[k] = struct{}{}
 		}
 	}
 
-	newBKey := ""
-	if bID != "" {
-		newBKey = Key(tenant, bID)
-	}
-
 	// update A projection
-	s.a[aKey] = &AProj{
-		TenantID: tenant,
-		AID:      aID,
-		Status:   status,
-		BID:      bID,
-		CIDs:     newC,
-		Updated:  time.Now(),
+	s.a[aID] = &AProj{
+		AID:     aID,
+		Status:  status,
+		BID:     bID,
+		CIDs:    newC,
+		Updated: time.Now(),
 	}
 
 	// update bToAs
-	if prevBKey != "" && prevBKey != newBKey {
+	if prevBKey != "" && prevBKey != bID {
 		if set := s.bToAs[prevBKey]; set != nil {
-			delete(set, aKey)
+			delete(set, aID)
 		}
 		bKeysToRefresh = append(bKeysToRefresh, prevBKey)
 	}
-	if newBKey != "" {
-		set := s.bToAs[newBKey]
+	if bID != "" {
+		set := s.bToAs[bID]
 		if set == nil {
 			set = map[string]struct{}{}
-			s.bToAs[newBKey] = set
+			s.bToAs[bID] = set
 		}
-		set[aKey] = struct{}{}
-		bKeysToRefresh = append(bKeysToRefresh, newBKey)
+		set[aID] = struct{}{}
+		bKeysToRefresh = append(bKeysToRefresh, bID)
 	}
 
 	// update cToAs (diff)
 	for k := range prevC {
 		if _, ok := newC[k]; !ok {
 			if set := s.cToAs[k]; set != nil {
-				delete(set, aKey)
+				delete(set, aID)
 			}
 			cKeysToRefresh = append(cKeysToRefresh, k)
 		}
@@ -159,7 +147,7 @@ func (s *Store) UpsertA(tenant, aID, status, bID string, cIDs []string) (bKeysTo
 				set = map[string]struct{}{}
 				s.cToAs[k] = set
 			}
-			set[aKey] = struct{}{}
+			set[aID] = struct{}{}
 			cKeysToRefresh = append(cKeysToRefresh, k)
 		}
 	}
@@ -167,65 +155,62 @@ func (s *Store) UpsertA(tenant, aID, status, bID string, cIDs []string) (bKeysTo
 	return uniq(bKeysToRefresh), uniq(cKeysToRefresh)
 }
 
-func (s *Store) DeleteA(tenant, aID string) (bKeysToRefresh, cKeysToRefresh []string) {
+func (s *Store) DeleteA(aID string) (bKeysToRefresh, cKeysToRefresh []string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	aKey := Key(tenant, aID)
-	prev := s.a[aKey]
+	prev := s.a[aID]
 	if prev == nil {
 		return nil, nil
 	}
 
 	if prev.BID != "" {
-		bKey := Key(tenant, prev.BID)
-		if set := s.bToAs[bKey]; set != nil {
-			delete(set, aKey)
+		if set := s.bToAs[prev.BID]; set != nil {
+			delete(set, aID)
 		}
-		bKeysToRefresh = append(bKeysToRefresh, bKey)
+		bKeysToRefresh = append(bKeysToRefresh, prev.BID)
 	}
 
 	for cKey := range prev.CIDs {
 		if set := s.cToAs[cKey]; set != nil {
-			delete(set, aKey)
+			delete(set, aID)
 		}
 		cKeysToRefresh = append(cKeysToRefresh, cKey)
 	}
 
-	delete(s.a, aKey)
+	delete(s.a, aID)
 	return uniq(bKeysToRefresh), uniq(cKeysToRefresh)
 }
 
-func (s *Store) UpsertB(tenant, bID, name string) {
+func (s *Store) UpsertB(bID, name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.b[Key(tenant, bID)] = &BProj{TenantID: tenant, BID: bID, Name: name, Updated: time.Now()}
+	s.b[bID] = &BProj{BID: bID, Name: name, Updated: time.Now()}
 }
 
-func (s *Store) DeleteB(tenant, bID string) {
+func (s *Store) DeleteB(bID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.b, Key(tenant, bID))
+	delete(s.b, bID)
 }
 
-func (s *Store) UpsertC(tenant, cID, typ, state string) {
+func (s *Store) UpsertC(cID, typ, state string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.c[Key(tenant, cID)] = &CProj{TenantID: tenant, CID: cID, Type: typ, State: state, Updated: time.Now()}
+	s.c[cID] = &CProj{CID: cID, Type: typ, State: state, Updated: time.Now()}
 }
 
-func (s *Store) DeleteC(tenant, cID string) {
+func (s *Store) DeleteC(cID string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.c, Key(tenant, cID))
+	delete(s.c, cID)
 }
 
-func (s *Store) AffectedAsByB(tenant, bID string) []string {
+func (s *Store) AffectedAsByB(bID string) []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	bKey := Key(tenant, bID)
-	set := s.bToAs[bKey]
+	set := s.bToAs[bID]
 	out := make([]string, 0, len(set))
 	for aKey := range set {
 		out = append(out, aKey)
@@ -233,12 +218,11 @@ func (s *Store) AffectedAsByB(tenant, bID string) []string {
 	return out
 }
 
-func (s *Store) AffectedAsByC(tenant, cID string) []string {
+func (s *Store) AffectedAsByC(cID string) []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cKey := Key(tenant, cID)
-	set := s.cToAs[cKey]
+	set := s.cToAs[cID]
 	out := make([]string, 0, len(set))
 	for aKey := range set {
 		out = append(out, aKey)
@@ -246,10 +230,10 @@ func (s *Store) AffectedAsByC(tenant, cID string) []string {
 	return out
 }
 
-func (s *Store) SnapshotA(aKey string) *AProj {
+func (s *Store) SnapshotA(aID string) *AProj {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if p := s.a[aKey]; p != nil {
+	if p := s.a[aID]; p != nil {
 		cp := *p
 		cp.CIDs = map[string]struct{}{}
 		for k := range p.CIDs {
@@ -260,36 +244,36 @@ func (s *Store) SnapshotA(aKey string) *AProj {
 	return nil
 }
 
-func (s *Store) SnapshotB(bKey string) *BProj {
+func (s *Store) SnapshotB(bID string) *BProj {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if p := s.b[bKey]; p != nil {
+	if p := s.b[bID]; p != nil {
 		cp := *p
 		return &cp
 	}
 	return nil
 }
 
-func (s *Store) SnapshotC(cKey string) *CProj {
+func (s *Store) SnapshotC(cID string) *CProj {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if p := s.c[cKey]; p != nil {
+	if p := s.c[cID]; p != nil {
 		cp := *p
 		return &cp
 	}
 	return nil
 }
 
-func (s *Store) CountAsForB(bKey string) int {
+func (s *Store) CountAsForB(bID string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.bToAs[bKey])
+	return len(s.bToAs[bID])
 }
 
-func (s *Store) CountAsForC(cKey string) int {
+func (s *Store) CountAsForC(cID string) int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.cToAs[cKey])
+	return len(s.cToAs[cID])
 }
 
 func uniq(in []string) []string {

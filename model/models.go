@@ -7,7 +7,6 @@ import (
 )
 
 type ASearchDoc struct {
-	TenantID  string    `json:"tenant_id"`
 	AID       string    `json:"a_id"`
 	Status    string    `json:"a_status"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -28,7 +27,6 @@ type CInline struct {
 }
 
 type BSearchDoc struct {
-	TenantID  string    `json:"tenant_id"`
 	BID       string    `json:"b_id"`
 	Name      string    `json:"b_name"`
 	ACount    int       `json:"a_count"`
@@ -36,7 +34,6 @@ type BSearchDoc struct {
 }
 
 type CSearchDoc struct {
-	TenantID  string    `json:"tenant_id"`
 	CID       string    `json:"c_id"`
 	Type      string    `json:"c_type"`
 	State     string    `json:"c_state"`
@@ -46,7 +43,6 @@ type CSearchDoc struct {
 
 func BuildADoc(a *store.AProj, b *store.BProj, cs []*store.CProj) ASearchDoc {
 	doc := ASearchDoc{
-		TenantID:  a.TenantID,
 		AID:       a.AID,
 		Status:    a.Status,
 		UpdatedAt: time.Now(),
@@ -65,7 +61,6 @@ func BuildADoc(a *store.AProj, b *store.BProj, cs []*store.CProj) ASearchDoc {
 
 func BuildBDoc(b *store.BProj, aCount int) BSearchDoc {
 	return BSearchDoc{
-		TenantID:  b.TenantID,
 		BID:       b.BID,
 		Name:      b.Name,
 		ACount:    aCount,
@@ -75,7 +70,6 @@ func BuildBDoc(b *store.BProj, aCount int) BSearchDoc {
 
 func BuildCDoc(c *store.CProj, aCount int) CSearchDoc {
 	return CSearchDoc{
-		TenantID:  c.TenantID,
 		CID:       c.CID,
 		Type:      c.Type,
 		State:     c.State,
