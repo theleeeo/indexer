@@ -22,23 +22,64 @@ message ChangeBatch {
 
 message ChangeEvent {
   // Used for idempotency / de-dup on the indexer side.
-  string  event_id            = 1;
+  string        event_id            = 1;
 
   // For debugging/ordering only (don’t rely on strict ordering).
-  int64   occurred_at_unix_ms = 2;
-
+  int64         occurred_at_unix_ms = 2;
 
   oneof payload {
-    AUpsert a_upsert            = 3;
-    ADelete a_delete            = 4;
+    AUpsert       a_upsert            = 3;
+    ADelete       a_delete            = 4;
 
-    BUpsert b_upsert            = 5;
-    BDelete b_delete            = 6;
+    BUpsert       b_upsert            = 5;
+    BDelete       b_delete            = 6;
 
-    CUpsert c_upsert            = 7;
-    CDelete c_delete            = 8;
+    CUpsert       c_upsert            = 7;
+    CDelete       c_delete            = 8;
+
+    CreatePayload create_payload      = 14;
+    UpdatePayload update_payload      = 15;
+    DeletePayload delete_payload      = 16;
   }
 }
+
+message CreatePayload {
+  string                 resource    = 1;
+  string                 resource_id = 2;
+  google.protobuf.Struct data        = 3;
+  repeated Relation      relations   = 4;
+}
+
+message UpdatePayload {
+  string                  resource         = 1;
+  string                  resource_id      = 2;
+  google.protobuf.Struct  data             = 3;
+  repeated RelationChange relation_changes = 4;
+}
+
+message DeletePayload {
+  string resource    = 1;
+  string resource_id = 2;
+}
+
+message RelationChange {
+  Relation relation = 1;
+
+  enum ChangeType {
+    CHANGE_TYPE_UNSPECIFIED = 0;
+    CHANGE_TYPE_ADDED       = 1;
+    CHANGE_TYPE_REMOVED     = 2;
+    CHANGE_TYPE_SET         = 3;
+  }
+  ChangeType change_type             = 2;
+}
+
+
+message Relation {
+  string resource    = 1;
+  string resource_id = 2;
+}
+
 
 message AUpsert {
   string          a_id   = 1;

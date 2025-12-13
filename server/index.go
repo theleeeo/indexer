@@ -89,9 +89,63 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 		return s.handleCUpsert(ctx, p.CUpsert)
 	case *index.ChangeEvent_CDelete:
 		return s.handleCDelete(ctx, p.CDelete)
+	case *index.ChangeEvent_CreatePayload:
+		return s.handleCreate(ctx, p.CreatePayload)
 	default:
 		return fmt.Errorf("unknown payload")
 	}
+}
+
+func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload) error {
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	relationsMap := make(map[string][]string)
+	for _, rl := range p.Relations {
+		relationsMap[rl.Resource] = append(relationsMap[rl.Resource], rl.ResourceId)
+	}
+
+	s.st.StoreResource(p.Resource, p.ResourceId, relationsMap)
+
+	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
+		"doc": p.Data,
+	}); err != nil {
+		return err
+	}
+
+	relatedResources := s.st.GetRelatedResources(p.Resource, p.ResourceId)
+	for _, relatedResource := range relatedResources {
+		rsType, rsId := store.KeyParts(relatedResource)
+		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	relationsToAdd := make(map[string][]string)
+	relationsToRemove := make(map[string][]string)
+	for _, rc := range p.RelationChanges {
+		switch rc.ChangeType {
+		case index.RelationChange_CHANGE_TYPE_ADDED:
+			relationsToAdd[rc.Relation.Resource] = append(relationsToAdd[rc.Relation.Resource], rc.Relation.ResourceId)
+		case index.RelationChange_CHANGE_TYPE_REMOVED:
+			relationsToRemove[rc.Relation.Resource] = append(relationsToRemove[rc.Relation.Resource], rc.Relation.ResourceId)
+		}
+	}
+
+	s.st.UpdateResource(p.Resource, p.ResourceId, relationsToAdd, relationsToRemove)
+
+	return s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
+		"doc": p.Data,
+	})
 }
 
 func (s *IndexerServer) handleAUpsert(ctx context.Context, a *index.AUpsert) error {

@@ -26,8 +26,28 @@ type CProj struct {
 	Updated time.Time
 }
 
+type ResourceKey string
+
+func Key(resource, resourceID string) ResourceKey {
+	return ResourceKey(resource + "|" + resourceID)
+}
+
+func KeyParts(rk ResourceKey) (string, string) {
+	parts := string(rk)
+	for i := 0; i < len(parts); i++ {
+		if parts[i] == '|' {
+			return parts[:i], parts[i+1:]
+		}
+	}
+	return parts, ""
+}
+
 type Store struct {
 	mu sync.RWMutex
+
+	// "resource|resource_id"
+	resources map[ResourceKey]struct{}
+	relations map[ResourceKey][]ResourceKey
 
 	// projections
 	a map[string]*AProj
@@ -44,6 +64,9 @@ type Store struct {
 
 func New() *Store {
 	return &Store{
+		resources: map[ResourceKey]struct{}{},
+		relations: map[ResourceKey][]ResourceKey{},
+
 		a:         map[string]*AProj{},
 		b:         map[string]*BProj{},
 		c:         map[string]*CProj{},
@@ -51,6 +74,94 @@ func New() *Store {
 		cToAs:     map[string]map[string]struct{}{},
 		seenEvent: map[string]time.Time{},
 	}
+}
+
+func (s *Store) StoreResource(resource, resourceID string, mappedResources map[string][]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rk := Key(resource, resourceID)
+	s.resources[rk] = struct{}{}
+
+	for relatedResource, relatedIDs := range mappedResources {
+		for _, relatedID := range relatedIDs {
+			relatedRK := Key(relatedResource, relatedID)
+			// We only really care about the "parent" direction, right?
+			// s.relations[rk] = append(s.relations[rk], relatedRK)
+			// Store it the other way as well for easy lookup
+			s.relations[relatedRK] = append(s.relations[relatedRK], rk)
+		}
+	}
+}
+
+func (s *Store) UpdateResource(resource, resourceID string, relationsToAdd map[string][]string, relationsToRemove map[string][]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rk := Key(resource, resourceID)
+	_, exists := s.resources[rk]
+	if !exists {
+		s.resources[rk] = struct{}{}
+	}
+
+	// Remove relations
+	for relatedResource, relatedIDs := range relationsToRemove {
+		for _, relatedID := range relatedIDs {
+			relatedRK := Key(relatedResource, relatedID)
+			related := s.relations[rk]
+			newRelated := make([]ResourceKey, 0, len(related))
+			for _, r := range related {
+				if r != relatedRK {
+					newRelated = append(newRelated, r)
+				}
+			}
+			s.relations[rk] = newRelated
+		}
+	}
+
+	// Add relations
+	for relatedResource, relatedIDs := range relationsToAdd {
+		for _, relatedID := range relatedIDs {
+			relatedRK := Key(relatedResource, relatedID)
+			s.relations[rk] = append(s.relations[rk], relatedRK)
+		}
+	}
+}
+
+func (s *Store) StoreRelation(resource, resourceID, relatedResource, relatedResourceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rk := Key(resource, resourceID)
+	relatedRK := Key(relatedResource, relatedResourceID)
+	s.relations[rk] = append(s.relations[rk], relatedRK)
+}
+
+func (s *Store) DeleteResource(resource, resourceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rk := Key(resource, resourceID)
+	delete(s.resources, rk)
+	delete(s.relations, rk)
+}
+
+func (s *Store) GetRelatedResources(resource, resourceID string) []ResourceKey {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rk := Key(resource, resourceID)
+	return s.relations[rk]
+}
+
+func (s *Store) DeleteRelation(resource, resourceID, relatedResource, relatedResourceID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rk := Key(resource, resourceID)
+	relatedRK := Key(relatedResource, relatedResourceID)
+	related := s.relations[rk]
+	newRelated := make([]ResourceKey, 0, len(related))
+	for _, r := range related {
+		if r != relatedRK {
+			newRelated = append(newRelated, r)
+		}
+	}
+	s.relations[rk] = newRelated
 }
 
 func (s *Store) SeenRecently(eventID string, ttl time.Duration) bool {
