@@ -79,6 +79,8 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 		return s.handleCDelete(ctx, p.CDelete)
 	case *index.ChangeEvent_CreatePayload:
 		return s.handleCreate(ctx, p.CreatePayload)
+	case *index.ChangeEvent_UpdatePayload:
+		return s.handleUpdate(ctx, p.UpdatePayload)
 	default:
 		return fmt.Errorf("unknown payload")
 	}
@@ -89,15 +91,10 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		return fmt.Errorf("resource_id required")
 	}
 
-	relationsMap := make(map[string][]string)
-	for _, rl := range p.Relations {
-		relationsMap[rl.Resource] = append(relationsMap[rl.Resource], rl.ResourceId)
-	}
-
-	s.st.StoreResource(p.Resource, p.ResourceId, relationsMap)
+	s.st.StoreRelations(p.Resource, p.ResourceId, p.Relations)
 
 	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
-		"doc": p.Data,
+		"fields": p.Data,
 	}); err != nil {
 		return err
 	}
@@ -118,22 +115,53 @@ func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload
 		return fmt.Errorf("resource_id required")
 	}
 
-	relationsToAdd := make(map[string][]string)
-	relationsToRemove := make(map[string][]string)
-	for _, rc := range p.RelationChanges {
-		switch rc.ChangeType {
-		case index.RelationChange_CHANGE_TYPE_ADDED:
-			relationsToAdd[rc.Relation.Resource] = append(relationsToAdd[rc.Relation.Resource], rc.Relation.ResourceId)
-		case index.RelationChange_CHANGE_TYPE_REMOVED:
-			relationsToRemove[rc.Relation.Resource] = append(relationsToRemove[rc.Relation.Resource], rc.Relation.ResourceId)
+	// var relationsToAdd []*index.Relation
+	// var relationsToRemove []*index.Relation
+	// var setRelation *index.Relation
+	// if len(p.RelationChanges) == 1 && p.RelationChanges[0].ChangeType == index.RelationChange_CHANGE_TYPE_SET {
+	// 	setRelation = &index.Relation{
+	// 		Resource:   p.RelationChanges[0].Relation.Resource,
+	// 		ResourceId: p.RelationChanges[0].Relation.ResourceId,
+	// 	}
+	// } else {
+	// 	for _, rc := range p.RelationChanges {
+	// 		switch rc.GetChangeType() {
+	// 		case index.RelationChange_CHANGE_TYPE_ADDED:
+	// 			relationsToAdd = append(relationsToAdd, &index.Relation{
+	// 				Resource:   rc.Relation.Resource,
+	// 				ResourceId: rc.Relation.ResourceId,
+	// 			})
+	// 		case index.RelationChange_CHANGE_TYPE_REMOVED:
+	// 			relationsToRemove = append(relationsToRemove, &index.Relation{
+	// 				Resource:   rc.Relation.Resource,
+	// 				ResourceId: rc.Relation.ResourceId,
+	// 			})
+	// 		}
+	// 	}
+	// }
+
+	// s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
+	// 	SetRelation:     setRelation,
+	// 	AddRelations:    relationsToAdd,
+	// 	RemoveRelations: relationsToRemove,
+	// })
+
+	// Update the main document
+	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
+		"fields": p.Data,
+	}); err != nil {
+		return err
+	}
+
+	relatedResources := s.st.GetRelatedResources(p.Resource, p.ResourceId)
+	for _, relatedResource := range relatedResources {
+		rsType, rsId := store.KeyParts(relatedResource)
+		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+			return err
 		}
 	}
 
-	s.st.UpdateResource(p.Resource, p.ResourceId, relationsToAdd, relationsToRemove)
-
-	return s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
-		"doc": p.Data,
-	})
+	return nil
 }
 
 func (s *IndexerServer) handleAUpsert(ctx context.Context, a *index.AUpsert) error {

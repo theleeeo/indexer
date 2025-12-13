@@ -1,6 +1,7 @@
 package store
 
 import (
+	"indexer/gen/index/v1"
 	"sync"
 	"time"
 )
@@ -47,6 +48,7 @@ type Store struct {
 
 	// "resource|resource_id"
 	resources map[ResourceKey]struct{}
+	// child: parents
 	relations map[ResourceKey][]ResourceKey
 
 	// projections
@@ -72,70 +74,65 @@ func New() *Store {
 	}
 }
 
-func (s *Store) StoreResource(resource, resourceID string, mappedResources map[string][]string) {
+func (s *Store) StoreRelations(resource, resourceId string, relations []*index.Relation) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rk := Key(resource, resourceID)
-	s.resources[rk] = struct{}{}
+	parentResourceKey := Key(resource, resourceId)
+	s.resources[parentResourceKey] = struct{}{}
 
-	for relatedResource, relatedIDs := range mappedResources {
-		for _, relatedID := range relatedIDs {
-			relatedRK := Key(relatedResource, relatedID)
-			// We only really care about the "parent" direction, right?
-			// s.relations[rk] = append(s.relations[rk], relatedRK)
-			// Store it the other way as well for easy lookup
-			s.relations[relatedRK] = append(s.relations[relatedRK], rk)
-		}
+	for _, rl := range relations {
+		childResourceKey := Key(rl.Resource, rl.ResourceId)
+		s.relations[childResourceKey] = append(s.relations[childResourceKey], parentResourceKey)
 	}
 }
 
-func (s *Store) UpdateResource(resource, resourceID string, relationsToAdd map[string][]string, relationsToRemove map[string][]string) {
+type RelationChangesParameter struct {
+	// If SetResource is set, we are setting a relation to this. Only for kind: one
+	SetRelation *index.Relation
+
+	// For kind: many relations, we can have multiple additions/removals
+	AddRelations    []*index.Relation
+	RemoveRelations []*index.Relation
+}
+
+func (s *Store) UpdateRelations(resource, resourceId string, relChanges RelationChangesParameter) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	rk := Key(resource, resourceID)
+	rk := Key(resource, resourceId)
 	_, exists := s.resources[rk]
 	if !exists {
 		s.resources[rk] = struct{}{}
 	}
 
-	// Remove relations
-	for relatedResource, relatedIDs := range relationsToRemove {
-		for _, relatedID := range relatedIDs {
-			relatedRK := Key(relatedResource, relatedID)
-			related := s.relations[rk]
-			newRelated := make([]ResourceKey, 0, len(related))
-			for _, r := range related {
-				if r != relatedRK {
-					newRelated = append(newRelated, r)
-				}
-			}
-			s.relations[rk] = newRelated
-		}
-	}
+	if relChanges.SetRelation != nil {
+		relatedRK := Key(relChanges.SetRelation.Resource, relChanges.SetRelation.ResourceId)
 
-	// Add relations
-	for relatedResource, relatedIDs := range relationsToAdd {
-		for _, relatedID := range relatedIDs {
-			relatedRK := Key(relatedResource, relatedID)
+		relations := s.relations[rk]
+		newRelations := make([]ResourceKey, 0, len(relations))
+		for _, r := range relations {
+			if r != relatedRK {
+				newRelations = append(newRelations, r)
+			}
+		}
+		newRelations = append(newRelations, relatedRK)
+		s.relations[rk] = newRelations
+	} else {
+		for _, rel := range relChanges.AddRelations {
+			relatedRK := Key(rel.Resource, rel.ResourceId)
 			s.relations[rk] = append(s.relations[rk], relatedRK)
 		}
+		for _, rel := range relChanges.RemoveRelations {
+			relatedRK := Key(rel.Resource, rel.ResourceId)
+			relations := s.relations[rk]
+			newRelations := make([]ResourceKey, 0, len(relations))
+			for _, r := range relations {
+				if r != relatedRK {
+					newRelations = append(newRelations, r)
+				}
+			}
+			s.relations[rk] = newRelations
+		}
 	}
-}
-
-func (s *Store) StoreRelation(resource, resourceID, relatedResource, relatedResourceID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rk := Key(resource, resourceID)
-	relatedRK := Key(relatedResource, relatedResourceID)
-	s.relations[rk] = append(s.relations[rk], relatedRK)
-}
-
-func (s *Store) DeleteResource(resource, resourceID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rk := Key(resource, resourceID)
-	delete(s.resources, rk)
-	delete(s.relations, rk)
 }
 
 func (s *Store) GetRelatedResources(resource, resourceID string) []ResourceKey {
@@ -143,31 +140,6 @@ func (s *Store) GetRelatedResources(resource, resourceID string) []ResourceKey {
 	defer s.mu.RUnlock()
 	rk := Key(resource, resourceID)
 	return s.relations[rk]
-}
-
-func (s *Store) DeleteRelation(resource, resourceID, relatedResource, relatedResourceID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	rk := Key(resource, resourceID)
-	relatedRK := Key(relatedResource, relatedResourceID)
-	related := s.relations[rk]
-	newRelated := make([]ResourceKey, 0, len(related))
-	for _, r := range related {
-		if r != relatedRK {
-			newRelated = append(newRelated, r)
-		}
-	}
-	s.relations[rk] = newRelated
-}
-
-type RelUpdates struct {
-	AKey                string
-	PrevBKey, NewBKey   string
-	PrevCKeys, NewCKeys []string
-	BKeysToRefresh      []string
-	CKeysToRefresh      []string
-	AsAffectedByBChange []string
-	AsAffectedByCChange []string
 }
 
 func (s *Store) UpsertA(aID, status, bID string, cIDs []string) (bKeysToRefresh, cKeysToRefresh []string) {
