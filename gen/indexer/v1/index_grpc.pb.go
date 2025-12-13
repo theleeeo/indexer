@@ -21,6 +21,9 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	Indexer_Publish_FullMethodName      = "/indexer.v1.Indexer/Publish"
 	Indexer_PublishBatch_FullMethodName = "/indexer.v1.Indexer/PublishBatch"
+	Indexer_SearchA_FullMethodName      = "/indexer.v1.Indexer/SearchA"
+	Indexer_SearchB_FullMethodName      = "/indexer.v1.Indexer/SearchB"
+	Indexer_SearchC_FullMethodName      = "/indexer.v1.Indexer/SearchC"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -29,6 +32,9 @@ const (
 type IndexerClient interface {
 	Publish(ctx context.Context, in *ChangeEvent, opts ...grpc.CallOption) (*PublishResponse, error)
 	PublishBatch(ctx context.Context, in *ChangeBatch, opts ...grpc.CallOption) (*PublishResponse, error)
+	SearchA(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+	SearchB(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+	SearchC(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
 }
 
 type indexerClient struct {
@@ -59,12 +65,45 @@ func (c *indexerClient) PublishBatch(ctx context.Context, in *ChangeBatch, opts 
 	return out, nil
 }
 
+func (c *indexerClient) SearchA(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchResponse)
+	err := c.cc.Invoke(ctx, Indexer_SearchA_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) SearchB(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchResponse)
+	err := c.cc.Invoke(ctx, Indexer_SearchB_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *indexerClient) SearchC(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SearchResponse)
+	err := c.cc.Invoke(ctx, Indexer_SearchC_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexerServer is the server API for Indexer service.
 // All implementations should embed UnimplementedIndexerServer
 // for forward compatibility.
 type IndexerServer interface {
 	Publish(context.Context, *ChangeEvent) (*PublishResponse, error)
 	PublishBatch(context.Context, *ChangeBatch) (*PublishResponse, error)
+	SearchA(context.Context, *SearchRequest) (*SearchResponse, error)
+	SearchB(context.Context, *SearchRequest) (*SearchResponse, error)
+	SearchC(context.Context, *SearchRequest) (*SearchResponse, error)
 }
 
 // UnimplementedIndexerServer should be embedded to have
@@ -79,6 +118,15 @@ func (UnimplementedIndexerServer) Publish(context.Context, *ChangeEvent) (*Publi
 }
 func (UnimplementedIndexerServer) PublishBatch(context.Context, *ChangeBatch) (*PublishResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishBatch not implemented")
+}
+func (UnimplementedIndexerServer) SearchA(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchA not implemented")
+}
+func (UnimplementedIndexerServer) SearchB(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchB not implemented")
+}
+func (UnimplementedIndexerServer) SearchC(context.Context, *SearchRequest) (*SearchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SearchC not implemented")
 }
 func (UnimplementedIndexerServer) testEmbeddedByValue() {}
 
@@ -136,6 +184,60 @@ func _Indexer_PublishBatch_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Indexer_SearchA_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).SearchA(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_SearchA_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).SearchA(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_SearchB_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).SearchB(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_SearchB_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).SearchB(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Indexer_SearchC_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SearchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexerServer).SearchC(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Indexer_SearchC_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexerServer).SearchC(ctx, req.(*SearchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Indexer_ServiceDesc is the grpc.ServiceDesc for Indexer service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -150,6 +252,18 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "PublishBatch",
 			Handler:    _Indexer_PublishBatch_Handler,
+		},
+		{
+			MethodName: "SearchA",
+			Handler:    _Indexer_SearchA_Handler,
+		},
+		{
+			MethodName: "SearchB",
+			Handler:    _Indexer_SearchB_Handler,
+		},
+		{
+			MethodName: "SearchC",
+			Handler:    _Indexer_SearchC_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

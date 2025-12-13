@@ -9,6 +9,8 @@ import (
 	"indexer/gen/indexer/v1"
 	"indexer/model"
 	"indexer/store"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -275,4 +277,171 @@ func (s *GRPCServer) bulkReindexA(ctx context.Context, aKeys []string) error {
 	}
 
 	return s.es.BulkUpsert(ctx, items)
+}
+
+func (s *GRPCServer) SearchA(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
+	return s.search(ctx, AIndex, req, defaultSearchFieldsA())
+}
+
+func (s *GRPCServer) SearchB(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
+	return s.search(ctx, BIndex, req, defaultSearchFieldsB())
+}
+
+func (s *GRPCServer) SearchC(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
+	return s.search(ctx, CIndex, req, defaultSearchFieldsC())
+}
+
+func (s *GRPCServer) search(ctx context.Context, indexAlias string, req *indexer.SearchRequest, searchFields []string) (*indexer.SearchResponse, error) {
+	if req == nil || req.TenantId == "" {
+		return nil, fmt.Errorf("tenant_id is required")
+	}
+
+	pageSize := int(req.PageSize)
+	if pageSize <= 0 {
+		pageSize = 25
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	page := int(req.Page)
+	if page < 0 {
+		page = 0
+	}
+
+	boolQ := map[string]any{
+		"must":   []any{},
+		"filter": []any{},
+	}
+
+	// Always tenant filter
+	boolQ["filter"] = append(boolQ["filter"].([]any), map[string]any{
+		"term": map[string]any{"tenant_id": req.TenantId},
+	})
+
+	// Full-text query (optional)
+	if req.Query != "" {
+		boolQ["must"] = append(boolQ["must"].([]any), map[string]any{
+			"multi_match": map[string]any{
+				"query":  req.Query,
+				"fields": searchFields,
+			},
+		})
+	}
+
+	// Structured filters
+	for _, f := range req.Filters {
+		if f == nil || f.Field == "" {
+			continue
+		}
+		filterClause, err := buildFilterClause(f)
+		if err != nil {
+			return nil, err
+		}
+		boolQ["filter"] = append(boolQ["filter"].([]any), filterClause)
+	}
+
+	body := map[string]any{
+		"query": map[string]any{"bool": boolQ},
+		"from":  page * pageSize,
+		"size":  pageSize,
+	}
+
+	// Sort (optional). If none provided, ES default scoring applies.
+	if len(req.Sort) > 0 {
+		var sorts []any
+		for _, srt := range req.Sort {
+			if srt == nil || srt.Field == "" {
+				continue
+			}
+			order := "asc"
+			if srt.Desc {
+				order = "desc"
+			}
+			sorts = append(sorts, map[string]any{
+				srt.Field: map[string]any{"order": order},
+			})
+		}
+		if len(sorts) > 0 {
+			body["sort"] = sorts
+		}
+	}
+
+	res, err := s.es.Search(ctx, indexAlias, body)
+	if err != nil {
+		return nil, err
+	}
+
+	out := &indexer.SearchResponse{Total: res.Total}
+	for _, h := range res.Hits {
+		st, err := structpb.NewStruct(h.Source)
+		if err != nil {
+			// if struct conversion fails, skip rather than fail the whole query
+			continue
+		}
+		out.Hits = append(out.Hits, &indexer.SearchHit{
+			Id:     h.ID,
+			Score:  h.Score,
+			Source: st,
+		})
+	}
+	return out, nil
+}
+
+func buildFilterClause(f *indexer.Filter) (any, error) {
+	var inner any
+
+	switch f.Op {
+	case indexer.FilterOp_FILTER_OP_EQ:
+		if f.Value == "" {
+			return nil, fmt.Errorf("EQ filter requires value for field %q", f.Field)
+		}
+		inner = map[string]any{"term": map[string]any{f.Field: f.Value}}
+
+	case indexer.FilterOp_FILTER_OP_IN:
+		if len(f.Values) == 0 {
+			return nil, fmt.Errorf("IN filter requires values for field %q", f.Field)
+		}
+		inner = map[string]any{"terms": map[string]any{f.Field: f.Values}}
+
+	default:
+		return nil, fmt.Errorf("unsupported filter op for field %q", f.Field)
+	}
+
+	// Nested wrapping (optional)
+	if f.NestedPath != "" {
+		return map[string]any{
+			"nested": map[string]any{
+				"path":  f.NestedPath,
+				"query": inner,
+			},
+		}, nil
+	}
+
+	return inner, nil
+}
+
+func defaultSearchFieldsA() []string {
+	// Adjust to what you actually index
+	return []string{
+		"a_id",
+		"a_status",
+		"b.name",
+		"c.type",
+		"c.state",
+	}
+}
+
+func defaultSearchFieldsB() []string {
+	return []string{
+		"b_id",
+		"b_name",
+	}
+}
+
+func defaultSearchFieldsC() []string {
+	return []string{
+		"c_id",
+		"c_type",
+		"c_state",
+	}
 }

@@ -2,11 +2,17 @@ syntax = "proto3";
 
 package indexer.v1;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "indexer/gen/indexer/v1;indexer";
 
 service Indexer {
   rpc Publish(ChangeEvent) returns (PublishResponse);
   rpc PublishBatch(ChangeBatch) returns (PublishResponse);
+
+  rpc SearchA(SearchRequest) returns (SearchResponse);
+  rpc SearchB(SearchRequest) returns (SearchResponse);
+  rpc SearchC(SearchRequest) returns (SearchResponse);
 }
 
 message PublishResponse {
@@ -70,4 +76,62 @@ message CUpsert {
 
 message CDelete {
   string c_id = 1;
+}
+
+enum FilterOp {
+  FILTER_OP_UNSPECIFIED = 0;
+  FILTER_OP_EQ          = 1; // term query
+  FILTER_OP_IN          = 2; // terms query
+}
+
+message Filter {
+  // Example: "b.name.keyword" or "a_status" or "c.state"
+  string          field       = 1;
+
+  FilterOp        op          = 2;
+
+  // For EQ
+  string          value       = 3;
+
+  // For IN
+  repeated string values      = 4;
+
+  // If you need nested filtering (e.g. c is mapped as "nested"):
+  // nested_path="c", field="c.state", op=EQ, value="active"
+  string          nested_path = 5;
+}
+
+message Sort {
+  // Example: "updated_at"
+  string field = 1;
+  bool   desc  = 2;
+}
+
+message SearchRequest {
+  // Always filter by tenant for safety
+  string          tenant_id = 1;
+
+  // Optional full text query
+  string          query     = 2;
+
+  repeated Filter filters   = 3;
+
+  // Pagination (simple from/size)
+  int32           page      = 4; // 0-based
+  int32           page_size = 5; // default 25, max 100
+
+  repeated Sort   sort      = 6;
+}
+
+message SearchHit {
+  string                 id     = 1;
+  double                 score  = 2;
+
+  // The indexed document (source)
+  google.protobuf.Struct source = 3;
+}
+
+message SearchResponse {
+  int64              total = 1;
+  repeated SearchHit hits  = 2;
 }
