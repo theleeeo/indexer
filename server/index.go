@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"indexer/es"
-	"indexer/gen/indexer/v1"
+	"indexer/gen/index/v1"
 	"indexer/model"
 	"indexer/store"
 )
@@ -18,7 +18,7 @@ const (
 )
 
 type IndexerServer struct {
-	indexer.UnimplementedIndexerServer
+	index.UnimplementedIndexerServer
 
 	st *store.Store
 	es *es.Client
@@ -35,9 +35,9 @@ func NewIndexer(st *store.Store, esClient *es.Client) *IndexerServer {
 	}
 }
 
-func (s *IndexerServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*indexer.PublishResponse, error) {
+func (s *IndexerServer) Publish(ctx context.Context, ev *index.ChangeEvent) (*index.PublishResponse, error) {
 	if ev == nil {
-		return &indexer.PublishResponse{Accepted: 0}, nil
+		return &index.PublishResponse{Accepted: 0}, nil
 	}
 	if ev.EventId == "" {
 		return nil, fmt.Errorf("event_id is required")
@@ -45,18 +45,18 @@ func (s *IndexerServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*
 
 	// best-effort idempotency (caller should still retry on transient errors)
 	if s.st.SeenRecently(ev.EventId, s.dedupTTL) {
-		return &indexer.PublishResponse{Accepted: 1}, nil
+		return &index.PublishResponse{Accepted: 1}, nil
 	}
 
 	if err := s.applyOne(ctx, ev); err != nil {
 		return nil, err
 	}
-	return &indexer.PublishResponse{Accepted: 1}, nil
+	return &index.PublishResponse{Accepted: 1}, nil
 }
 
-func (s *IndexerServer) PublishBatch(ctx context.Context, batch *indexer.ChangeBatch) (*indexer.PublishResponse, error) {
+func (s *IndexerServer) PublishBatch(ctx context.Context, batch *index.ChangeBatch) (*index.PublishResponse, error) {
 	if batch == nil || len(batch.Events) == 0 {
-		return &indexer.PublishResponse{Accepted: 0}, nil
+		return &index.PublishResponse{Accepted: 0}, nil
 	}
 	var accepted int64
 	for _, ev := range batch.Events {
@@ -72,29 +72,29 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, batch *indexer.ChangeB
 		}
 		accepted++
 	}
-	return &indexer.PublishResponse{Accepted: accepted}, nil
+	return &index.PublishResponse{Accepted: accepted}, nil
 }
 
-func (s *IndexerServer) applyOne(ctx context.Context, ev *indexer.ChangeEvent) error {
+func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) error {
 	switch p := ev.Payload.(type) {
-	case *indexer.ChangeEvent_AUpsert:
+	case *index.ChangeEvent_AUpsert:
 		return s.handleAUpsert(ctx, p.AUpsert)
-	case *indexer.ChangeEvent_ADelete:
+	case *index.ChangeEvent_ADelete:
 		return s.handleADelete(ctx, p.ADelete)
-	case *indexer.ChangeEvent_BUpsert:
+	case *index.ChangeEvent_BUpsert:
 		return s.handleBUpsert(ctx, p.BUpsert)
-	case *indexer.ChangeEvent_BDelete:
+	case *index.ChangeEvent_BDelete:
 		return s.handleBDelete(ctx, p.BDelete)
-	case *indexer.ChangeEvent_CUpsert:
+	case *index.ChangeEvent_CUpsert:
 		return s.handleCUpsert(ctx, p.CUpsert)
-	case *indexer.ChangeEvent_CDelete:
+	case *index.ChangeEvent_CDelete:
 		return s.handleCDelete(ctx, p.CDelete)
 	default:
 		return fmt.Errorf("unknown payload")
 	}
 }
 
-func (s *IndexerServer) handleAUpsert(ctx context.Context, a *indexer.AUpsert) error {
+func (s *IndexerServer) handleAUpsert(ctx context.Context, a *index.AUpsert) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
@@ -120,7 +120,7 @@ func (s *IndexerServer) handleAUpsert(ctx context.Context, a *indexer.AUpsert) e
 	return nil
 }
 
-func (s *IndexerServer) handleADelete(ctx context.Context, a *indexer.ADelete) error {
+func (s *IndexerServer) handleADelete(ctx context.Context, a *index.ADelete) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
@@ -144,7 +144,7 @@ func (s *IndexerServer) handleADelete(ctx context.Context, a *indexer.ADelete) e
 	return nil
 }
 
-func (s *IndexerServer) handleBUpsert(ctx context.Context, b *indexer.BUpsert) error {
+func (s *IndexerServer) handleBUpsert(ctx context.Context, b *index.BUpsert) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
@@ -160,7 +160,7 @@ func (s *IndexerServer) handleBUpsert(ctx context.Context, b *indexer.BUpsert) e
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleBDelete(ctx context.Context, b *indexer.BDelete) error {
+func (s *IndexerServer) handleBDelete(ctx context.Context, b *index.BDelete) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
@@ -176,7 +176,7 @@ func (s *IndexerServer) handleBDelete(ctx context.Context, b *indexer.BDelete) e
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleCUpsert(ctx context.Context, c *indexer.CUpsert) error {
+func (s *IndexerServer) handleCUpsert(ctx context.Context, c *index.CUpsert) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}
@@ -192,7 +192,7 @@ func (s *IndexerServer) handleCUpsert(ctx context.Context, c *indexer.CUpsert) e
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *IndexerServer) handleCDelete(ctx context.Context, c *indexer.CDelete) error {
+func (s *IndexerServer) handleCDelete(ctx context.Context, c *index.CDelete) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}

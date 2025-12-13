@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"indexer/es"
-	"indexer/gen/searcher"
+	"indexer/gen/search/v1"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -12,7 +12,7 @@ import (
 )
 
 type SearcherServer struct {
-	searcher.UnimplementedSearchServiceServer
+	search.UnimplementedSearchServiceServer
 
 	es *es.Client
 }
@@ -23,7 +23,7 @@ func NewSearcher(esClient *es.Client) *SearcherServer {
 	}
 }
 
-func (s *SearcherServer) Search(ctx context.Context, req *searcher.SearchRequest) (*searcher.SearchResponse, error) {
+func (s *SearcherServer) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
 	switch req.Index {
 	case "":
 		return nil, status.Error(codes.InvalidArgument, "index is required")
@@ -38,7 +38,7 @@ func (s *SearcherServer) Search(ctx context.Context, req *searcher.SearchRequest
 	}
 }
 
-func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *searcher.SearchRequest, searchFields []string) (*searcher.SearchResponse, error) {
+func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *search.SearchRequest, searchFields []string) (*search.SearchResponse, error) {
 	pageSize := int(req.PageSize)
 	if pageSize <= 0 {
 		pageSize = 25
@@ -114,14 +114,14 @@ func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *sea
 		return nil, err
 	}
 
-	out := &searcher.SearchResponse{Total: res.Total}
+	out := &search.SearchResponse{Total: res.Total}
 	for _, h := range res.Hits {
 		st, err := structpb.NewStruct(h.Source)
 		if err != nil {
 			// if struct conversion fails, skip rather than fail the whole query
 			continue
 		}
-		out.Hits = append(out.Hits, &searcher.SearchHit{
+		out.Hits = append(out.Hits, &search.SearchHit{
 			Id:     h.ID,
 			Score:  h.Score,
 			Source: st,
@@ -130,17 +130,17 @@ func (s *SearcherServer) search(ctx context.Context, indexAlias string, req *sea
 	return out, nil
 }
 
-func buildFilterClause(f *searcher.Filter) (any, error) {
+func buildFilterClause(f *search.Filter) (any, error) {
 	var inner any
 
 	switch f.Op {
-	case searcher.FilterOp_FILTER_OP_EQ:
+	case search.FilterOp_FILTER_OP_EQ:
 		if f.Value == "" {
 			return nil, fmt.Errorf("EQ filter requires value for field %q", f.Field)
 		}
 		inner = map[string]any{"term": map[string]any{f.Field: f.Value}}
 
-	case searcher.FilterOp_FILTER_OP_IN:
+	case search.FilterOp_FILTER_OP_IN:
 		if len(f.Values) == 0 {
 			return nil, fmt.Errorf("IN filter requires values for field %q", f.Field)
 		}

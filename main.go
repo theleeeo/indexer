@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"indexer/es"
-	"indexer/gen/indexer/v1"
-	"indexer/gen/searcher"
+	"indexer/gen/index/v1"
+	"indexer/gen/search/v1"
 	"indexer/server"
 	"indexer/store"
 
@@ -49,8 +49,8 @@ func main() {
 	}
 
 	g := grpc.NewServer()
-	indexer.RegisterIndexerServer(g, idxSrv)
-	searcher.RegisterSearchServiceServer(g, searchSrv)
+	index.RegisterIndexerServer(g, idxSrv)
+	search.RegisterSearchServiceServer(g, searchSrv)
 	reflection.Register(g)
 
 	log.Printf("indexer listening on %s", grpcAddr)

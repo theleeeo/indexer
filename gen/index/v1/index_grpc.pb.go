@@ -2,9 +2,9 @@
 // versions:
 // - protoc-gen-go-grpc v1.5.1
 // - protoc             (unknown)
-// source: indexer/v1/index.proto
+// source: index/v1/index.proto
 
-package indexer
+package index
 
 import (
 	context "context"
@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Indexer_Publish_FullMethodName      = "/indexer.v1.Indexer/Publish"
-	Indexer_PublishBatch_FullMethodName = "/indexer.v1.Indexer/PublishBatch"
+	Indexer_Publish_FullMethodName      = "/index.v1.Indexer/Publish"
+	Indexer_PublishBatch_FullMethodName = "/index.v1.Indexer/PublishBatch"
 )
 
 // IndexerClient is the client API for Indexer service.
@@ -140,7 +140,7 @@ func _Indexer_PublishBatch_Handler(srv interface{}, ctx context.Context, dec fun
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Indexer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "indexer.v1.Indexer",
+	ServiceName: "index.v1.Indexer",
 	HandlerType: (*IndexerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
@@ -153,5 +153,5 @@ var Indexer_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "indexer/v1/index.proto",
+	Metadata: "index/v1/index.proto",
 }

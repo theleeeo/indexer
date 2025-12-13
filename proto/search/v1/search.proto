@@ -1,10 +1,10 @@
 syntax = "proto3";
 
-package searcher.v1;
+package search.v1;
 
 import "google/protobuf/struct.proto";
 
-option go_package = "indexer/gen/searcher/v1;searcher";
+option go_package = "indexer/gen/searcher/v1;search";
 
 service SearchService{
   rpc Search(SearchRequest) returns (SearchResponse);

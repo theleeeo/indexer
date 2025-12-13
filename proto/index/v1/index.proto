@@ -1,13 +1,16 @@
 syntax = "proto3";
 
-package indexer.v1;
+package index.v1;
 
-option go_package = "indexer/gen/indexer/v1;indexer";
+import "google/protobuf/struct.proto";
+
+option go_package = "indexer/gen/index/v1;index";
 
 service Indexer {
   rpc Publish(ChangeEvent) returns (PublishResponse);
   rpc PublishBatch(ChangeBatch) returns (PublishResponse);
 }
+
 
 message PublishResponse {
   int64 accepted = 1;
