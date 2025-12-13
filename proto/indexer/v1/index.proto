@@ -1,0 +1,73 @@
+syntax = "proto3";
+
+package indexer.v1;
+
+option go_package = "indexer/gen/indexer/v1;indexer";
+
+service Indexer {
+  rpc Publish(ChangeEvent) returns (PublishResponse);
+  rpc PublishBatch(ChangeBatch) returns (PublishResponse);
+}
+
+message PublishResponse {
+  int64 accepted = 1;
+}
+
+message ChangeBatch {
+  repeated ChangeEvent events = 1;
+}
+
+message ChangeEvent {
+  // Used for idempotency / de-dup on the indexer side.
+  string  event_id            = 1;
+
+  // For debugging/ordering only (don’t rely on strict ordering).
+  int64   occurred_at_unix_ms = 2;
+
+  string  tenant_id           = 3;
+
+  oneof payload {
+    AUpsert a_upsert            = 10;
+    ADelete a_delete            = 11;
+
+    BUpsert b_upsert            = 20;
+    BDelete b_delete            = 21;
+
+    CUpsert c_upsert            = 30;
+    CDelete c_delete            = 31;
+  }
+}
+
+message AUpsert {
+  string          a_id   = 1;
+
+  // Example A fields you might filter/sort on:
+  string          status = 2;
+
+  // Relationships:
+  string          b_id   = 10;
+  repeated string c_ids  = 11;
+}
+
+message ADelete {
+  string a_id = 1;
+}
+
+message BUpsert {
+  string b_id = 1;
+  string name = 2;
+}
+
+message BDelete {
+  string b_id = 1;
+}
+
+message CUpsert {
+  string c_id  = 1;
+  string type  = 2;
+  string state = 3;
+}
+
+message CDelete {
+  string c_id = 1;
+}

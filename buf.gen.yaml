@@ -1,0 +1,38 @@
+version: v2
+managed:
+  enabled: true
+  disable:
+    # Don't modify any file option or field option for googleapis
+    - module: buf.build/googleapis/googleapis
+inputs:
+  - directory: proto
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.10
+    out: gen
+    opt:
+      - paths=source_relative
+
+  - remote: buf.build/grpc/go:v1.5.1
+    out: gen
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  # - remote: buf.build/grpc-gateway/go
+  #   out: api-go
+  #   opt:
+  #     - paths=source_relative
+  #     - allow_repeated_fields_in_body=true
+
+  # - remote: buf.build/connectrpc/go:v1.16.1
+  #   out: api-go
+  #   opt:
+  #     - paths=source_relative
+
+  # - remote: buf.build/bufbuild/es:v1.10.0
+  #   out: frontend/src/lib/proto
+  #   opt: target=ts
+
+  # - remote: buf.build/connectrpc/es:v1.5.0
+  #   out: frontend/src/lib/proto
+  #   opt: target=ts
