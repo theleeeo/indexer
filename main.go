@@ -8,6 +8,7 @@ import (
 
 	"indexer/es"
 	"indexer/gen/indexer/v1"
+	"indexer/gen/searcher"
 	"indexer/server"
 	"indexer/store"
 
@@ -39,7 +40,8 @@ func main() {
 	}
 
 	st := store.New()
-	srv := server.New(st, esClient)
+	idxSrv := server.NewIndexer(st, esClient)
+	searchSrv := server.NewSearcher(esClient)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
@@ -47,7 +49,8 @@ func main() {
 	}
 
 	g := grpc.NewServer()
-	indexer.RegisterIndexerServer(g, srv)
+	indexer.RegisterIndexerServer(g, idxSrv)
+	searcher.RegisterSearcherServer(g, searchSrv)
 	reflection.Register(g)
 
 	log.Printf("indexer listening on %s", grpcAddr)

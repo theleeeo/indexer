@@ -9,7 +9,6 @@ package indexer
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,55 +20,6 @@ const (
 	// Verify that runtime/protoimpl is sufficiently up-to-date.
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
-
-type FilterOp int32
-
-const (
-	FilterOp_FILTER_OP_UNSPECIFIED FilterOp = 0
-	FilterOp_FILTER_OP_EQ          FilterOp = 1 // term query
-	FilterOp_FILTER_OP_IN          FilterOp = 2 // terms query
-)
-
-// Enum value maps for FilterOp.
-var (
-	FilterOp_name = map[int32]string{
-		0: "FILTER_OP_UNSPECIFIED",
-		1: "FILTER_OP_EQ",
-		2: "FILTER_OP_IN",
-	}
-	FilterOp_value = map[string]int32{
-		"FILTER_OP_UNSPECIFIED": 0,
-		"FILTER_OP_EQ":          1,
-		"FILTER_OP_IN":          2,
-	}
-)
-
-func (x FilterOp) Enum() *FilterOp {
-	p := new(FilterOp)
-	*p = x
-	return p
-}
-
-func (x FilterOp) String() string {
-	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
-}
-
-func (FilterOp) Descriptor() protoreflect.EnumDescriptor {
-	return file_indexer_v1_index_proto_enumTypes[0].Descriptor()
-}
-
-func (FilterOp) Type() protoreflect.EnumType {
-	return &file_indexer_v1_index_proto_enumTypes[0]
-}
-
-func (x FilterOp) Number() protoreflect.EnumNumber {
-	return protoreflect.EnumNumber(x)
-}
-
-// Deprecated: Use FilterOp.Descriptor instead.
-func (FilterOp) EnumDescriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{0}
-}
 
 type PublishResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -296,27 +246,27 @@ type isChangeEvent_Payload interface {
 }
 
 type ChangeEvent_AUpsert struct {
-	AUpsert *AUpsert `protobuf:"bytes,10,opt,name=a_upsert,json=aUpsert,proto3,oneof"`
+	AUpsert *AUpsert `protobuf:"bytes,4,opt,name=a_upsert,json=aUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_ADelete struct {
-	ADelete *ADelete `protobuf:"bytes,11,opt,name=a_delete,json=aDelete,proto3,oneof"`
+	ADelete *ADelete `protobuf:"bytes,5,opt,name=a_delete,json=aDelete,proto3,oneof"`
 }
 
 type ChangeEvent_BUpsert struct {
-	BUpsert *BUpsert `protobuf:"bytes,20,opt,name=b_upsert,json=bUpsert,proto3,oneof"`
+	BUpsert *BUpsert `protobuf:"bytes,6,opt,name=b_upsert,json=bUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_BDelete struct {
-	BDelete *BDelete `protobuf:"bytes,21,opt,name=b_delete,json=bDelete,proto3,oneof"`
+	BDelete *BDelete `protobuf:"bytes,7,opt,name=b_delete,json=bDelete,proto3,oneof"`
 }
 
 type ChangeEvent_CUpsert struct {
-	CUpsert *CUpsert `protobuf:"bytes,30,opt,name=c_upsert,json=cUpsert,proto3,oneof"`
+	CUpsert *CUpsert `protobuf:"bytes,8,opt,name=c_upsert,json=cUpsert,proto3,oneof"`
 }
 
 type ChangeEvent_CDelete struct {
-	CDelete *CDelete `protobuf:"bytes,31,opt,name=c_delete,json=cDelete,proto3,oneof"`
+	CDelete *CDelete `protobuf:"bytes,9,opt,name=c_delete,json=cDelete,proto3,oneof"`
 }
 
 func (*ChangeEvent_AUpsert) isChangeEvent_Payload() {}
@@ -337,8 +287,8 @@ type AUpsert struct {
 	// Example A fields you might filter/sort on:
 	Status string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	// Relationships:
-	BId           string   `protobuf:"bytes,10,opt,name=b_id,json=bId,proto3" json:"b_id,omitempty"`
-	CIds          []string `protobuf:"bytes,11,rep,name=c_ids,json=cIds,proto3" json:"c_ids,omitempty"`
+	BId           string   `protobuf:"bytes,3,opt,name=b_id,json=bId,proto3" json:"b_id,omitempty"`
+	CIds          []string `protobuf:"bytes,4,rep,name=c_ids,json=cIds,proto3" json:"c_ids,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -645,346 +595,12 @@ func (x *CDelete) GetCId() string {
 	return ""
 }
 
-type Filter struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Example: "b.name.keyword" or "a_status" or "c.state"
-	Field string   `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
-	Op    FilterOp `protobuf:"varint,2,opt,name=op,proto3,enum=indexer.v1.FilterOp" json:"op,omitempty"`
-	// For EQ
-	Value string `protobuf:"bytes,3,opt,name=value,proto3" json:"value,omitempty"`
-	// For IN
-	Values []string `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty"`
-	// If you need nested filtering (e.g. c is mapped as "nested"):
-	// nested_path="c", field="c.state", op=EQ, value="active"
-	NestedPath    string `protobuf:"bytes,5,opt,name=nested_path,json=nestedPath,proto3" json:"nested_path,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Filter) Reset() {
-	*x = Filter{}
-	mi := &file_indexer_v1_index_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Filter) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Filter) ProtoMessage() {}
-
-func (x *Filter) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_v1_index_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Filter.ProtoReflect.Descriptor instead.
-func (*Filter) Descriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *Filter) GetField() string {
-	if x != nil {
-		return x.Field
-	}
-	return ""
-}
-
-func (x *Filter) GetOp() FilterOp {
-	if x != nil {
-		return x.Op
-	}
-	return FilterOp_FILTER_OP_UNSPECIFIED
-}
-
-func (x *Filter) GetValue() string {
-	if x != nil {
-		return x.Value
-	}
-	return ""
-}
-
-func (x *Filter) GetValues() []string {
-	if x != nil {
-		return x.Values
-	}
-	return nil
-}
-
-func (x *Filter) GetNestedPath() string {
-	if x != nil {
-		return x.NestedPath
-	}
-	return ""
-}
-
-type Sort struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Example: "updated_at"
-	Field         string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
-	Desc          bool   `protobuf:"varint,2,opt,name=desc,proto3" json:"desc,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Sort) Reset() {
-	*x = Sort{}
-	mi := &file_indexer_v1_index_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Sort) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Sort) ProtoMessage() {}
-
-func (x *Sort) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_v1_index_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Sort.ProtoReflect.Descriptor instead.
-func (*Sort) Descriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *Sort) GetField() string {
-	if x != nil {
-		return x.Field
-	}
-	return ""
-}
-
-func (x *Sort) GetDesc() bool {
-	if x != nil {
-		return x.Desc
-	}
-	return false
-}
-
-type SearchRequest struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	// Always filter by tenant for safety
-	TenantId string `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	// Optional full text query
-	Query   string    `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	Filters []*Filter `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
-	// Pagination (simple from/size)
-	Page          int32   `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`                         // 0-based
-	PageSize      int32   `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // default 25, max 100
-	Sort          []*Sort `protobuf:"bytes,6,rep,name=sort,proto3" json:"sort,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SearchRequest) Reset() {
-	*x = SearchRequest{}
-	mi := &file_indexer_v1_index_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SearchRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SearchRequest) ProtoMessage() {}
-
-func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_v1_index_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
-func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *SearchRequest) GetTenantId() string {
-	if x != nil {
-		return x.TenantId
-	}
-	return ""
-}
-
-func (x *SearchRequest) GetQuery() string {
-	if x != nil {
-		return x.Query
-	}
-	return ""
-}
-
-func (x *SearchRequest) GetFilters() []*Filter {
-	if x != nil {
-		return x.Filters
-	}
-	return nil
-}
-
-func (x *SearchRequest) GetPage() int32 {
-	if x != nil {
-		return x.Page
-	}
-	return 0
-}
-
-func (x *SearchRequest) GetPageSize() int32 {
-	if x != nil {
-		return x.PageSize
-	}
-	return 0
-}
-
-func (x *SearchRequest) GetSort() []*Sort {
-	if x != nil {
-		return x.Sort
-	}
-	return nil
-}
-
-type SearchHit struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Score float64                `protobuf:"fixed64,2,opt,name=score,proto3" json:"score,omitempty"`
-	// The indexed document (source)
-	Source        *structpb.Struct `protobuf:"bytes,3,opt,name=source,proto3" json:"source,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SearchHit) Reset() {
-	*x = SearchHit{}
-	mi := &file_indexer_v1_index_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SearchHit) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SearchHit) ProtoMessage() {}
-
-func (x *SearchHit) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_v1_index_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SearchHit.ProtoReflect.Descriptor instead.
-func (*SearchHit) Descriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *SearchHit) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
-func (x *SearchHit) GetScore() float64 {
-	if x != nil {
-		return x.Score
-	}
-	return 0
-}
-
-func (x *SearchHit) GetSource() *structpb.Struct {
-	if x != nil {
-		return x.Source
-	}
-	return nil
-}
-
-type SearchResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Total         int64                  `protobuf:"varint,1,opt,name=total,proto3" json:"total,omitempty"`
-	Hits          []*SearchHit           `protobuf:"bytes,2,rep,name=hits,proto3" json:"hits,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SearchResponse) Reset() {
-	*x = SearchResponse{}
-	mi := &file_indexer_v1_index_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SearchResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SearchResponse) ProtoMessage() {}
-
-func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_indexer_v1_index_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
-func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_indexer_v1_index_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *SearchResponse) GetTotal() int64 {
-	if x != nil {
-		return x.Total
-	}
-	return 0
-}
-
-func (x *SearchResponse) GetHits() []*SearchHit {
-	if x != nil {
-		return x.Hits
-	}
-	return nil
-}
-
 var File_indexer_v1_index_proto protoreflect.FileDescriptor
 
 const file_indexer_v1_index_proto_rawDesc = "" +
 	"\n" +
 	"\x16indexer/v1/index.proto\x12\n" +
-	"indexer.v1\x1a\x1cgoogle/protobuf/struct.proto\"-\n" +
+	"indexer.v1\"-\n" +
 	"\x0fPublishResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\x03R\baccepted\">\n" +
 	"\vChangeBatch\x12/\n" +
@@ -993,20 +609,18 @@ const file_indexer_v1_index_proto_rawDesc = "" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12-\n" +
 	"\x13occurred_at_unix_ms\x18\x02 \x01(\x03R\x10occurredAtUnixMs\x12\x1b\n" +
 	"\ttenant_id\x18\x03 \x01(\tR\btenantId\x120\n" +
-	"\ba_upsert\x18\n" +
-	" \x01(\v2\x13.indexer.v1.AUpsertH\x00R\aaUpsert\x120\n" +
-	"\ba_delete\x18\v \x01(\v2\x13.indexer.v1.ADeleteH\x00R\aaDelete\x120\n" +
-	"\bb_upsert\x18\x14 \x01(\v2\x13.indexer.v1.BUpsertH\x00R\abUpsert\x120\n" +
-	"\bb_delete\x18\x15 \x01(\v2\x13.indexer.v1.BDeleteH\x00R\abDelete\x120\n" +
-	"\bc_upsert\x18\x1e \x01(\v2\x13.indexer.v1.CUpsertH\x00R\acUpsert\x120\n" +
-	"\bc_delete\x18\x1f \x01(\v2\x13.indexer.v1.CDeleteH\x00R\acDeleteB\t\n" +
+	"\ba_upsert\x18\x04 \x01(\v2\x13.indexer.v1.AUpsertH\x00R\aaUpsert\x120\n" +
+	"\ba_delete\x18\x05 \x01(\v2\x13.indexer.v1.ADeleteH\x00R\aaDelete\x120\n" +
+	"\bb_upsert\x18\x06 \x01(\v2\x13.indexer.v1.BUpsertH\x00R\abUpsert\x120\n" +
+	"\bb_delete\x18\a \x01(\v2\x13.indexer.v1.BDeleteH\x00R\abDelete\x120\n" +
+	"\bc_upsert\x18\b \x01(\v2\x13.indexer.v1.CUpsertH\x00R\acUpsert\x120\n" +
+	"\bc_delete\x18\t \x01(\v2\x13.indexer.v1.CDeleteH\x00R\acDeleteB\t\n" +
 	"\apayload\"\\\n" +
 	"\aAUpsert\x12\x11\n" +
 	"\x04a_id\x18\x01 \x01(\tR\x03aId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x11\n" +
-	"\x04b_id\x18\n" +
-	" \x01(\tR\x03bId\x12\x13\n" +
-	"\x05c_ids\x18\v \x03(\tR\x04cIds\"\x1c\n" +
+	"\x04b_id\x18\x03 \x01(\tR\x03bId\x12\x13\n" +
+	"\x05c_ids\x18\x04 \x03(\tR\x04cIds\"\x1c\n" +
 	"\aADelete\x12\x11\n" +
 	"\x04a_id\x18\x01 \x01(\tR\x03aId\"0\n" +
 	"\aBUpsert\x12\x11\n" +
@@ -1019,41 +633,10 @@ const file_indexer_v1_index_proto_rawDesc = "" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\"\x1c\n" +
 	"\aCDelete\x12\x11\n" +
-	"\x04c_id\x18\x01 \x01(\tR\x03cId\"\x93\x01\n" +
-	"\x06Filter\x12\x14\n" +
-	"\x05field\x18\x01 \x01(\tR\x05field\x12$\n" +
-	"\x02op\x18\x02 \x01(\x0e2\x14.indexer.v1.FilterOpR\x02op\x12\x14\n" +
-	"\x05value\x18\x03 \x01(\tR\x05value\x12\x16\n" +
-	"\x06values\x18\x04 \x03(\tR\x06values\x12\x1f\n" +
-	"\vnested_path\x18\x05 \x01(\tR\n" +
-	"nestedPath\"0\n" +
-	"\x04Sort\x12\x14\n" +
-	"\x05field\x18\x01 \x01(\tR\x05field\x12\x12\n" +
-	"\x04desc\x18\x02 \x01(\bR\x04desc\"\xc7\x01\n" +
-	"\rSearchRequest\x12\x1b\n" +
-	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
-	"\x05query\x18\x02 \x01(\tR\x05query\x12,\n" +
-	"\afilters\x18\x03 \x03(\v2\x12.indexer.v1.FilterR\afilters\x12\x12\n" +
-	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +
-	"\tpage_size\x18\x05 \x01(\x05R\bpageSize\x12$\n" +
-	"\x04sort\x18\x06 \x03(\v2\x10.indexer.v1.SortR\x04sort\"b\n" +
-	"\tSearchHit\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
-	"\x05score\x18\x02 \x01(\x01R\x05score\x12/\n" +
-	"\x06source\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x06source\"Q\n" +
-	"\x0eSearchResponse\x12\x14\n" +
-	"\x05total\x18\x01 \x01(\x03R\x05total\x12)\n" +
-	"\x04hits\x18\x02 \x03(\v2\x15.indexer.v1.SearchHitR\x04hits*I\n" +
-	"\bFilterOp\x12\x19\n" +
-	"\x15FILTER_OP_UNSPECIFIED\x10\x00\x12\x10\n" +
-	"\fFILTER_OP_EQ\x10\x01\x12\x10\n" +
-	"\fFILTER_OP_IN\x10\x022\xd6\x02\n" +
+	"\x04c_id\x18\x01 \x01(\tR\x03cId2\x90\x01\n" +
 	"\aIndexer\x12?\n" +
 	"\aPublish\x12\x17.indexer.v1.ChangeEvent\x1a\x1b.indexer.v1.PublishResponse\x12D\n" +
-	"\fPublishBatch\x12\x17.indexer.v1.ChangeBatch\x1a\x1b.indexer.v1.PublishResponse\x12@\n" +
-	"\aSearchA\x12\x19.indexer.v1.SearchRequest\x1a\x1a.indexer.v1.SearchResponse\x12@\n" +
-	"\aSearchB\x12\x19.indexer.v1.SearchRequest\x1a\x1a.indexer.v1.SearchResponse\x12@\n" +
-	"\aSearchC\x12\x19.indexer.v1.SearchRequest\x1a\x1a.indexer.v1.SearchResponseB\x85\x01\n" +
+	"\fPublishBatch\x12\x17.indexer.v1.ChangeBatch\x1a\x1b.indexer.v1.PublishResponseB\x85\x01\n" +
 	"\x0ecom.indexer.v1B\n" +
 	"IndexProtoP\x01Z\x1eindexer/gen/indexer/v1;indexer\xa2\x02\x03IXX\xaa\x02\n" +
 	"Indexer.V1\xca\x02\n" +
@@ -1071,54 +654,35 @@ func file_indexer_v1_index_proto_rawDescGZIP() []byte {
 	return file_indexer_v1_index_proto_rawDescData
 }
 
-var file_indexer_v1_index_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_indexer_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_indexer_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_indexer_v1_index_proto_goTypes = []any{
-	(FilterOp)(0),           // 0: indexer.v1.FilterOp
-	(*PublishResponse)(nil), // 1: indexer.v1.PublishResponse
-	(*ChangeBatch)(nil),     // 2: indexer.v1.ChangeBatch
-	(*ChangeEvent)(nil),     // 3: indexer.v1.ChangeEvent
-	(*AUpsert)(nil),         // 4: indexer.v1.AUpsert
-	(*ADelete)(nil),         // 5: indexer.v1.ADelete
-	(*BUpsert)(nil),         // 6: indexer.v1.BUpsert
-	(*BDelete)(nil),         // 7: indexer.v1.BDelete
-	(*CUpsert)(nil),         // 8: indexer.v1.CUpsert
-	(*CDelete)(nil),         // 9: indexer.v1.CDelete
-	(*Filter)(nil),          // 10: indexer.v1.Filter
-	(*Sort)(nil),            // 11: indexer.v1.Sort
-	(*SearchRequest)(nil),   // 12: indexer.v1.SearchRequest
-	(*SearchHit)(nil),       // 13: indexer.v1.SearchHit
-	(*SearchResponse)(nil),  // 14: indexer.v1.SearchResponse
-	(*structpb.Struct)(nil), // 15: google.protobuf.Struct
+	(*PublishResponse)(nil), // 0: indexer.v1.PublishResponse
+	(*ChangeBatch)(nil),     // 1: indexer.v1.ChangeBatch
+	(*ChangeEvent)(nil),     // 2: indexer.v1.ChangeEvent
+	(*AUpsert)(nil),         // 3: indexer.v1.AUpsert
+	(*ADelete)(nil),         // 4: indexer.v1.ADelete
+	(*BUpsert)(nil),         // 5: indexer.v1.BUpsert
+	(*BDelete)(nil),         // 6: indexer.v1.BDelete
+	(*CUpsert)(nil),         // 7: indexer.v1.CUpsert
+	(*CDelete)(nil),         // 8: indexer.v1.CDelete
 }
 var file_indexer_v1_index_proto_depIdxs = []int32{
-	3,  // 0: indexer.v1.ChangeBatch.events:type_name -> indexer.v1.ChangeEvent
-	4,  // 1: indexer.v1.ChangeEvent.a_upsert:type_name -> indexer.v1.AUpsert
-	5,  // 2: indexer.v1.ChangeEvent.a_delete:type_name -> indexer.v1.ADelete
-	6,  // 3: indexer.v1.ChangeEvent.b_upsert:type_name -> indexer.v1.BUpsert
-	7,  // 4: indexer.v1.ChangeEvent.b_delete:type_name -> indexer.v1.BDelete
-	8,  // 5: indexer.v1.ChangeEvent.c_upsert:type_name -> indexer.v1.CUpsert
-	9,  // 6: indexer.v1.ChangeEvent.c_delete:type_name -> indexer.v1.CDelete
-	0,  // 7: indexer.v1.Filter.op:type_name -> indexer.v1.FilterOp
-	10, // 8: indexer.v1.SearchRequest.filters:type_name -> indexer.v1.Filter
-	11, // 9: indexer.v1.SearchRequest.sort:type_name -> indexer.v1.Sort
-	15, // 10: indexer.v1.SearchHit.source:type_name -> google.protobuf.Struct
-	13, // 11: indexer.v1.SearchResponse.hits:type_name -> indexer.v1.SearchHit
-	3,  // 12: indexer.v1.Indexer.Publish:input_type -> indexer.v1.ChangeEvent
-	2,  // 13: indexer.v1.Indexer.PublishBatch:input_type -> indexer.v1.ChangeBatch
-	12, // 14: indexer.v1.Indexer.SearchA:input_type -> indexer.v1.SearchRequest
-	12, // 15: indexer.v1.Indexer.SearchB:input_type -> indexer.v1.SearchRequest
-	12, // 16: indexer.v1.Indexer.SearchC:input_type -> indexer.v1.SearchRequest
-	1,  // 17: indexer.v1.Indexer.Publish:output_type -> indexer.v1.PublishResponse
-	1,  // 18: indexer.v1.Indexer.PublishBatch:output_type -> indexer.v1.PublishResponse
-	14, // 19: indexer.v1.Indexer.SearchA:output_type -> indexer.v1.SearchResponse
-	14, // 20: indexer.v1.Indexer.SearchB:output_type -> indexer.v1.SearchResponse
-	14, // 21: indexer.v1.Indexer.SearchC:output_type -> indexer.v1.SearchResponse
-	17, // [17:22] is the sub-list for method output_type
-	12, // [12:17] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	2, // 0: indexer.v1.ChangeBatch.events:type_name -> indexer.v1.ChangeEvent
+	3, // 1: indexer.v1.ChangeEvent.a_upsert:type_name -> indexer.v1.AUpsert
+	4, // 2: indexer.v1.ChangeEvent.a_delete:type_name -> indexer.v1.ADelete
+	5, // 3: indexer.v1.ChangeEvent.b_upsert:type_name -> indexer.v1.BUpsert
+	6, // 4: indexer.v1.ChangeEvent.b_delete:type_name -> indexer.v1.BDelete
+	7, // 5: indexer.v1.ChangeEvent.c_upsert:type_name -> indexer.v1.CUpsert
+	8, // 6: indexer.v1.ChangeEvent.c_delete:type_name -> indexer.v1.CDelete
+	2, // 7: indexer.v1.Indexer.Publish:input_type -> indexer.v1.ChangeEvent
+	1, // 8: indexer.v1.Indexer.PublishBatch:input_type -> indexer.v1.ChangeBatch
+	0, // 9: indexer.v1.Indexer.Publish:output_type -> indexer.v1.PublishResponse
+	0, // 10: indexer.v1.Indexer.PublishBatch:output_type -> indexer.v1.PublishResponse
+	9, // [9:11] is the sub-list for method output_type
+	7, // [7:9] is the sub-list for method input_type
+	7, // [7:7] is the sub-list for extension type_name
+	7, // [7:7] is the sub-list for extension extendee
+	0, // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_indexer_v1_index_proto_init() }
@@ -1139,14 +703,13 @@ func file_indexer_v1_index_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_indexer_v1_index_proto_rawDesc), len(file_indexer_v1_index_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   14,
+			NumEnums:      0,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_indexer_v1_index_proto_goTypes,
 		DependencyIndexes: file_indexer_v1_index_proto_depIdxs,
-		EnumInfos:         file_indexer_v1_index_proto_enumTypes,
 		MessageInfos:      file_indexer_v1_index_proto_msgTypes,
 	}.Build()
 	File_indexer_v1_index_proto = out.File

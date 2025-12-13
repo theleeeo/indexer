@@ -9,8 +9,6 @@ import (
 	"indexer/gen/indexer/v1"
 	"indexer/model"
 	"indexer/store"
-
-	"google.golang.org/protobuf/types/known/structpb"
 )
 
 const (
@@ -19,7 +17,7 @@ const (
 	CIndex = "c_search"
 )
 
-type GRPCServer struct {
+type IndexerServer struct {
 	indexer.UnimplementedIndexerServer
 
 	st *store.Store
@@ -29,15 +27,15 @@ type GRPCServer struct {
 	dedupTTL time.Duration
 }
 
-func New(st *store.Store, esClient *es.Client) *GRPCServer {
-	return &GRPCServer{
+func NewIndexer(st *store.Store, esClient *es.Client) *IndexerServer {
+	return &IndexerServer{
 		st:       st,
 		es:       esClient,
 		dedupTTL: 5 * time.Minute,
 	}
 }
 
-func (s *GRPCServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*indexer.PublishResponse, error) {
+func (s *IndexerServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*indexer.PublishResponse, error) {
 	if ev == nil {
 		return &indexer.PublishResponse{Accepted: 0}, nil
 	}
@@ -56,7 +54,7 @@ func (s *GRPCServer) Publish(ctx context.Context, ev *indexer.ChangeEvent) (*ind
 	return &indexer.PublishResponse{Accepted: 1}, nil
 }
 
-func (s *GRPCServer) PublishBatch(ctx context.Context, batch *indexer.ChangeBatch) (*indexer.PublishResponse, error) {
+func (s *IndexerServer) PublishBatch(ctx context.Context, batch *indexer.ChangeBatch) (*indexer.PublishResponse, error) {
 	if batch == nil || len(batch.Events) == 0 {
 		return &indexer.PublishResponse{Accepted: 0}, nil
 	}
@@ -77,7 +75,7 @@ func (s *GRPCServer) PublishBatch(ctx context.Context, batch *indexer.ChangeBatc
 	return &indexer.PublishResponse{Accepted: accepted}, nil
 }
 
-func (s *GRPCServer) applyOne(ctx context.Context, ev *indexer.ChangeEvent) error {
+func (s *IndexerServer) applyOne(ctx context.Context, ev *indexer.ChangeEvent) error {
 	switch p := ev.Payload.(type) {
 	case *indexer.ChangeEvent_AUpsert:
 		return s.handleAUpsert(ctx, ev.TenantId, p.AUpsert)
@@ -96,7 +94,7 @@ func (s *GRPCServer) applyOne(ctx context.Context, ev *indexer.ChangeEvent) erro
 	}
 }
 
-func (s *GRPCServer) handleAUpsert(ctx context.Context, tenant string, a *indexer.AUpsert) error {
+func (s *IndexerServer) handleAUpsert(ctx context.Context, tenant string, a *indexer.AUpsert) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
@@ -122,7 +120,7 @@ func (s *GRPCServer) handleAUpsert(ctx context.Context, tenant string, a *indexe
 	return nil
 }
 
-func (s *GRPCServer) handleADelete(ctx context.Context, tenant string, a *indexer.ADelete) error {
+func (s *IndexerServer) handleADelete(ctx context.Context, tenant string, a *indexer.ADelete) error {
 	if a.AId == "" {
 		return fmt.Errorf("a_id required")
 	}
@@ -146,7 +144,7 @@ func (s *GRPCServer) handleADelete(ctx context.Context, tenant string, a *indexe
 	return nil
 }
 
-func (s *GRPCServer) handleBUpsert(ctx context.Context, tenant string, b *indexer.BUpsert) error {
+func (s *IndexerServer) handleBUpsert(ctx context.Context, tenant string, b *indexer.BUpsert) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
@@ -162,7 +160,7 @@ func (s *GRPCServer) handleBUpsert(ctx context.Context, tenant string, b *indexe
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *GRPCServer) handleBDelete(ctx context.Context, tenant string, b *indexer.BDelete) error {
+func (s *IndexerServer) handleBDelete(ctx context.Context, tenant string, b *indexer.BDelete) error {
 	if b.BId == "" {
 		return fmt.Errorf("b_id required")
 	}
@@ -178,7 +176,7 @@ func (s *GRPCServer) handleBDelete(ctx context.Context, tenant string, b *indexe
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *GRPCServer) handleCUpsert(ctx context.Context, tenant string, c *indexer.CUpsert) error {
+func (s *IndexerServer) handleCUpsert(ctx context.Context, tenant string, c *indexer.CUpsert) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}
@@ -194,7 +192,7 @@ func (s *GRPCServer) handleCUpsert(ctx context.Context, tenant string, c *indexe
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *GRPCServer) handleCDelete(ctx context.Context, tenant string, c *indexer.CDelete) error {
+func (s *IndexerServer) handleCDelete(ctx context.Context, tenant string, c *indexer.CDelete) error {
 	if c.CId == "" {
 		return fmt.Errorf("c_id required")
 	}
@@ -210,7 +208,7 @@ func (s *GRPCServer) handleCDelete(ctx context.Context, tenant string, c *indexe
 	return s.bulkReindexA(ctx, aKeys)
 }
 
-func (s *GRPCServer) reindexAByKey(ctx context.Context, aKey string) error {
+func (s *IndexerServer) reindexAByKey(ctx context.Context, aKey string) error {
 	aProj := s.st.SnapshotA(aKey)
 	if aProj == nil {
 		return nil
@@ -230,7 +228,7 @@ func (s *GRPCServer) reindexAByKey(ctx context.Context, aKey string) error {
 	return s.es.UpsertJSON(ctx, AIndex, aKey, doc)
 }
 
-func (s *GRPCServer) reindexBByKey(ctx context.Context, bKey string) error {
+func (s *IndexerServer) reindexBByKey(ctx context.Context, bKey string) error {
 	bProj := s.st.SnapshotB(bKey)
 	if bProj == nil {
 		return nil
@@ -240,7 +238,7 @@ func (s *GRPCServer) reindexBByKey(ctx context.Context, bKey string) error {
 	return s.es.UpsertJSON(ctx, BIndex, bKey, doc)
 }
 
-func (s *GRPCServer) reindexCByKey(ctx context.Context, cKey string) error {
+func (s *IndexerServer) reindexCByKey(ctx context.Context, cKey string) error {
 	cProj := s.st.SnapshotC(cKey)
 	if cProj == nil {
 		return nil
@@ -250,7 +248,7 @@ func (s *GRPCServer) reindexCByKey(ctx context.Context, cKey string) error {
 	return s.es.UpsertJSON(ctx, CIndex, cKey, doc)
 }
 
-func (s *GRPCServer) bulkReindexA(ctx context.Context, aKeys []string) error {
+func (s *IndexerServer) bulkReindexA(ctx context.Context, aKeys []string) error {
 	if len(aKeys) == 0 {
 		return nil
 	}
@@ -277,171 +275,4 @@ func (s *GRPCServer) bulkReindexA(ctx context.Context, aKeys []string) error {
 	}
 
 	return s.es.BulkUpsert(ctx, items)
-}
-
-func (s *GRPCServer) SearchA(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
-	return s.search(ctx, AIndex, req, defaultSearchFieldsA())
-}
-
-func (s *GRPCServer) SearchB(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
-	return s.search(ctx, BIndex, req, defaultSearchFieldsB())
-}
-
-func (s *GRPCServer) SearchC(ctx context.Context, req *indexer.SearchRequest) (*indexer.SearchResponse, error) {
-	return s.search(ctx, CIndex, req, defaultSearchFieldsC())
-}
-
-func (s *GRPCServer) search(ctx context.Context, indexAlias string, req *indexer.SearchRequest, searchFields []string) (*indexer.SearchResponse, error) {
-	if req == nil || req.TenantId == "" {
-		return nil, fmt.Errorf("tenant_id is required")
-	}
-
-	pageSize := int(req.PageSize)
-	if pageSize <= 0 {
-		pageSize = 25
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	page := int(req.Page)
-	if page < 0 {
-		page = 0
-	}
-
-	boolQ := map[string]any{
-		"must":   []any{},
-		"filter": []any{},
-	}
-
-	// Always tenant filter
-	boolQ["filter"] = append(boolQ["filter"].([]any), map[string]any{
-		"term": map[string]any{"tenant_id": req.TenantId},
-	})
-
-	// Full-text query (optional)
-	if req.Query != "" {
-		boolQ["must"] = append(boolQ["must"].([]any), map[string]any{
-			"multi_match": map[string]any{
-				"query":  req.Query,
-				"fields": searchFields,
-			},
-		})
-	}
-
-	// Structured filters
-	for _, f := range req.Filters {
-		if f == nil || f.Field == "" {
-			continue
-		}
-		filterClause, err := buildFilterClause(f)
-		if err != nil {
-			return nil, err
-		}
-		boolQ["filter"] = append(boolQ["filter"].([]any), filterClause)
-	}
-
-	body := map[string]any{
-		"query": map[string]any{"bool": boolQ},
-		"from":  page * pageSize,
-		"size":  pageSize,
-	}
-
-	// Sort (optional). If none provided, ES default scoring applies.
-	if len(req.Sort) > 0 {
-		var sorts []any
-		for _, srt := range req.Sort {
-			if srt == nil || srt.Field == "" {
-				continue
-			}
-			order := "asc"
-			if srt.Desc {
-				order = "desc"
-			}
-			sorts = append(sorts, map[string]any{
-				srt.Field: map[string]any{"order": order},
-			})
-		}
-		if len(sorts) > 0 {
-			body["sort"] = sorts
-		}
-	}
-
-	res, err := s.es.Search(ctx, indexAlias, body)
-	if err != nil {
-		return nil, err
-	}
-
-	out := &indexer.SearchResponse{Total: res.Total}
-	for _, h := range res.Hits {
-		st, err := structpb.NewStruct(h.Source)
-		if err != nil {
-			// if struct conversion fails, skip rather than fail the whole query
-			continue
-		}
-		out.Hits = append(out.Hits, &indexer.SearchHit{
-			Id:     h.ID,
-			Score:  h.Score,
-			Source: st,
-		})
-	}
-	return out, nil
-}
-
-func buildFilterClause(f *indexer.Filter) (any, error) {
-	var inner any
-
-	switch f.Op {
-	case indexer.FilterOp_FILTER_OP_EQ:
-		if f.Value == "" {
-			return nil, fmt.Errorf("EQ filter requires value for field %q", f.Field)
-		}
-		inner = map[string]any{"term": map[string]any{f.Field: f.Value}}
-
-	case indexer.FilterOp_FILTER_OP_IN:
-		if len(f.Values) == 0 {
-			return nil, fmt.Errorf("IN filter requires values for field %q", f.Field)
-		}
-		inner = map[string]any{"terms": map[string]any{f.Field: f.Values}}
-
-	default:
-		return nil, fmt.Errorf("unsupported filter op for field %q", f.Field)
-	}
-
-	// Nested wrapping (optional)
-	if f.NestedPath != "" {
-		return map[string]any{
-			"nested": map[string]any{
-				"path":  f.NestedPath,
-				"query": inner,
-			},
-		}, nil
-	}
-
-	return inner, nil
-}
-
-func defaultSearchFieldsA() []string {
-	// Adjust to what you actually index
-	return []string{
-		"a_id",
-		"a_status",
-		"b.name",
-		"c.type",
-		"c.state",
-	}
-}
-
-func defaultSearchFieldsB() []string {
-	return []string{
-		"b_id",
-		"b_name",
-	}
-}
-
-func defaultSearchFieldsC() []string {
-	return []string{
-		"c_id",
-		"c_type",
-		"c_state",
-	}
 }
