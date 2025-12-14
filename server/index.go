@@ -74,11 +74,11 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 	case *index.ChangeEvent_DeletePayload:
 		return s.handleDelete(ctx, p.DeletePayload)
 	case *index.ChangeEvent_SetRelationPayload:
-		panic("not implemented")
+		return s.handleSetRelation(ctx, p.SetRelationPayload)
 	case *index.ChangeEvent_AddRelationPayload:
 		return s.handleAddRelation(ctx, p.AddRelationPayload)
 	case *index.ChangeEvent_RemoveRelationPayload:
-		panic("not implemented")
+		return s.handleRemoveRelation(ctx, p.RemoveRelationPayload)
 	default:
 		return fmt.Errorf("unknown payload")
 	}
@@ -216,7 +216,7 @@ func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload
 	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
 	for _, relatedResource := range parentResources {
 		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.DeleteFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId); err != nil {
+		if err := s.es.RemoveFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId); err != nil {
 			return err
 		}
 	}
@@ -247,6 +247,54 @@ func (s *IndexerServer) handleAddRelation(ctx context.Context, p *index.AddRelat
 	if err := s.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.RelationToAdd.Resource, map[string]any{
 		"id": p.RelationToAdd.ResourceId,
 	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *IndexerServer) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
+		RemoveRelations: []*index.Relation{
+			{
+				Resource:   p.RelationToRemove.Resource,
+				ResourceId: p.RelationToRemove.ResourceId,
+			},
+		},
+	})
+
+	if err := s.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.RelationToRemove.Resource, p.RelationToRemove.ResourceId); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *IndexerServer) handleSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
+		SetRelation: &index.Relation{
+			Resource:   p.RelationToSet.Resource,
+			ResourceId: p.RelationToSet.ResourceId,
+		},
+	})
+
+	if err := s.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.RelationToSet.Resource, idStruct{Id: p.RelationToSet.ResourceId}); err != nil {
 		return err
 	}
 

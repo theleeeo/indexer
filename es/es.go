@@ -305,7 +305,7 @@ func (c *Client) AddFieldResource(ctx context.Context, indexAlias, docID, field 
 	return nil
 }
 
-func (c *Client) DeleteFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementID any) error {
+func (c *Client) RemoveFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementID any) error {
 	script := `
 		def f = ctx._source[params.field];
 		if (f != null) {
