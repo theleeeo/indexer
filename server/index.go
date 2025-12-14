@@ -110,10 +110,11 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 
 	// TODO: Weather to make it array or single object should be based on the relation kind from the schema
 	for resType, resIds := range resourceMap {
-		if len(resIds) == 1 {
-			docMap[resType] = idStruct{Id: resIds[0]}
-			continue
-		}
+		// TODO: Until we have proper handling of single vs multiple relations, always use array
+		// if len(resIds) == 1 {
+		// 	docMap[resType] = idStruct{Id: resIds[0]}
+		// 	continue
+		// }
 
 		idStructs := make([]idStruct, 0, len(resIds))
 		for _, rid := range resIds {
@@ -224,6 +225,7 @@ func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload
 }
 
 // TODO: Failes if applied on object, not array
+// TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
 func (s *IndexerServer) handleAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
