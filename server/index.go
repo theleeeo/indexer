@@ -76,7 +76,7 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 	case *index.ChangeEvent_SetRelationPayload:
 		panic("not implemented")
 	case *index.ChangeEvent_AddRelationPayload:
-		panic("not implemented")
+		return s.handleAddRelation(ctx, p.AddRelationPayload)
 	case *index.ChangeEvent_RemoveRelationPayload:
 		panic("not implemented")
 	default:
@@ -123,14 +123,14 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 	}
 
 	if err := s.es.Upsert(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
-		return err
+		return fmt.Errorf("upsert failed: %w", err)
 	}
 
 	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
 	for _, relatedResource := range parentResources {
 		rsType, rsId := store.KeyParts(relatedResource)
 		if err := s.es.UpsertFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
-			return err
+			return fmt.Errorf("upsert parent resource failed: %w", err)
 		}
 	}
 
@@ -218,6 +218,34 @@ func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload
 		if err := s.es.DeleteFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// TODO: Failes if applied on object, not array
+func (s *IndexerServer) handleAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
+		AddRelations: []*index.Relation{
+			{
+				Resource:   p.RelationToAdd.Resource,
+				ResourceId: p.RelationToAdd.ResourceId,
+			},
+		},
+	})
+
+	if err := s.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.RelationToAdd.Resource, map[string]any{
+		"id": p.RelationToAdd.ResourceId,
+	}); err != nil {
+		return err
 	}
 
 	return nil

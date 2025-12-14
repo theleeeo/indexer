@@ -189,7 +189,17 @@ func (c *Client) UpdateField(ctx context.Context, indexAlias, docID, field strin
 	return nil
 }
 
-func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementID any, newElement any) error {
+func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementId string, newElement any) error {
+	if elementId == "" {
+		return fmt.Errorf("elementId required")
+	}
+
+	if newElement == nil {
+		newElement = map[string]any{
+			"id": elementId,
+		}
+	}
+
 	script := `
 		params.new_element['id'] = params.element_id;  // ensure id is always set
 		if (ctx._source[params.field] == null) {
@@ -215,7 +225,7 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 			"lang":   "painless",
 			"params": map[string]any{
 				"field":       field,
-				"element_id":  elementID,
+				"element_id":  elementId,
 				"new_element": newElement,
 			},
 		},
@@ -242,7 +252,56 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("UpsertFieldElementByID: upserted element (id=%v, field=%s, docID=%s, index=%s)", elementID, field, docID, indexAlias)
+	log.Printf("UpsertFieldElementByID: upserted element (id=%v, field=%s, docID=%s, index=%s)", elementId, field, docID, indexAlias)
+	return nil
+}
+
+func (c *Client) AddFieldResource(ctx context.Context, indexAlias, docID, field string, newElement any) error {
+	if newElement == nil {
+		return fmt.Errorf("newElement required")
+	}
+
+	script := `
+		if (ctx._source[params.field] == null) {
+			ctx._source[params.field] = [params.new_element];
+		} else {
+			ctx._source[params.field].add(params.new_element);
+		}
+	`
+
+	updateBody := map[string]any{
+		"script": map[string]any{
+			"source": script,
+			"lang":   "painless",
+			"params": map[string]any{
+				"field":       field,
+				"new_element": newElement,
+			},
+		},
+	}
+
+	body, err := json.Marshal(updateBody)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.es.Update(
+		indexAlias,
+		docID,
+		bytes.NewReader(body),
+		c.es.Update.WithContext(ctx),
+		c.es.Update.WithRefresh("false"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		b, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+	}
+	log.Printf("AddFieldElement: added element (field=%s, docID=%s, index=%s)", field, docID, indexAlias)
 	return nil
 }
 
