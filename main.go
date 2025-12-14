@@ -39,7 +39,7 @@ func main() {
 		log.Fatalf("es client: %v", err)
 	}
 
-	st := store.New()
+	st := store.NewMemoryStore()
 	idxSrv := server.NewIndexer(st, esClient)
 	searchSrv := server.NewSearcher(esClient)
 

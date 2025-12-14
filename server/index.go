@@ -22,14 +22,14 @@ const (
 type IndexerServer struct {
 	index.UnimplementedIndexServiceServer
 
-	st *store.Store
+	st store.Store
 	es *es.Client
 
 	// de-dup window (in-memory)
 	dedupTTL time.Duration
 }
 
-func NewIndexer(st *store.Store, esClient *es.Client) *IndexerServer {
+func NewIndexer(st store.Store, esClient *es.Client) *IndexerServer {
 	return &IndexerServer{
 		st:       st,
 		es:       esClient,
@@ -97,7 +97,9 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		return fmt.Errorf("resource_id required")
 	}
 
-	s.st.StoreRelations(p.Resource, p.ResourceId, p.Relations)
+	if err := s.st.AddRelations(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId}, p.Relations); err != nil {
+		return fmt.Errorf("store relations failed: %w", err)
+	}
 
 	docMap := map[string]any{
 		"fields": p.Data,
@@ -127,10 +129,13 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		return fmt.Errorf("upsert failed: %w", err)
 	}
 
-	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
+	parentResources, err := s.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	if err != nil {
+		return fmt.Errorf("get parent resources failed: %w", err)
+	}
+
 	for _, relatedResource := range parentResources {
-		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.UpsertFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+		if err := s.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, p.Data); err != nil {
 			return fmt.Errorf("upsert parent resource failed: %w", err)
 		}
 	}
@@ -188,10 +193,12 @@ func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload
 	}
 
 	// Update parent documents
-	relatedResources := s.st.GetParentResources(p.Resource, p.ResourceId)
-	for _, relatedResource := range relatedResources {
-		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.UpsertFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+	parentResources, err := s.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	if err != nil {
+		return fmt.Errorf("get parent resources failed: %w", err)
+	}
+	for _, relatedResource := range parentResources {
+		if err := s.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, p.Data); err != nil {
 			return err
 		}
 	}
@@ -213,10 +220,12 @@ func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload
 	}
 
 	// TODO: Flag for cascade delete?
-	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
+	parentResources, err := s.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	if err != nil {
+		return fmt.Errorf("get parent resources failed: %w", err)
+	}
 	for _, relatedResource := range parentResources {
-		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.RemoveFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId); err != nil {
+		if err := s.es.RemoveFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId); err != nil {
 			return err
 		}
 	}
@@ -235,14 +244,16 @@ func (s *IndexerServer) handleAddRelation(ctx context.Context, p *index.AddRelat
 		return fmt.Errorf("resource_id required")
 	}
 
-	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
-		AddRelations: []*index.Relation{
+	if err := s.st.AddRelations(ctx,
+		store.Resource{Type: p.Resource, Id: p.ResourceId},
+		[]*index.Relation{
 			{
 				Resource:   p.RelationToAdd.Resource,
 				ResourceId: p.RelationToAdd.ResourceId,
 			},
-		},
-	})
+		}); err != nil {
+		return fmt.Errorf("store relations failed: %w", err)
+	}
 
 	if err := s.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.RelationToAdd.Resource, map[string]any{
 		"id": p.RelationToAdd.ResourceId,
@@ -262,14 +273,11 @@ func (s *IndexerServer) handleRemoveRelation(ctx context.Context, p *index.Remov
 		return fmt.Errorf("resource_id required")
 	}
 
-	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
-		RemoveRelations: []*index.Relation{
-			{
-				Resource:   p.RelationToRemove.Resource,
-				ResourceId: p.RelationToRemove.ResourceId,
-			},
-		},
-	})
+	if err := s.st.RemoveRelation(ctx,
+		store.Resource{Type: p.Resource, Id: p.ResourceId},
+		store.Resource{Type: p.RelationToRemove.Resource, Id: p.RelationToRemove.ResourceId}); err != nil {
+		return fmt.Errorf("remove relation failed: %w", err)
+	}
 
 	if err := s.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.RelationToRemove.Resource, p.RelationToRemove.ResourceId); err != nil {
 		return err
@@ -287,12 +295,11 @@ func (s *IndexerServer) handleSetRelation(ctx context.Context, p *index.SetRelat
 		return fmt.Errorf("resource_id required")
 	}
 
-	s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
-		SetRelation: &index.Relation{
-			Resource:   p.RelationToSet.Resource,
-			ResourceId: p.RelationToSet.ResourceId,
-		},
-	})
+	if err := s.st.SetRelation(ctx,
+		store.Resource{Type: p.Resource, Id: p.ResourceId},
+		store.Resource{Type: p.RelationToSet.Resource, Id: p.RelationToSet.ResourceId}); err != nil {
+		return fmt.Errorf("set relation failed: %w", err)
+	}
 
 	if err := s.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.RelationToSet.Resource, idStruct{Id: p.RelationToSet.ResourceId}); err != nil {
 		return err
