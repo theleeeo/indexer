@@ -34,7 +34,7 @@ func New(cfg Config) (*Client, error) {
 	return &Client{es: es}, nil
 }
 
-func (c *Client) UpsertJSON(ctx context.Context, indexAlias, docID string, doc any) error {
+func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) error {
 	body, err := json.Marshal(doc)
 	if err != nil {
 		return err
@@ -46,6 +46,7 @@ func (c *Client) UpsertJSON(ctx context.Context, indexAlias, docID string, doc a
 		c.es.Index.WithDocumentID(docID),
 		c.es.Index.WithContext(ctx),
 		c.es.Index.WithRefresh("false"),
+		// c.es.Index.WithOpType("create"), // Only create, fail if exists
 	)
 	if err != nil {
 		return err
@@ -54,11 +55,40 @@ func (c *Client) UpsertJSON(ctx context.Context, indexAlias, docID string, doc a
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es index error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es create error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("UpsertJSON: indexed doc (id=%s, index=%s)", docID, indexAlias)
+	log.Printf("Create: created doc (id=%s, index=%s)", docID, indexAlias)
 	return nil
 }
+
+// func (c *Client) UpdateFields(ctx context.Context, indexAlias, docID string, fields map[string]any) error {
+// 	updateBody := map[string]any{
+// 		"doc": fields,
+// 	}
+// 	body, err := json.Marshal(updateBody)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	res, err := c.es.Update(
+// 		indexAlias,
+// 		docID,
+// 		bytes.NewReader(body),
+// 		c.es.Update.WithContext(ctx),
+// 		c.es.Update.WithRefresh("false"),
+// 	)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer res.Body.Close()
+
+// 	if res.IsError() {
+// 		b, _ := io.ReadAll(res.Body)
+// 		return fmt.Errorf("es update fields error: %s %s", res.Status(), string(b))
+// 	}
+// 	log.Printf("UpdateFields: updated fields in doc (id=%s, index=%s)", docID, indexAlias)
+// 	return nil
+// }
 
 func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 	res, err := c.es.Delete(
@@ -159,31 +189,32 @@ func (c *Client) UpdateField(ctx context.Context, indexAlias, docID, field strin
 	return nil
 }
 
-func (c *Client) UpsertFieldElementByID(ctx context.Context, indexAlias, docID, field string, elementID any, newElement any) error {
-	script := fmt.Sprintf(`
+func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementID any, newElement any) error {
+	script := `
 		params.new_element['id'] = params.element_id;  // ensure id is always set
-		if (ctx._source['%s'] == null) {
-			ctx._source['%s'] = [params.new_element];
+		if (ctx._source[params.field] == null) {
+			ctx._source[params.field] = [params.new_element];
 		} else {
 			def found = false;
-			for (int i = 0; i < ctx._source['%s'].length; i++) {
-				if (ctx._source['%s'][i].id == params.element_id) {
-					ctx._source['%s'][i] = params.new_element;
+			for (int i = 0; i < ctx._source[params.field].length; i++) {
+				if (ctx._source[params.field][i].id == params.element_id) {
+					ctx._source[params.field][i] = params.new_element;
 					found = true;
 					break;
 				}
 			}
 			if (!found) {
-				ctx._source['%s'].add(params.new_element);
+				ctx._source[params.field].add(params.new_element);
 			}
 		}
-	`, field, field, field, field, field, field)
+	`
 
 	updateBody := map[string]any{
 		"script": map[string]any{
 			"source": script,
 			"lang":   "painless",
 			"params": map[string]any{
+				"field":       field,
 				"element_id":  elementID,
 				"new_element": newElement,
 			},
@@ -212,5 +243,53 @@ func (c *Client) UpsertFieldElementByID(ctx context.Context, indexAlias, docID, 
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
 	log.Printf("UpsertFieldElementByID: upserted element (id=%v, field=%s, docID=%s, index=%s)", elementID, field, docID, indexAlias)
+	return nil
+}
+
+func (c *Client) DeleteFieldResourceById(ctx context.Context, indexAlias, docID, field string, elementID any) error {
+	script := `
+		def f = ctx._source[params.field];
+		if (f != null) {
+			if (f instanceof List) {
+				f.removeIf(e -> e != null && e.id == params.element_id);
+			} else if (f instanceof Map && f.id == params.element_id) {
+				ctx._source.remove(params.field);
+			}
+		}
+	`
+
+	updateBody := map[string]any{
+		"script": map[string]any{
+			"source": script,
+			"lang":   "painless",
+			"params": map[string]any{
+				"field":      field,
+				"element_id": elementID,
+			},
+		},
+	}
+
+	body, err := json.Marshal(updateBody)
+	if err != nil {
+		return err
+	}
+
+	res, err := c.es.Update(
+		indexAlias,
+		docID,
+		bytes.NewReader(body),
+		c.es.Update.WithContext(ctx),
+		c.es.Update.WithRefresh("false"),
+	)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.IsError() {
+		b, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+	}
+	log.Printf("DeleteFieldElementByID: deleted element (id=%v, field=%s, docID=%s, index=%s)", elementID, field, docID, indexAlias)
 	return nil
 }

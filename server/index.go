@@ -71,12 +71,28 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 		return s.handleCreate(ctx, p.CreatePayload)
 	case *index.ChangeEvent_UpdatePayload:
 		return s.handleUpdate(ctx, p.UpdatePayload)
+	case *index.ChangeEvent_DeletePayload:
+		return s.handleDelete(ctx, p.DeletePayload)
+	case *index.ChangeEvent_SetRelationPayload:
+		panic("not implemented")
+	case *index.ChangeEvent_AddRelationPayload:
+		panic("not implemented")
+	case *index.ChangeEvent_RemoveRelationPayload:
+		panic("not implemented")
 	default:
 		return fmt.Errorf("unknown payload")
 	}
 }
 
+type idStruct struct {
+	Id string `json:"id"`
+}
+
 func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
@@ -92,10 +108,7 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		resourceMap[rel.Resource] = append(resourceMap[rel.Resource], rel.ResourceId)
 	}
 
-	type idStruct struct {
-		Id string `json:"id"`
-	}
-
+	// TODO: Weather to make it array or single object should be based on the relation kind from the schema
 	for resType, resIds := range resourceMap {
 		if len(resIds) == 1 {
 			docMap[resType] = idStruct{Id: resIds[0]}
@@ -109,14 +122,14 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		docMap[resType] = idStructs
 	}
 
-	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
+	if err := s.es.Upsert(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
 		return err
 	}
 
 	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
 	for _, relatedResource := range parentResources {
 		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+		if err := s.es.UpsertFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
 			return err
 		}
 	}
@@ -125,6 +138,10 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 }
 
 func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
@@ -154,6 +171,10 @@ func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload
 	// 	}
 	// }
 
+	// if setRelation != nil {
+
+	// }
+
 	// s.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
 	// 	SetRelation:     setRelation,
 	// 	AddRelations:    relationsToAdd,
@@ -161,16 +182,40 @@ func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload
 	// })
 
 	// Update the main document
-	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
-		"fields": p.Data,
-	}); err != nil {
+	if err := s.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", p.Data); err != nil {
 		return err
 	}
 
+	// Update parent documents
 	relatedResources := s.st.GetParentResources(p.Resource, p.ResourceId)
 	for _, relatedResource := range relatedResources {
 		rsType, rsId := store.KeyParts(relatedResource)
-		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+		if err := s.es.UpsertFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	if err := s.es.Delete(ctx, p.Resource+"_search", p.ResourceId); err != nil {
+		return err
+	}
+
+	// TODO: Flag for cascade delete?
+	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
+	for _, relatedResource := range parentResources {
+		rsType, rsId := store.KeyParts(relatedResource)
+		if err := s.es.DeleteFieldResourceById(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId); err != nil {
 			return err
 		}
 	}

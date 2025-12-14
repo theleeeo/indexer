@@ -26,9 +26,12 @@ message PublishBatchResponse {}
 
 message ChangeEvent {
   oneof payload {
-    CreatePayload create_payload = 1;
-    UpdatePayload update_payload = 2;
-    DeletePayload delete_payload = 3;
+    CreatePayload         create_payload          = 1;
+    UpdatePayload         update_payload          = 2;
+    DeletePayload         delete_payload          = 3;
+    AddRelationPayload    add_relation_payload    = 4;
+    RemoveRelationPayload remove_relation_payload = 5;
+    SetRelationPayload    set_relation_payload    = 6;
   }
 }
 
@@ -40,10 +43,9 @@ message CreatePayload {
 }
 
 message UpdatePayload {
-  string                  resource         = 1;
-  string                  resource_id      = 2;
-  google.protobuf.Struct  data             = 3;
-  repeated RelationChange relation_changes = 4;
+  string                 resource    = 1;
+  string                 resource_id = 2;
+  google.protobuf.Struct data        = 3;
 }
 
 message DeletePayload {
@@ -51,16 +53,22 @@ message DeletePayload {
   string resource_id = 2;
 }
 
-message RelationChange {
-  Relation relation = 1;
+message AddRelationPayload {
+  string   resource        = 1;
+  string   resource_id     = 2;
+  Relation relation_to_add = 3;
+}
 
-  enum ChangeType {
-    CHANGE_TYPE_UNSPECIFIED = 0;
-    CHANGE_TYPE_ADDED       = 1;
-    CHANGE_TYPE_REMOVED     = 2;
-    CHANGE_TYPE_SET         = 3;
-  }
-  ChangeType change_type             = 2;
+message RemoveRelationPayload {
+  string   resource           = 1;
+  string   resource_id        = 2;
+  Relation relation_to_remove = 3;
+}
+
+message SetRelationPayload {
+  string   resource        = 1;
+  string   resource_id     = 2;
+  Relation relation_to_set = 3;
 }
 
 message Relation {
