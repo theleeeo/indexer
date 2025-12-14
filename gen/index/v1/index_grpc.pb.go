@@ -19,137 +19,137 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Indexer_Publish_FullMethodName      = "/index.v1.Indexer/Publish"
-	Indexer_PublishBatch_FullMethodName = "/index.v1.Indexer/PublishBatch"
+	IndexService_Publish_FullMethodName      = "/index.v1.IndexService/Publish"
+	IndexService_PublishBatch_FullMethodName = "/index.v1.IndexService/PublishBatch"
 )
 
-// IndexerClient is the client API for Indexer service.
+// IndexServiceClient is the client API for IndexService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type IndexerClient interface {
-	Publish(ctx context.Context, in *ChangeEvent, opts ...grpc.CallOption) (*PublishResponse, error)
-	PublishBatch(ctx context.Context, in *ChangeBatch, opts ...grpc.CallOption) (*PublishResponse, error)
+type IndexServiceClient interface {
+	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error)
+	PublishBatch(ctx context.Context, in *PublishBatchRequest, opts ...grpc.CallOption) (*PublishBatchResponse, error)
 }
 
-type indexerClient struct {
+type indexServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewIndexerClient(cc grpc.ClientConnInterface) IndexerClient {
-	return &indexerClient{cc}
+func NewIndexServiceClient(cc grpc.ClientConnInterface) IndexServiceClient {
+	return &indexServiceClient{cc}
 }
 
-func (c *indexerClient) Publish(ctx context.Context, in *ChangeEvent, opts ...grpc.CallOption) (*PublishResponse, error) {
+func (c *indexServiceClient) Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(PublishResponse)
-	err := c.cc.Invoke(ctx, Indexer_Publish_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, IndexService_Publish_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *indexerClient) PublishBatch(ctx context.Context, in *ChangeBatch, opts ...grpc.CallOption) (*PublishResponse, error) {
+func (c *indexServiceClient) PublishBatch(ctx context.Context, in *PublishBatchRequest, opts ...grpc.CallOption) (*PublishBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PublishResponse)
-	err := c.cc.Invoke(ctx, Indexer_PublishBatch_FullMethodName, in, out, cOpts...)
+	out := new(PublishBatchResponse)
+	err := c.cc.Invoke(ctx, IndexService_PublishBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// IndexerServer is the server API for Indexer service.
-// All implementations should embed UnimplementedIndexerServer
+// IndexServiceServer is the server API for IndexService service.
+// All implementations should embed UnimplementedIndexServiceServer
 // for forward compatibility.
-type IndexerServer interface {
-	Publish(context.Context, *ChangeEvent) (*PublishResponse, error)
-	PublishBatch(context.Context, *ChangeBatch) (*PublishResponse, error)
+type IndexServiceServer interface {
+	Publish(context.Context, *PublishRequest) (*PublishResponse, error)
+	PublishBatch(context.Context, *PublishBatchRequest) (*PublishBatchResponse, error)
 }
 
-// UnimplementedIndexerServer should be embedded to have
+// UnimplementedIndexServiceServer should be embedded to have
 // forward compatible implementations.
 //
 // NOTE: this should be embedded by value instead of pointer to avoid a nil
 // pointer dereference when methods are called.
-type UnimplementedIndexerServer struct{}
+type UnimplementedIndexServiceServer struct{}
 
-func (UnimplementedIndexerServer) Publish(context.Context, *ChangeEvent) (*PublishResponse, error) {
+func (UnimplementedIndexServiceServer) Publish(context.Context, *PublishRequest) (*PublishResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
-func (UnimplementedIndexerServer) PublishBatch(context.Context, *ChangeBatch) (*PublishResponse, error) {
+func (UnimplementedIndexServiceServer) PublishBatch(context.Context, *PublishBatchRequest) (*PublishBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method PublishBatch not implemented")
 }
-func (UnimplementedIndexerServer) testEmbeddedByValue() {}
+func (UnimplementedIndexServiceServer) testEmbeddedByValue() {}
 
-// UnsafeIndexerServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to IndexerServer will
+// UnsafeIndexServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to IndexServiceServer will
 // result in compilation errors.
-type UnsafeIndexerServer interface {
-	mustEmbedUnimplementedIndexerServer()
+type UnsafeIndexServiceServer interface {
+	mustEmbedUnimplementedIndexServiceServer()
 }
 
-func RegisterIndexerServer(s grpc.ServiceRegistrar, srv IndexerServer) {
-	// If the following call pancis, it indicates UnimplementedIndexerServer was
+func RegisterIndexServiceServer(s grpc.ServiceRegistrar, srv IndexServiceServer) {
+	// If the following call pancis, it indicates UnimplementedIndexServiceServer was
 	// embedded by pointer and is nil.  This will cause panics if an
 	// unimplemented method is ever invoked, so we test this at initialization
 	// time to prevent it from happening at runtime later due to I/O.
 	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
 		t.testEmbeddedByValue()
 	}
-	s.RegisterService(&Indexer_ServiceDesc, srv)
+	s.RegisterService(&IndexService_ServiceDesc, srv)
 }
 
-func _Indexer_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeEvent)
+func _IndexService_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IndexerServer).Publish(ctx, in)
+		return srv.(IndexServiceServer).Publish(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Indexer_Publish_FullMethodName,
+		FullMethod: IndexService_Publish_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexerServer).Publish(ctx, req.(*ChangeEvent))
+		return srv.(IndexServiceServer).Publish(ctx, req.(*PublishRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Indexer_PublishBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeBatch)
+func _IndexService_PublishBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PublishBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IndexerServer).PublishBatch(ctx, in)
+		return srv.(IndexServiceServer).PublishBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Indexer_PublishBatch_FullMethodName,
+		FullMethod: IndexService_PublishBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexerServer).PublishBatch(ctx, req.(*ChangeBatch))
+		return srv.(IndexServiceServer).PublishBatch(ctx, req.(*PublishBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Indexer_ServiceDesc is the grpc.ServiceDesc for Indexer service.
+// IndexService_ServiceDesc is the grpc.ServiceDesc for IndexService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Indexer_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "index.v1.Indexer",
-	HandlerType: (*IndexerServer)(nil),
+var IndexService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "index.v1.IndexService",
+	HandlerType: (*IndexServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "Publish",
-			Handler:    _Indexer_Publish_Handler,
+			Handler:    _IndexService_Publish_Handler,
 		},
 		{
 			MethodName: "PublishBatch",
-			Handler:    _Indexer_PublishBatch_Handler,
+			Handler:    _IndexService_PublishBatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

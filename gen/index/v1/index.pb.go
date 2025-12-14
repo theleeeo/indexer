@@ -71,19 +71,62 @@ func (x RelationChange_ChangeType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use RelationChange_ChangeType.Descriptor instead.
 func (RelationChange_ChangeType) EnumDescriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{6, 0}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{8, 0}
+}
+
+type PublishRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Event         *ChangeEvent           `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishRequest) Reset() {
+	*x = PublishRequest{}
+	mi := &file_index_v1_index_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishRequest) ProtoMessage() {}
+
+func (x *PublishRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
+func (*PublishRequest) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *PublishRequest) GetEvent() *ChangeEvent {
+	if x != nil {
+		return x.Event
+	}
+	return nil
 }
 
 type PublishResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Accepted      int64                  `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *PublishResponse) Reset() {
 	*x = PublishResponse{}
-	mi := &file_index_v1_index_proto_msgTypes[0]
+	mi := &file_index_v1_index_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -95,7 +138,7 @@ func (x *PublishResponse) String() string {
 func (*PublishResponse) ProtoMessage() {}
 
 func (x *PublishResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[0]
+	mi := &file_index_v1_index_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -108,38 +151,31 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
 func (*PublishResponse) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{0}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *PublishResponse) GetAccepted() int64 {
-	if x != nil {
-		return x.Accepted
-	}
-	return 0
-}
-
-type ChangeBatch struct {
+type PublishBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Events        []*ChangeEvent         `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangeBatch) Reset() {
-	*x = ChangeBatch{}
-	mi := &file_index_v1_index_proto_msgTypes[1]
+func (x *PublishBatchRequest) Reset() {
+	*x = PublishBatchRequest{}
+	mi := &file_index_v1_index_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangeBatch) String() string {
+func (x *PublishBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangeBatch) ProtoMessage() {}
+func (*PublishBatchRequest) ProtoMessage() {}
 
-func (x *ChangeBatch) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[1]
+func (x *PublishBatchRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -150,30 +186,58 @@ func (x *ChangeBatch) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangeBatch.ProtoReflect.Descriptor instead.
-func (*ChangeBatch) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{1}
+// Deprecated: Use PublishBatchRequest.ProtoReflect.Descriptor instead.
+func (*PublishBatchRequest) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *ChangeBatch) GetEvents() []*ChangeEvent {
+func (x *PublishBatchRequest) GetEvents() []*ChangeEvent {
 	if x != nil {
 		return x.Events
 	}
 	return nil
 }
 
+type PublishBatchResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PublishBatchResponse) Reset() {
+	*x = PublishBatchResponse{}
+	mi := &file_index_v1_index_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PublishBatchResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PublishBatchResponse) ProtoMessage() {}
+
+func (x *PublishBatchResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PublishBatchResponse.ProtoReflect.Descriptor instead.
+func (*PublishBatchResponse) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{3}
+}
+
 type ChangeEvent struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// For debugging/ordering only (don’t rely on strict ordering).
-	OccurredAtUnixMs int64 `protobuf:"varint,2,opt,name=occurred_at_unix_ms,json=occurredAtUnixMs,proto3" json:"occurred_at_unix_ms,omitempty"`
 	// Types that are valid to be assigned to Payload:
 	//
-	//	*ChangeEvent_AUpsert
-	//	*ChangeEvent_ADelete
-	//	*ChangeEvent_BUpsert
-	//	*ChangeEvent_BDelete
-	//	*ChangeEvent_CUpsert
-	//	*ChangeEvent_CDelete
 	//	*ChangeEvent_CreatePayload
 	//	*ChangeEvent_UpdatePayload
 	//	*ChangeEvent_DeletePayload
@@ -184,7 +248,7 @@ type ChangeEvent struct {
 
 func (x *ChangeEvent) Reset() {
 	*x = ChangeEvent{}
-	mi := &file_index_v1_index_proto_msgTypes[2]
+	mi := &file_index_v1_index_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -196,7 +260,7 @@ func (x *ChangeEvent) String() string {
 func (*ChangeEvent) ProtoMessage() {}
 
 func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[2]
+	mi := &file_index_v1_index_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -209,73 +273,12 @@ func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ChangeEvent.ProtoReflect.Descriptor instead.
 func (*ChangeEvent) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *ChangeEvent) GetOccurredAtUnixMs() int64 {
-	if x != nil {
-		return x.OccurredAtUnixMs
-	}
-	return 0
+	return file_index_v1_index_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *ChangeEvent) GetPayload() isChangeEvent_Payload {
 	if x != nil {
 		return x.Payload
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetAUpsert() *AUpsert {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_AUpsert); ok {
-			return x.AUpsert
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetADelete() *ADelete {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_ADelete); ok {
-			return x.ADelete
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetBUpsert() *BUpsert {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_BUpsert); ok {
-			return x.BUpsert
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetBDelete() *BDelete {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_BDelete); ok {
-			return x.BDelete
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetCUpsert() *CUpsert {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_CUpsert); ok {
-			return x.CUpsert
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetCDelete() *CDelete {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_CDelete); ok {
-			return x.CDelete
-		}
 	}
 	return nil
 }
@@ -311,53 +314,17 @@ type isChangeEvent_Payload interface {
 	isChangeEvent_Payload()
 }
 
-type ChangeEvent_AUpsert struct {
-	AUpsert *AUpsert `protobuf:"bytes,3,opt,name=a_upsert,json=aUpsert,proto3,oneof"`
-}
-
-type ChangeEvent_ADelete struct {
-	ADelete *ADelete `protobuf:"bytes,4,opt,name=a_delete,json=aDelete,proto3,oneof"`
-}
-
-type ChangeEvent_BUpsert struct {
-	BUpsert *BUpsert `protobuf:"bytes,5,opt,name=b_upsert,json=bUpsert,proto3,oneof"`
-}
-
-type ChangeEvent_BDelete struct {
-	BDelete *BDelete `protobuf:"bytes,6,opt,name=b_delete,json=bDelete,proto3,oneof"`
-}
-
-type ChangeEvent_CUpsert struct {
-	CUpsert *CUpsert `protobuf:"bytes,7,opt,name=c_upsert,json=cUpsert,proto3,oneof"`
-}
-
-type ChangeEvent_CDelete struct {
-	CDelete *CDelete `protobuf:"bytes,8,opt,name=c_delete,json=cDelete,proto3,oneof"`
-}
-
 type ChangeEvent_CreatePayload struct {
-	CreatePayload *CreatePayload `protobuf:"bytes,14,opt,name=create_payload,json=createPayload,proto3,oneof"`
+	CreatePayload *CreatePayload `protobuf:"bytes,1,opt,name=create_payload,json=createPayload,proto3,oneof"`
 }
 
 type ChangeEvent_UpdatePayload struct {
-	UpdatePayload *UpdatePayload `protobuf:"bytes,15,opt,name=update_payload,json=updatePayload,proto3,oneof"`
+	UpdatePayload *UpdatePayload `protobuf:"bytes,2,opt,name=update_payload,json=updatePayload,proto3,oneof"`
 }
 
 type ChangeEvent_DeletePayload struct {
-	DeletePayload *DeletePayload `protobuf:"bytes,16,opt,name=delete_payload,json=deletePayload,proto3,oneof"`
+	DeletePayload *DeletePayload `protobuf:"bytes,3,opt,name=delete_payload,json=deletePayload,proto3,oneof"`
 }
-
-func (*ChangeEvent_AUpsert) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_ADelete) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_BUpsert) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_BDelete) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_CUpsert) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_CDelete) isChangeEvent_Payload() {}
 
 func (*ChangeEvent_CreatePayload) isChangeEvent_Payload() {}
 
@@ -377,7 +344,7 @@ type CreatePayload struct {
 
 func (x *CreatePayload) Reset() {
 	*x = CreatePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[3]
+	mi := &file_index_v1_index_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +356,7 @@ func (x *CreatePayload) String() string {
 func (*CreatePayload) ProtoMessage() {}
 
 func (x *CreatePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[3]
+	mi := &file_index_v1_index_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +369,7 @@ func (x *CreatePayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePayload.ProtoReflect.Descriptor instead.
 func (*CreatePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{3}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreatePayload) GetResource() string {
@@ -445,7 +412,7 @@ type UpdatePayload struct {
 
 func (x *UpdatePayload) Reset() {
 	*x = UpdatePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[4]
+	mi := &file_index_v1_index_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -457,7 +424,7 @@ func (x *UpdatePayload) String() string {
 func (*UpdatePayload) ProtoMessage() {}
 
 func (x *UpdatePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[4]
+	mi := &file_index_v1_index_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -470,7 +437,7 @@ func (x *UpdatePayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePayload.ProtoReflect.Descriptor instead.
 func (*UpdatePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{4}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *UpdatePayload) GetResource() string {
@@ -511,7 +478,7 @@ type DeletePayload struct {
 
 func (x *DeletePayload) Reset() {
 	*x = DeletePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[5]
+	mi := &file_index_v1_index_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -523,7 +490,7 @@ func (x *DeletePayload) String() string {
 func (*DeletePayload) ProtoMessage() {}
 
 func (x *DeletePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[5]
+	mi := &file_index_v1_index_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -536,7 +503,7 @@ func (x *DeletePayload) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePayload.ProtoReflect.Descriptor instead.
 func (*DeletePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{5}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *DeletePayload) GetResource() string {
@@ -563,7 +530,7 @@ type RelationChange struct {
 
 func (x *RelationChange) Reset() {
 	*x = RelationChange{}
-	mi := &file_index_v1_index_proto_msgTypes[6]
+	mi := &file_index_v1_index_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -575,7 +542,7 @@ func (x *RelationChange) String() string {
 func (*RelationChange) ProtoMessage() {}
 
 func (x *RelationChange) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[6]
+	mi := &file_index_v1_index_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -588,7 +555,7 @@ func (x *RelationChange) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelationChange.ProtoReflect.Descriptor instead.
 func (*RelationChange) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{6}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RelationChange) GetRelation() *Relation {
@@ -615,7 +582,7 @@ type Relation struct {
 
 func (x *Relation) Reset() {
 	*x = Relation{}
-	mi := &file_index_v1_index_proto_msgTypes[7]
+	mi := &file_index_v1_index_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -627,7 +594,7 @@ func (x *Relation) String() string {
 func (*Relation) ProtoMessage() {}
 
 func (x *Relation) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[7]
+	mi := &file_index_v1_index_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -640,7 +607,7 @@ func (x *Relation) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Relation.ProtoReflect.Descriptor instead.
 func (*Relation) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{7}
+	return file_index_v1_index_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *Relation) GetResource() string {
@@ -657,340 +624,21 @@ func (x *Relation) GetResourceId() string {
 	return ""
 }
 
-type AUpsert struct {
-	state protoimpl.MessageState `protogen:"open.v1"`
-	AId   string                 `protobuf:"bytes,1,opt,name=a_id,json=aId,proto3" json:"a_id,omitempty"`
-	// Example A fields you might filter/sort on:
-	Status string `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
-	// Relationships:
-	BId           string   `protobuf:"bytes,3,opt,name=b_id,json=bId,proto3" json:"b_id,omitempty"`
-	CIds          []string `protobuf:"bytes,4,rep,name=c_ids,json=cIds,proto3" json:"c_ids,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AUpsert) Reset() {
-	*x = AUpsert{}
-	mi := &file_index_v1_index_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AUpsert) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AUpsert) ProtoMessage() {}
-
-func (x *AUpsert) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AUpsert.ProtoReflect.Descriptor instead.
-func (*AUpsert) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *AUpsert) GetAId() string {
-	if x != nil {
-		return x.AId
-	}
-	return ""
-}
-
-func (x *AUpsert) GetStatus() string {
-	if x != nil {
-		return x.Status
-	}
-	return ""
-}
-
-func (x *AUpsert) GetBId() string {
-	if x != nil {
-		return x.BId
-	}
-	return ""
-}
-
-func (x *AUpsert) GetCIds() []string {
-	if x != nil {
-		return x.CIds
-	}
-	return nil
-}
-
-type ADelete struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AId           string                 `protobuf:"bytes,1,opt,name=a_id,json=aId,proto3" json:"a_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *ADelete) Reset() {
-	*x = ADelete{}
-	mi := &file_index_v1_index_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *ADelete) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*ADelete) ProtoMessage() {}
-
-func (x *ADelete) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use ADelete.ProtoReflect.Descriptor instead.
-func (*ADelete) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *ADelete) GetAId() string {
-	if x != nil {
-		return x.AId
-	}
-	return ""
-}
-
-type BUpsert struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BId           string                 `protobuf:"bytes,1,opt,name=b_id,json=bId,proto3" json:"b_id,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BUpsert) Reset() {
-	*x = BUpsert{}
-	mi := &file_index_v1_index_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BUpsert) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BUpsert) ProtoMessage() {}
-
-func (x *BUpsert) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BUpsert.ProtoReflect.Descriptor instead.
-func (*BUpsert) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *BUpsert) GetBId() string {
-	if x != nil {
-		return x.BId
-	}
-	return ""
-}
-
-func (x *BUpsert) GetName() string {
-	if x != nil {
-		return x.Name
-	}
-	return ""
-}
-
-type BDelete struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	BId           string                 `protobuf:"bytes,1,opt,name=b_id,json=bId,proto3" json:"b_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *BDelete) Reset() {
-	*x = BDelete{}
-	mi := &file_index_v1_index_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *BDelete) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*BDelete) ProtoMessage() {}
-
-func (x *BDelete) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use BDelete.ProtoReflect.Descriptor instead.
-func (*BDelete) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *BDelete) GetBId() string {
-	if x != nil {
-		return x.BId
-	}
-	return ""
-}
-
-type CUpsert struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CId           string                 `protobuf:"bytes,1,opt,name=c_id,json=cId,proto3" json:"c_id,omitempty"`
-	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
-	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CUpsert) Reset() {
-	*x = CUpsert{}
-	mi := &file_index_v1_index_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CUpsert) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CUpsert) ProtoMessage() {}
-
-func (x *CUpsert) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CUpsert.ProtoReflect.Descriptor instead.
-func (*CUpsert) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *CUpsert) GetCId() string {
-	if x != nil {
-		return x.CId
-	}
-	return ""
-}
-
-func (x *CUpsert) GetType() string {
-	if x != nil {
-		return x.Type
-	}
-	return ""
-}
-
-func (x *CUpsert) GetState() string {
-	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-type CDelete struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CId           string                 `protobuf:"bytes,1,opt,name=c_id,json=cId,proto3" json:"c_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CDelete) Reset() {
-	*x = CDelete{}
-	mi := &file_index_v1_index_proto_msgTypes[13]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CDelete) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CDelete) ProtoMessage() {}
-
-func (x *CDelete) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[13]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CDelete.ProtoReflect.Descriptor instead.
-func (*CDelete) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{13}
-}
-
-func (x *CDelete) GetCId() string {
-	if x != nil {
-		return x.CId
-	}
-	return ""
-}
-
 var File_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_index_v1_index_proto_rawDesc = "" +
 	"\n" +
-	"\x14index/v1/index.proto\x12\bindex.v1\x1a\x1cgoogle/protobuf/struct.proto\"-\n" +
-	"\x0fPublishResponse\x12\x1a\n" +
-	"\baccepted\x18\x01 \x01(\x03R\baccepted\"<\n" +
-	"\vChangeBatch\x12-\n" +
-	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\xad\x04\n" +
-	"\vChangeEvent\x12-\n" +
-	"\x13occurred_at_unix_ms\x18\x02 \x01(\x03R\x10occurredAtUnixMs\x12.\n" +
-	"\ba_upsert\x18\x03 \x01(\v2\x11.index.v1.AUpsertH\x00R\aaUpsert\x12.\n" +
-	"\ba_delete\x18\x04 \x01(\v2\x11.index.v1.ADeleteH\x00R\aaDelete\x12.\n" +
-	"\bb_upsert\x18\x05 \x01(\v2\x11.index.v1.BUpsertH\x00R\abUpsert\x12.\n" +
-	"\bb_delete\x18\x06 \x01(\v2\x11.index.v1.BDeleteH\x00R\abDelete\x12.\n" +
-	"\bc_upsert\x18\a \x01(\v2\x11.index.v1.CUpsertH\x00R\acUpsert\x12.\n" +
-	"\bc_delete\x18\b \x01(\v2\x11.index.v1.CDeleteH\x00R\acDelete\x12@\n" +
-	"\x0ecreate_payload\x18\x0e \x01(\v2\x17.index.v1.CreatePayloadH\x00R\rcreatePayload\x12@\n" +
-	"\x0eupdate_payload\x18\x0f \x01(\v2\x17.index.v1.UpdatePayloadH\x00R\rupdatePayload\x12@\n" +
-	"\x0edelete_payload\x18\x10 \x01(\v2\x17.index.v1.DeletePayloadH\x00R\rdeletePayloadB\t\n" +
+	"\x14index/v1/index.proto\x12\bindex.v1\x1a\x1cgoogle/protobuf/struct.proto\"=\n" +
+	"\x0ePublishRequest\x12+\n" +
+	"\x05event\x18\x01 \x01(\v2\x15.index.v1.ChangeEventR\x05event\"\x11\n" +
+	"\x0fPublishResponse\"D\n" +
+	"\x13PublishBatchRequest\x12-\n" +
+	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\x16\n" +
+	"\x14PublishBatchResponse\"\xde\x01\n" +
+	"\vChangeEvent\x12@\n" +
+	"\x0ecreate_payload\x18\x01 \x01(\v2\x17.index.v1.CreatePayloadH\x00R\rcreatePayload\x12@\n" +
+	"\x0eupdate_payload\x18\x02 \x01(\v2\x17.index.v1.UpdatePayloadH\x00R\rupdatePayload\x12@\n" +
+	"\x0edelete_payload\x18\x03 \x01(\v2\x17.index.v1.DeletePayloadH\x00R\rdeletePayloadB\t\n" +
 	"\apayload\"\xab\x01\n" +
 	"\rCreatePayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
@@ -1021,28 +669,10 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\bRelation\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\"\\\n" +
-	"\aAUpsert\x12\x11\n" +
-	"\x04a_id\x18\x01 \x01(\tR\x03aId\x12\x16\n" +
-	"\x06status\x18\x02 \x01(\tR\x06status\x12\x11\n" +
-	"\x04b_id\x18\x03 \x01(\tR\x03bId\x12\x13\n" +
-	"\x05c_ids\x18\x04 \x03(\tR\x04cIds\"\x1c\n" +
-	"\aADelete\x12\x11\n" +
-	"\x04a_id\x18\x01 \x01(\tR\x03aId\"0\n" +
-	"\aBUpsert\x12\x11\n" +
-	"\x04b_id\x18\x01 \x01(\tR\x03bId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\x1c\n" +
-	"\aBDelete\x12\x11\n" +
-	"\x04b_id\x18\x01 \x01(\tR\x03bId\"F\n" +
-	"\aCUpsert\x12\x11\n" +
-	"\x04c_id\x18\x01 \x01(\tR\x03cId\x12\x12\n" +
-	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
-	"\x05state\x18\x03 \x01(\tR\x05state\"\x1c\n" +
-	"\aCDelete\x12\x11\n" +
-	"\x04c_id\x18\x01 \x01(\tR\x03cId2\x88\x01\n" +
-	"\aIndexer\x12;\n" +
-	"\aPublish\x12\x15.index.v1.ChangeEvent\x1a\x19.index.v1.PublishResponse\x12@\n" +
-	"\fPublishBatch\x12\x15.index.v1.ChangeBatch\x1a\x19.index.v1.PublishResponseBw\n" +
+	"resourceId2\x9d\x01\n" +
+	"\fIndexService\x12>\n" +
+	"\aPublish\x12\x18.index.v1.PublishRequest\x1a\x19.index.v1.PublishResponse\x12M\n" +
+	"\fPublishBatch\x12\x1d.index.v1.PublishBatchRequest\x1a\x1e.index.v1.PublishBatchResponseBw\n" +
 	"\fcom.index.v1B\n" +
 	"IndexProtoP\x01Z\x1aindexer/gen/index/v1;index\xa2\x02\x03IXX\xaa\x02\bIndex.V1\xca\x02\bIndex\\V1\xe2\x02\x14Index\\V1\\GPBMetadata\xea\x02\tIndex::V1b\x06proto3"
 
@@ -1059,51 +689,42 @@ func file_index_v1_index_proto_rawDescGZIP() []byte {
 }
 
 var file_index_v1_index_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
 var file_index_v1_index_proto_goTypes = []any{
 	(RelationChange_ChangeType)(0), // 0: index.v1.RelationChange.ChangeType
-	(*PublishResponse)(nil),        // 1: index.v1.PublishResponse
-	(*ChangeBatch)(nil),            // 2: index.v1.ChangeBatch
-	(*ChangeEvent)(nil),            // 3: index.v1.ChangeEvent
-	(*CreatePayload)(nil),          // 4: index.v1.CreatePayload
-	(*UpdatePayload)(nil),          // 5: index.v1.UpdatePayload
-	(*DeletePayload)(nil),          // 6: index.v1.DeletePayload
-	(*RelationChange)(nil),         // 7: index.v1.RelationChange
-	(*Relation)(nil),               // 8: index.v1.Relation
-	(*AUpsert)(nil),                // 9: index.v1.AUpsert
-	(*ADelete)(nil),                // 10: index.v1.ADelete
-	(*BUpsert)(nil),                // 11: index.v1.BUpsert
-	(*BDelete)(nil),                // 12: index.v1.BDelete
-	(*CUpsert)(nil),                // 13: index.v1.CUpsert
-	(*CDelete)(nil),                // 14: index.v1.CDelete
-	(*structpb.Struct)(nil),        // 15: google.protobuf.Struct
+	(*PublishRequest)(nil),         // 1: index.v1.PublishRequest
+	(*PublishResponse)(nil),        // 2: index.v1.PublishResponse
+	(*PublishBatchRequest)(nil),    // 3: index.v1.PublishBatchRequest
+	(*PublishBatchResponse)(nil),   // 4: index.v1.PublishBatchResponse
+	(*ChangeEvent)(nil),            // 5: index.v1.ChangeEvent
+	(*CreatePayload)(nil),          // 6: index.v1.CreatePayload
+	(*UpdatePayload)(nil),          // 7: index.v1.UpdatePayload
+	(*DeletePayload)(nil),          // 8: index.v1.DeletePayload
+	(*RelationChange)(nil),         // 9: index.v1.RelationChange
+	(*Relation)(nil),               // 10: index.v1.Relation
+	(*structpb.Struct)(nil),        // 11: google.protobuf.Struct
 }
 var file_index_v1_index_proto_depIdxs = []int32{
-	3,  // 0: index.v1.ChangeBatch.events:type_name -> index.v1.ChangeEvent
-	9,  // 1: index.v1.ChangeEvent.a_upsert:type_name -> index.v1.AUpsert
-	10, // 2: index.v1.ChangeEvent.a_delete:type_name -> index.v1.ADelete
-	11, // 3: index.v1.ChangeEvent.b_upsert:type_name -> index.v1.BUpsert
-	12, // 4: index.v1.ChangeEvent.b_delete:type_name -> index.v1.BDelete
-	13, // 5: index.v1.ChangeEvent.c_upsert:type_name -> index.v1.CUpsert
-	14, // 6: index.v1.ChangeEvent.c_delete:type_name -> index.v1.CDelete
-	4,  // 7: index.v1.ChangeEvent.create_payload:type_name -> index.v1.CreatePayload
-	5,  // 8: index.v1.ChangeEvent.update_payload:type_name -> index.v1.UpdatePayload
-	6,  // 9: index.v1.ChangeEvent.delete_payload:type_name -> index.v1.DeletePayload
-	15, // 10: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
-	8,  // 11: index.v1.CreatePayload.relations:type_name -> index.v1.Relation
-	15, // 12: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
-	7,  // 13: index.v1.UpdatePayload.relation_changes:type_name -> index.v1.RelationChange
-	8,  // 14: index.v1.RelationChange.relation:type_name -> index.v1.Relation
-	0,  // 15: index.v1.RelationChange.change_type:type_name -> index.v1.RelationChange.ChangeType
-	3,  // 16: index.v1.Indexer.Publish:input_type -> index.v1.ChangeEvent
-	2,  // 17: index.v1.Indexer.PublishBatch:input_type -> index.v1.ChangeBatch
-	1,  // 18: index.v1.Indexer.Publish:output_type -> index.v1.PublishResponse
-	1,  // 19: index.v1.Indexer.PublishBatch:output_type -> index.v1.PublishResponse
-	18, // [18:20] is the sub-list for method output_type
-	16, // [16:18] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	5,  // 0: index.v1.PublishRequest.event:type_name -> index.v1.ChangeEvent
+	5,  // 1: index.v1.PublishBatchRequest.events:type_name -> index.v1.ChangeEvent
+	6,  // 2: index.v1.ChangeEvent.create_payload:type_name -> index.v1.CreatePayload
+	7,  // 3: index.v1.ChangeEvent.update_payload:type_name -> index.v1.UpdatePayload
+	8,  // 4: index.v1.ChangeEvent.delete_payload:type_name -> index.v1.DeletePayload
+	11, // 5: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
+	10, // 6: index.v1.CreatePayload.relations:type_name -> index.v1.Relation
+	11, // 7: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
+	9,  // 8: index.v1.UpdatePayload.relation_changes:type_name -> index.v1.RelationChange
+	10, // 9: index.v1.RelationChange.relation:type_name -> index.v1.Relation
+	0,  // 10: index.v1.RelationChange.change_type:type_name -> index.v1.RelationChange.ChangeType
+	1,  // 11: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
+	3,  // 12: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest
+	2,  // 13: index.v1.IndexService.Publish:output_type -> index.v1.PublishResponse
+	4,  // 14: index.v1.IndexService.PublishBatch:output_type -> index.v1.PublishBatchResponse
+	13, // [13:15] is the sub-list for method output_type
+	11, // [11:13] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_index_v1_index_proto_init() }
@@ -1111,13 +732,7 @@ func file_index_v1_index_proto_init() {
 	if File_index_v1_index_proto != nil {
 		return
 	}
-	file_index_v1_index_proto_msgTypes[2].OneofWrappers = []any{
-		(*ChangeEvent_AUpsert)(nil),
-		(*ChangeEvent_ADelete)(nil),
-		(*ChangeEvent_BUpsert)(nil),
-		(*ChangeEvent_BDelete)(nil),
-		(*ChangeEvent_CUpsert)(nil),
-		(*ChangeEvent_CDelete)(nil),
+	file_index_v1_index_proto_msgTypes[4].OneofWrappers = []any{
 		(*ChangeEvent_CreatePayload)(nil),
 		(*ChangeEvent_UpdatePayload)(nil),
 		(*ChangeEvent_DeletePayload)(nil),
@@ -1128,7 +743,7 @@ func file_index_v1_index_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_index_v1_index_proto_rawDesc), len(file_index_v1_index_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   14,
+			NumMessages:   10,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

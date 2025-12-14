@@ -6,37 +6,29 @@ import "google/protobuf/struct.proto";
 
 option go_package = "indexer/gen/index/v1;index";
 
-service Indexer {
-  rpc Publish(ChangeEvent) returns (PublishResponse);
-  rpc PublishBatch(ChangeBatch) returns (PublishResponse);
+service IndexService {
+  rpc Publish(PublishRequest) returns (PublishResponse);
+  rpc PublishBatch(PublishBatchRequest) returns (PublishBatchResponse);
+}
+
+message PublishRequest {
+  ChangeEvent event = 1;
 }
 
 
-message PublishResponse {
-  int64 accepted = 1;
-}
+message PublishResponse {}
 
-message ChangeBatch {
+message PublishBatchRequest {
   repeated ChangeEvent events = 1;
 }
 
+message PublishBatchResponse {}
+
 message ChangeEvent {
-  // For debugging/ordering only (don’t rely on strict ordering).
-  int64         occurred_at_unix_ms = 2;
-
   oneof payload {
-    AUpsert       a_upsert            = 3;
-    ADelete       a_delete            = 4;
-
-    BUpsert       b_upsert            = 5;
-    BDelete       b_delete            = 6;
-
-    CUpsert       c_upsert            = 7;
-    CDelete       c_delete            = 8;
-
-    CreatePayload create_payload      = 14;
-    UpdatePayload update_payload      = 15;
-    DeletePayload delete_payload      = 16;
+    CreatePayload create_payload = 1;
+    UpdatePayload update_payload = 2;
+    DeletePayload delete_payload = 3;
   }
 }
 
@@ -71,43 +63,7 @@ message RelationChange {
   ChangeType change_type             = 2;
 }
 
-
 message Relation {
   string resource    = 1;
   string resource_id = 2;
-}
-
-
-message AUpsert {
-  string          a_id   = 1;
-
-  // Example A fields you might filter/sort on:
-  string          status = 2;
-
-  // Relationships:
-  string          b_id   = 3;
-  repeated string c_ids  = 4;
-}
-
-message ADelete {
-  string a_id = 1;
-}
-
-message BUpsert {
-  string b_id = 1;
-  string name = 2;
-}
-
-message BDelete {
-  string b_id = 1;
-}
-
-message CUpsert {
-  string c_id  = 1;
-  string type  = 2;
-  string state = 3;
-}
-
-message CDelete {
-  string c_id = 1;
 }

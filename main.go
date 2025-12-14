@@ -49,7 +49,7 @@ func main() {
 	}
 
 	g := grpc.NewServer()
-	index.RegisterIndexerServer(g, idxSrv)
+	index.RegisterIndexServiceServer(g, idxSrv)
 	search.RegisterSearchServiceServer(g, searchSrv)
 	reflection.Register(g)
 
