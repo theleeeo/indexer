@@ -98,9 +98,9 @@ func (s *Store) UpdateRelations(resource, resourceId string, relChanges Relation
 	}
 }
 
-func (s *Store) GetRelatedResources(resource, resourceID string) []ResourceKey {
+func (s *Store) GetParentResources(childResource, childResourceId string) []ResourceKey {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	rk := Key(resource, resourceID)
+	rk := Key(childResource, childResourceId)
 	return s.relations[rk]
 }

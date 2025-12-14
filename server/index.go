@@ -83,14 +83,38 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 
 	s.st.StoreRelations(p.Resource, p.ResourceId, p.Relations)
 
-	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, map[string]any{
+	docMap := map[string]any{
 		"fields": p.Data,
-	}); err != nil {
+	}
+
+	resourceMap := map[string][]string{}
+	for _, rel := range p.Relations {
+		resourceMap[rel.Resource] = append(resourceMap[rel.Resource], rel.ResourceId)
+	}
+
+	type idStruct struct {
+		Id string `json:"id"`
+	}
+
+	for resType, resIds := range resourceMap {
+		if len(resIds) == 1 {
+			docMap[resType] = idStruct{Id: resIds[0]}
+			continue
+		}
+
+		idStructs := make([]idStruct, 0, len(resIds))
+		for _, rid := range resIds {
+			idStructs = append(idStructs, idStruct{Id: rid})
+		}
+		docMap[resType] = idStructs
+	}
+
+	if err := s.es.UpsertJSON(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
 		return err
 	}
 
-	relatedResources := s.st.GetRelatedResources(p.Resource, p.ResourceId)
-	for _, relatedResource := range relatedResources {
+	parentResources := s.st.GetParentResources(p.Resource, p.ResourceId)
+	for _, relatedResource := range parentResources {
 		rsType, rsId := store.KeyParts(relatedResource)
 		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
 			return err
@@ -143,7 +167,7 @@ func (s *IndexerServer) handleUpdate(ctx context.Context, p *index.UpdatePayload
 		return err
 	}
 
-	relatedResources := s.st.GetRelatedResources(p.Resource, p.ResourceId)
+	relatedResources := s.st.GetParentResources(p.Resource, p.ResourceId)
 	for _, relatedResource := range relatedResources {
 		rsType, rsId := store.KeyParts(relatedResource)
 		if err := s.es.UpsertFieldElementByID(ctx, rsType+"_search", rsId, p.Resource, p.ResourceId, p.Data); err != nil {
