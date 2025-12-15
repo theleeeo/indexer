@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"indexer/es"
 	"indexer/gen/index/v1"
@@ -24,16 +23,12 @@ type IndexerServer struct {
 
 	st store.Store
 	es *es.Client
-
-	// de-dup window (in-memory)
-	dedupTTL time.Duration
 }
 
 func NewIndexer(st store.Store, esClient *es.Client) *IndexerServer {
 	return &IndexerServer{
-		st:       st,
-		es:       esClient,
-		dedupTTL: 5 * time.Minute,
+		st: st,
+		es: esClient,
 	}
 }
 

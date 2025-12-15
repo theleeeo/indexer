@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"indexer/server"
 	"indexer/store"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -39,7 +41,14 @@ func main() {
 		log.Fatalf("es client: %v", err)
 	}
 
-	st := store.NewMemoryStore()
+	dbpool, err := pgxpool.New(context.Background(), "postgres://user:pass@localhost:5432/indexer")
+	if err != nil {
+		log.Fatalf("pgxpool: %v", err)
+	}
+	defer dbpool.Close()
+
+	// st := store.NewMemoryStore()
+	st := store.NewPostgresStore(dbpool)
 	idxSrv := server.NewIndexer(st, esClient)
 	searchSrv := server.NewSearcher(esClient)
 
