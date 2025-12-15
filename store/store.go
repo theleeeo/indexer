@@ -15,4 +15,5 @@ type Store interface {
 	RemoveRelation(ctx context.Context, resource Resource, relResource Resource) error
 	SetRelation(ctx context.Context, resource Resource, relResource Resource) error
 	GetParentResources(ctx context.Context, childResource Resource) ([]Resource, error)
+	RemoveResource(ctx context.Context, resource Resource) error
 }

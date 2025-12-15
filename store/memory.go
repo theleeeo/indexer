@@ -68,3 +68,11 @@ func (s *MemoryStore) GetParentResources(_ context.Context, childResource Resour
 	}
 	return parents, nil
 }
+
+func (s *MemoryStore) RemoveResource(ctx context.Context, resource Resource) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	delete(s.relations, resource)
+	return nil
+}

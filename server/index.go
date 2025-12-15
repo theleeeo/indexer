@@ -221,8 +221,12 @@ func (s *IndexerServer) handleDelete(ctx context.Context, p *index.DeletePayload
 	}
 	for _, relatedResource := range parentResources {
 		if err := s.es.RemoveFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId); err != nil {
-			return err
+			return fmt.Errorf("remove from parent resource failed: %w", err)
 		}
+	}
+
+	if err := s.st.RemoveResource(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId}); err != nil {
+		return fmt.Errorf("remove relations failed: %w", err)
 	}
 
 	return nil

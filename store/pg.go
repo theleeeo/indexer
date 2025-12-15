@@ -88,3 +88,12 @@ func (s *PostgresStore) GetParentResources(ctx context.Context, childResource Re
 	}
 	return parents, nil
 }
+
+func (s *PostgresStore) RemoveResource(ctx context.Context, resource Resource) error {
+	_, err := s.pool.Exec(
+		ctx,
+		`DELETE FROM relations WHERE resource=$1 AND resource_id=$2`,
+		resource.Type, resource.Id,
+	)
+	return err
+}
