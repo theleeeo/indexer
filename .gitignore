@@ -1,2 +1,5 @@
 dev/
 tmp/
+
+resources.yml
+!example.resources.yml

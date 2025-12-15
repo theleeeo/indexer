@@ -4,6 +4,7 @@ go 1.25
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
+	github.com/goccy/go-yaml v1.19.0
 	github.com/jackc/pgx/v5 v5.7.6
 	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.35.1
