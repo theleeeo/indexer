@@ -36,10 +36,17 @@ message ChangeEvent {
 }
 
 message CreatePayload {
-  string                 resource    = 1;
-  string                 resource_id = 2;
-  google.protobuf.Struct data        = 3;
-  repeated Relation      relations   = 4;
+  string                            resource    = 1;
+  string                            resource_id = 2;
+  google.protobuf.Struct            data        = 3;
+  repeated CreateRelationParameters relations   = 4;
+}
+
+message CreateRelationParameters {
+  Relation relation_to_add = 1;
+  // If true, the relation is two-way (i.e., reciprocal).
+  // IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
+  bool     two_way         = 2;
 }
 
 message UpdatePayload {

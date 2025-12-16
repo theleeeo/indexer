@@ -92,17 +92,30 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		return fmt.Errorf("resource_id required")
 	}
 
-	relations := make([]store.Relation, len(p.Relations))
-	for i, crp := range p.Relations {
-		relations[i] = store.Relation{
+	relations := make([]store.Relation, 0, len(p.Relations))
+	for _, crp := range p.Relations {
+		relations = append(relations, store.Relation{
 			Parent: store.Resource{
 				Type: p.Resource,
 				Id:   p.ResourceId,
 			},
 			Children: store.Resource{
-				Type: crp.Resource,
-				Id:   crp.ResourceId,
+				Type: crp.RelationToAdd.Resource,
+				Id:   crp.RelationToAdd.ResourceId,
 			},
+		})
+
+		if crp.TwoWay {
+			relations = append(relations, store.Relation{
+				Parent: store.Resource{
+					Type: crp.RelationToAdd.Resource,
+					Id:   crp.RelationToAdd.ResourceId,
+				},
+				Children: store.Resource{
+					Type: p.Resource,
+					Id:   p.ResourceId,
+				},
+			})
 		}
 	}
 	if err := s.st.AddRelations(ctx, relations); err != nil {
@@ -115,7 +128,7 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 
 	resourceMap := map[string][]string{}
 	for _, rel := range p.Relations {
-		resourceMap[rel.Resource] = append(resourceMap[rel.Resource], rel.ResourceId)
+		resourceMap[rel.RelationToAdd.Resource] = append(resourceMap[rel.RelationToAdd.Resource], rel.RelationToAdd.ResourceId)
 	}
 
 	// TODO: Weather to make it array or single object should be based on the relation kind from the schema
