@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"indexer/gen/index/v1"
 )
 
 type Resource struct {
@@ -10,10 +9,15 @@ type Resource struct {
 	Id   string
 }
 
+type Relation struct {
+	Parent   Resource
+	Children Resource
+}
+
 type Store interface {
-	AddRelations(ctx context.Context, resource Resource, relations []*index.Relation) error
-	RemoveRelation(ctx context.Context, resource Resource, relResource Resource) error
-	SetRelation(ctx context.Context, resource Resource, relResource Resource) error
+	AddRelations(ctx context.Context, relations []Relation) error
+	RemoveRelation(ctx context.Context, relation Relation) error
+	SetRelation(ctx context.Context, relation Relation) error
 	GetParentResources(ctx context.Context, childResource Resource) ([]Resource, error)
 	RemoveResource(ctx context.Context, resource Resource) error
 }

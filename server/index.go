@@ -92,7 +92,20 @@ func (s *IndexerServer) handleCreate(ctx context.Context, p *index.CreatePayload
 		return fmt.Errorf("resource_id required")
 	}
 
-	if err := s.st.AddRelations(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId}, p.Relations); err != nil {
+	relations := make([]store.Relation, len(p.Relations))
+	for i, crp := range p.Relations {
+		relations[i] = store.Relation{
+			Parent: store.Resource{
+				Type: p.Resource,
+				Id:   p.ResourceId,
+			},
+			Children: store.Resource{
+				Type: crp.Resource,
+				Id:   crp.ResourceId,
+			},
+		}
+	}
+	if err := s.st.AddRelations(ctx, relations); err != nil {
 		return fmt.Errorf("store relations failed: %w", err)
 	}
 
@@ -244,11 +257,10 @@ func (s *IndexerServer) handleAddRelation(ctx context.Context, p *index.AddRelat
 	}
 
 	if err := s.st.AddRelations(ctx,
-		store.Resource{Type: p.Resource, Id: p.ResourceId},
-		[]*index.Relation{
+		[]store.Relation{
 			{
-				Resource:   p.RelationToAdd.Resource,
-				ResourceId: p.RelationToAdd.ResourceId,
+				Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
+				Children: store.Resource{Type: p.RelationToAdd.Resource, Id: p.RelationToAdd.ResourceId},
 			},
 		}); err != nil {
 		return fmt.Errorf("store relations failed: %w", err)
@@ -273,8 +285,11 @@ func (s *IndexerServer) handleRemoveRelation(ctx context.Context, p *index.Remov
 	}
 
 	if err := s.st.RemoveRelation(ctx,
-		store.Resource{Type: p.Resource, Id: p.ResourceId},
-		store.Resource{Type: p.RelationToRemove.Resource, Id: p.RelationToRemove.ResourceId}); err != nil {
+		store.Relation{
+			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
+			Children: store.Resource{Type: p.RelationToRemove.Resource, Id: p.RelationToRemove.ResourceId},
+		},
+	); err != nil {
 		return fmt.Errorf("remove relation failed: %w", err)
 	}
 
@@ -295,8 +310,11 @@ func (s *IndexerServer) handleSetRelation(ctx context.Context, p *index.SetRelat
 	}
 
 	if err := s.st.SetRelation(ctx,
-		store.Resource{Type: p.Resource, Id: p.ResourceId},
-		store.Resource{Type: p.RelationToSet.Resource, Id: p.RelationToSet.ResourceId}); err != nil {
+		store.Relation{
+			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
+			Children: store.Resource{Type: p.RelationToSet.Resource, Id: p.RelationToSet.ResourceId},
+		},
+	); err != nil {
 		return fmt.Errorf("set relation failed: %w", err)
 	}
 

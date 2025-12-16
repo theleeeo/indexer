@@ -2,7 +2,6 @@ package store
 
 import (
 	"context"
-	"indexer/gen/index/v1"
 	"sync"
 )
 
@@ -21,41 +20,40 @@ func NewMemoryStore() *MemoryStore {
 	}
 }
 
-func (s *MemoryStore) AddRelations(_ context.Context, resource Resource, relations []*index.Relation) error {
+func (s *MemoryStore) AddRelations(_ context.Context, relations []Relation) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	for _, rl := range relations {
-		childResource := Resource{Type: rl.Resource, Id: rl.ResourceId}
-		s.relations[childResource] = append(s.relations[childResource], resource)
+		s.relations[rl.Children] = append(s.relations[rl.Children], rl.Parent)
 	}
 
 	return nil
 }
 
-func (s *MemoryStore) RemoveRelation(ctx context.Context, resource, relResource Resource) error {
+func (s *MemoryStore) RemoveRelation(ctx context.Context, relation Relation) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	parents, ok := s.relations[relResource]
+	parents, ok := s.relations[relation.Children]
 	if !ok {
 		return nil
 	}
 
 	newParents := []Resource{}
 	for _, pr := range parents {
-		if pr != resource {
+		if pr != relation.Parent {
 			newParents = append(newParents, pr)
 		}
 	}
-	s.relations[relResource] = newParents
+	s.relations[relation.Children] = newParents
 	return nil
 }
 
-func (s *MemoryStore) SetRelation(ctx context.Context, parentResource Resource, relatedResource Resource) error {
+func (s *MemoryStore) SetRelation(ctx context.Context, relation Relation) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.relations[relatedResource] = []Resource{parentResource}
+	s.relations[relation.Children] = []Resource{relation.Parent}
 	return nil
 }
 
