@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"indexer/app"
 	"indexer/es"
 	"indexer/gen/index/v1"
 	"indexer/gen/search/v1"
@@ -68,8 +69,9 @@ func main() {
 
 	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)
-	idxSrv := server.NewIndexer(st, esClient)
-	searchSrv := server.NewSearcher(esClient)
+	app := app.New(st, esClient)
+	idxSrv := server.NewIndexer(app)
+	searchSrv := server.NewSearcher(app)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
