@@ -6,10 +6,6 @@ import (
 	"indexer/gen/search/v1"
 )
 
-var (
-	ErrUnknownResource = errors.New("unknown resource")
-)
-
 func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
 	if req.Resource == "" {
 		return nil, errors.New("resource is required")
@@ -30,7 +26,7 @@ func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.Se
 		req.Page = 0
 	}
 
-	res, err := a.es.Search(ctx, req, r.IndexName, r.GetSearchableFields())
+	res, err := a.es.Search(ctx, req, r.Resource+"_search", r.GetSearchableFields())
 	if err != nil {
 		return nil, err
 	}

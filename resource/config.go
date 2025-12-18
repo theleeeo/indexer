@@ -4,7 +4,6 @@ import "fmt"
 
 type Config struct {
 	Resource  string           `yaml:"resource"`
-	IndexName string           `yaml:"indexName"`
 	Fields    []FieldConfig    `yaml:"fields"`
 	Relations []RelationConfig `yaml:"relations"`
 }
@@ -12,10 +11,6 @@ type Config struct {
 func (c Config) Validate() error {
 	if c.Resource == "" {
 		return fmt.Errorf("resource required")
-	}
-
-	if c.IndexName == "" {
-		return fmt.Errorf("index_name required")
 	}
 
 	for i, f := range c.Fields {

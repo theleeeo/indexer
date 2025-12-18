@@ -397,8 +397,8 @@ func (x *CreatePayload) GetRelations() []*CreateRelationParameters {
 }
 
 type CreateRelationParameters struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RelationToAdd *Relation              `protobuf:"bytes,1,opt,name=relation_to_add,json=relationToAdd,proto3" json:"relation_to_add,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Relation *Relation              `protobuf:"bytes,1,opt,name=relation,proto3" json:"relation,omitempty"`
 	// If true, the relation is two-way (i.e., reciprocal).
 	// IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
 	TwoWay        bool `protobuf:"varint,2,opt,name=two_way,json=twoWay,proto3" json:"two_way,omitempty"`
@@ -436,9 +436,9 @@ func (*CreateRelationParameters) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *CreateRelationParameters) GetRelationToAdd() *Relation {
+func (x *CreateRelationParameters) GetRelation() *Relation {
 	if x != nil {
-		return x.RelationToAdd
+		return x.Relation
 	}
 	return nil
 }
@@ -566,7 +566,7 @@ type AddRelationPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	RelationToAdd *Relation              `protobuf:"bytes,3,opt,name=relation_to_add,json=relationToAdd,proto3" json:"relation_to_add,omitempty"`
+	Relation      *Relation              `protobuf:"bytes,3,opt,name=relation,proto3" json:"relation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -615,20 +615,20 @@ func (x *AddRelationPayload) GetResourceId() string {
 	return ""
 }
 
-func (x *AddRelationPayload) GetRelationToAdd() *Relation {
+func (x *AddRelationPayload) GetRelation() *Relation {
 	if x != nil {
-		return x.RelationToAdd
+		return x.Relation
 	}
 	return nil
 }
 
 type RemoveRelationPayload struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Resource         string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	ResourceId       string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	RelationToRemove *Relation              `protobuf:"bytes,3,opt,name=relation_to_remove,json=relationToRemove,proto3" json:"relation_to_remove,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Relation      *Relation              `protobuf:"bytes,3,opt,name=relation,proto3" json:"relation,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RemoveRelationPayload) Reset() {
@@ -675,9 +675,9 @@ func (x *RemoveRelationPayload) GetResourceId() string {
 	return ""
 }
 
-func (x *RemoveRelationPayload) GetRelationToRemove() *Relation {
+func (x *RemoveRelationPayload) GetRelation() *Relation {
 	if x != nil {
-		return x.RelationToRemove
+		return x.Relation
 	}
 	return nil
 }
@@ -686,7 +686,7 @@ type SetRelationPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
 	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
-	RelationToSet *Relation              `protobuf:"bytes,3,opt,name=relation_to_set,json=relationToSet,proto3" json:"relation_to_set,omitempty"`
+	Relation      *Relation              `protobuf:"bytes,3,opt,name=relation,proto3" json:"relation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -735,9 +735,9 @@ func (x *SetRelationPayload) GetResourceId() string {
 	return ""
 }
 
-func (x *SetRelationPayload) GetRelationToSet() *Relation {
+func (x *SetRelationPayload) GetRelation() *Relation {
 	if x != nil {
-		return x.RelationToSet
+		return x.Relation
 	}
 	return nil
 }
@@ -818,9 +818,9 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\x12+\n" +
 	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\x12@\n" +
-	"\trelations\x18\x04 \x03(\v2\".index.v1.CreateRelationParametersR\trelations\"o\n" +
-	"\x18CreateRelationParameters\x12:\n" +
-	"\x0frelation_to_add\x18\x01 \x01(\v2\x12.index.v1.RelationR\rrelationToAdd\x12\x17\n" +
+	"\trelations\x18\x04 \x03(\v2\".index.v1.CreateRelationParametersR\trelations\"c\n" +
+	"\x18CreateRelationParameters\x12.\n" +
+	"\brelation\x18\x01 \x01(\v2\x12.index.v1.RelationR\brelation\x12\x17\n" +
 	"\atwo_way\x18\x02 \x01(\bR\x06twoWay\"y\n" +
 	"\rUpdatePayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
@@ -830,22 +830,22 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\rDeletePayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\"\x8d\x01\n" +
+	"resourceId\"\x81\x01\n" +
 	"\x12AddRelationPayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\x12:\n" +
-	"\x0frelation_to_add\x18\x03 \x01(\v2\x12.index.v1.RelationR\rrelationToAdd\"\x96\x01\n" +
+	"resourceId\x12.\n" +
+	"\brelation\x18\x03 \x01(\v2\x12.index.v1.RelationR\brelation\"\x84\x01\n" +
 	"\x15RemoveRelationPayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\x12@\n" +
-	"\x12relation_to_remove\x18\x03 \x01(\v2\x12.index.v1.RelationR\x10relationToRemove\"\x8d\x01\n" +
+	"resourceId\x12.\n" +
+	"\brelation\x18\x03 \x01(\v2\x12.index.v1.RelationR\brelation\"\x81\x01\n" +
 	"\x12SetRelationPayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\x12:\n" +
-	"\x0frelation_to_set\x18\x03 \x01(\v2\x12.index.v1.RelationR\rrelationToSet\"G\n" +
+	"resourceId\x12.\n" +
+	"\brelation\x18\x03 \x01(\v2\x12.index.v1.RelationR\brelation\"G\n" +
 	"\bRelation\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
@@ -896,11 +896,11 @@ var file_index_v1_index_proto_depIdxs = []int32{
 	11, // 7: index.v1.ChangeEvent.set_relation_payload:type_name -> index.v1.SetRelationPayload
 	13, // 8: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
 	6,  // 9: index.v1.CreatePayload.relations:type_name -> index.v1.CreateRelationParameters
-	12, // 10: index.v1.CreateRelationParameters.relation_to_add:type_name -> index.v1.Relation
+	12, // 10: index.v1.CreateRelationParameters.relation:type_name -> index.v1.Relation
 	13, // 11: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
-	12, // 12: index.v1.AddRelationPayload.relation_to_add:type_name -> index.v1.Relation
-	12, // 13: index.v1.RemoveRelationPayload.relation_to_remove:type_name -> index.v1.Relation
-	12, // 14: index.v1.SetRelationPayload.relation_to_set:type_name -> index.v1.Relation
+	12, // 12: index.v1.AddRelationPayload.relation:type_name -> index.v1.Relation
+	12, // 13: index.v1.RemoveRelationPayload.relation:type_name -> index.v1.Relation
+	12, // 14: index.v1.SetRelationPayload.relation:type_name -> index.v1.Relation
 	0,  // 15: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
 	2,  // 16: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest
 	1,  // 17: index.v1.IndexService.Publish:output_type -> index.v1.PublishResponse

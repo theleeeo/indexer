@@ -1,10 +1,23 @@
 package app
 
 import (
+	"errors"
 	"indexer/es"
 	"indexer/resource"
 	"indexer/store"
 )
+
+var (
+	ErrUnknownResource = errors.New("unknown resource")
+)
+
+type InvalidArgumentError struct {
+	Msg string
+}
+
+func (e *InvalidArgumentError) Error() string {
+	return e.Msg
+}
 
 type App struct {
 	st store.Store

@@ -24,6 +24,11 @@ func New(client *elasticsearch.Client, withRefresh bool) *Client {
 }
 
 func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) error {
+	now := time.Now()
+	defer func() {
+		log.Printf("Upsert: upserted doc (id=%s, index=%s) in %v", docID, indexAlias, time.Since(now))
+	}()
+
 	body, err := json.Marshal(doc)
 	if err != nil {
 		return err
@@ -51,7 +56,6 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es create error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("Create: created doc (id=%s, index=%s)", docID, indexAlias)
 	return nil
 }
 

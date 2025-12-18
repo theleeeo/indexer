@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"indexer/app"
@@ -29,8 +30,17 @@ func (s *IndexerServer) Publish(ctx context.Context, req *index.PublishRequest) 
 	}
 
 	if err := s.applyOne(ctx, req.Event); err != nil {
+		if errors.Is(err, app.ErrUnknownResource) {
+			return nil, status.Error(codes.FailedPrecondition, "unknown resource")
+		}
+
+		var invalidArgsErr *app.InvalidArgumentError
+		if errors.As(err, &invalidArgsErr) {
+			return nil, status.Error(codes.InvalidArgument, invalidArgsErr.Msg)
+		}
 		return nil, err
 	}
+
 	return &index.PublishResponse{}, nil
 }
 

@@ -43,10 +43,10 @@ message CreatePayload {
 }
 
 message CreateRelationParameters {
-  Relation relation_to_add = 1;
+  Relation relation = 1;
   // If true, the relation is two-way (i.e., reciprocal).
   // IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
-  bool     two_way         = 2;
+  bool     two_way  = 2;
 }
 
 message UpdatePayload {
@@ -61,21 +61,21 @@ message DeletePayload {
 }
 
 message AddRelationPayload {
-  string   resource        = 1;
-  string   resource_id     = 2;
-  Relation relation_to_add = 3;
+  string   resource    = 1;
+  string   resource_id = 2;
+  Relation relation    = 3;
 }
 
 message RemoveRelationPayload {
-  string   resource           = 1;
-  string   resource_id        = 2;
-  Relation relation_to_remove = 3;
+  string   resource    = 1;
+  string   resource_id = 2;
+  Relation relation    = 3;
 }
 
 message SetRelationPayload {
-  string   resource        = 1;
-  string   resource_id     = 2;
-  Relation relation_to_set = 3;
+  string   resource    = 1;
+  string   resource_id = 2;
+  Relation relation    = 3;
 }
 
 message Relation {

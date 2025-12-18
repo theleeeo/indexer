@@ -4,16 +4,40 @@ import (
 	"context"
 	"fmt"
 	"indexer/gen/index/v1"
+	"indexer/resource"
 	"indexer/store"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 type idStruct struct {
 	Id string `json:"id"`
 }
 
+func buildResourceData(rawData *structpb.Struct, resourceConfig *resource.Config) map[string]any {
+	result := make(map[string]interface{})
+
+	for _, fieldConfig := range resourceConfig.Fields {
+		fieldValue, exists := rawData.Fields[fieldConfig.Name]
+		if !exists {
+			continue
+		}
+
+		// result[fieldConfig.Name] = fieldValue.AsInterface()
+		result[fieldConfig.Name] = fieldValue
+	}
+
+	return result
+}
+
 func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
+	}
+
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
 	}
 
 	if p.ResourceId == "" {
@@ -22,22 +46,26 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 
 	relations := make([]store.Relation, 0, len(p.Relations))
 	for _, crp := range p.Relations {
+		if crp.Relation == nil {
+			return &InvalidArgumentError{Msg: "relation is missing the related resource"}
+		}
+
 		relations = append(relations, store.Relation{
 			Parent: store.Resource{
 				Type: p.Resource,
 				Id:   p.ResourceId,
 			},
 			Children: store.Resource{
-				Type: crp.RelationToAdd.Resource,
-				Id:   crp.RelationToAdd.ResourceId,
+				Type: crp.Relation.Resource,
+				Id:   crp.Relation.ResourceId,
 			},
 		})
 
 		if crp.TwoWay {
 			relations = append(relations, store.Relation{
 				Parent: store.Resource{
-					Type: crp.RelationToAdd.Resource,
-					Id:   crp.RelationToAdd.ResourceId,
+					Type: crp.Relation.Resource,
+					Id:   crp.Relation.ResourceId,
 				},
 				Children: store.Resource{
 					Type: p.Resource,
@@ -51,12 +79,12 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	}
 
 	docMap := map[string]any{
-		"fields": p.Data,
+		"fields": buildResourceData(p.Data, r),
 	}
 
 	resourceMap := map[string][]string{}
 	for _, rel := range p.Relations {
-		resourceMap[rel.RelationToAdd.Resource] = append(resourceMap[rel.RelationToAdd.Resource], rel.RelationToAdd.ResourceId)
+		resourceMap[rel.Relation.Resource] = append(resourceMap[rel.Relation.Resource], rel.Relation.ResourceId)
 	}
 
 	// TODO: Weather to make it array or single object should be based on the relation kind from the schema
@@ -97,47 +125,17 @@ func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
 		return fmt.Errorf("resource required")
 	}
 
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
 
-	// var relationsToAdd []*index.Relation
-	// var relationsToRemove []*index.Relation
-	// var setRelation *index.Relation
-	// if len(p.RelationChanges) == 1 && p.RelationChanges[0].ChangeType == index.RelationChange_CHANGE_TYPE_SET {
-	// 	setRelation = &index.Relation{
-	// 		Resource:   p.RelationChanges[0].Relation.Resource,
-	// 		ResourceId: p.RelationChanges[0].Relation.ResourceId,
-	// 	}
-	// } else {
-	// 	for _, rc := range p.RelationChanges {
-	// 		switch rc.GetChangeType() {
-	// 		case index.RelationChange_CHANGE_TYPE_ADDED:
-	// 			relationsToAdd = append(relationsToAdd, &index.Relation{
-	// 				Resource:   rc.Relation.Resource,
-	// 				ResourceId: rc.Relation.ResourceId,
-	// 			})
-	// 		case index.RelationChange_CHANGE_TYPE_REMOVED:
-	// 			relationsToRemove = append(relationsToRemove, &index.Relation{
-	// 				Resource:   rc.Relation.Resource,
-	// 				ResourceId: rc.Relation.ResourceId,
-	// 			})
-	// 		}
-	// 	}
-	// }
-
-	// if setRelation != nil {
-
-	// }
-
-	// a.st.UpdateRelations(p.Resource, p.ResourceId, store.RelationChangesParameter{
-	// 	SetRelation:     setRelation,
-	// 	AddRelations:    relationsToAdd,
-	// 	RemoveRelations: relationsToRemove,
-	// })
-
 	// Update the main document
-	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", p.Data); err != nil {
+	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", buildResourceData(p.Data, r)); err != nil {
 		return err
 	}
 
@@ -158,6 +156,11 @@ func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
 func (a *App) Delete(ctx context.Context, p *index.DeletePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
+	}
+
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
 	}
 
 	if p.ResourceId == "" {
@@ -193,6 +196,11 @@ func (a *App) AddRelation(ctx context.Context, p *index.AddRelationPayload) erro
 		return fmt.Errorf("resource required")
 	}
 
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
@@ -201,14 +209,14 @@ func (a *App) AddRelation(ctx context.Context, p *index.AddRelationPayload) erro
 		[]store.Relation{
 			{
 				Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-				Children: store.Resource{Type: p.RelationToAdd.Resource, Id: p.RelationToAdd.ResourceId},
+				Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 			},
 		}); err != nil {
 		return fmt.Errorf("store relations failed: %w", err)
 	}
 
-	if err := a.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.RelationToAdd.Resource, map[string]any{
-		"id": p.RelationToAdd.ResourceId,
+	if err := a.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, map[string]any{
+		"id": p.Relation.ResourceId,
 	}); err != nil {
 		return err
 	}
@@ -221,6 +229,11 @@ func (a *App) RemoveRelation(ctx context.Context, p *index.RemoveRelationPayload
 		return fmt.Errorf("resource required")
 	}
 
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
@@ -228,13 +241,13 @@ func (a *App) RemoveRelation(ctx context.Context, p *index.RemoveRelationPayload
 	if err := a.st.RemoveRelation(ctx,
 		store.Relation{
 			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: store.Resource{Type: p.RelationToRemove.Resource, Id: p.RelationToRemove.ResourceId},
+			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("remove relation failed: %w", err)
 	}
 
-	if err := a.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.RelationToRemove.Resource, p.RelationToRemove.ResourceId); err != nil {
+	if err := a.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, p.Relation.ResourceId); err != nil {
 		return err
 	}
 
@@ -246,6 +259,11 @@ func (a *App) SetRelation(ctx context.Context, p *index.SetRelationPayload) erro
 		return fmt.Errorf("resource required")
 	}
 
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
+	}
+
 	if p.ResourceId == "" {
 		return fmt.Errorf("resource_id required")
 	}
@@ -253,13 +271,13 @@ func (a *App) SetRelation(ctx context.Context, p *index.SetRelationPayload) erro
 	if err := a.st.SetRelation(ctx,
 		store.Relation{
 			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: store.Resource{Type: p.RelationToSet.Resource, Id: p.RelationToSet.ResourceId},
+			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("set relation failed: %w", err)
 	}
 
-	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.RelationToSet.Resource, idStruct{Id: p.RelationToSet.ResourceId}); err != nil {
+	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, idStruct{Id: p.Relation.ResourceId}); err != nil {
 		return err
 	}
 
