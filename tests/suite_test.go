@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"indexer/app"
 	"indexer/es"
+	"indexer/resource"
 	"indexer/store"
 	"log"
 	"net/http"
@@ -114,7 +115,34 @@ func (t *TestSuite) SetupSuite() {
 		t.T().Fatalf("failed to apply schema: %v", err)
 	}
 
-	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true))
+	resources := []*resource.Config{
+		{
+			IndexName: "a_search",
+			Resource:  "a",
+			Fields: []resource.FieldConfig{
+				{
+					Name: "field1",
+				},
+				{
+					Name: "field2",
+				},
+			},
+		},
+		{
+			IndexName: "b_search",
+			Resource:  "b",
+			Fields: []resource.FieldConfig{
+				{
+					Name: "field1",
+				},
+				{
+					Name: "field2",
+				},
+			},
+		},
+	}
+
+	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources)
 }
 
 func (t *TestSuite) TearDownSuite() {

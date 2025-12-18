@@ -11,6 +11,15 @@ var (
 )
 
 func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
+	if req.Resource == "" {
+		return nil, errors.New("resource is required")
+	}
+
+	r := a.resolveResourceConfig(req.Resource)
+	if r == nil {
+		return nil, ErrUnknownResource
+	}
+
 	if req.PageSize <= 0 {
 		req.PageSize = 25
 	}
@@ -19,11 +28,6 @@ func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.Se
 	}
 	if req.Page < 0 {
 		req.Page = 0
-	}
-
-	r := a.resolveResourceConfig(req.Resource)
-	if r == nil {
-		return nil, ErrUnknownResource
 	}
 
 	res, err := a.es.Search(ctx, req, r.IndexName, r.GetSearchableFields())

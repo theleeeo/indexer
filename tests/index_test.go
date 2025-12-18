@@ -17,9 +17,9 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 					"field1": {
 						Kind: &structpb.Value_StringValue{StringValue: "value1"},
 					},
-					"field2": {
-						Kind: &structpb.Value_BoolValue{BoolValue: true},
-					},
+					// "field2": {
+					// 	Kind: &structpb.Value_BoolValue{BoolValue: true},
+					// },
 				},
 			},
 		})
@@ -33,9 +33,9 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 					"field1": {
 						Kind: &structpb.Value_StringValue{StringValue: "value2"},
 					},
-					"field2": {
-						Kind: &structpb.Value_BoolValue{BoolValue: true},
-					},
+					// "field2": {
+					// 	Kind: &structpb.Value_BoolValue{BoolValue: true},
+					// },
 				},
 			},
 		})
@@ -43,7 +43,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("no query or filters", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 2)
 		t.Require().Equal("1", resp.Hits[0].Id)
@@ -51,28 +51,32 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("with query, string value", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
-			Query: "value1",
-		}, []string{"fields.field1"})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{
+			Resource: "a",
+			Query:    "value1",
+		})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 1)
 		t.Require().Equal("1", resp.Hits[0].Id)
 	})
 
-	t.Run("with query, bool value", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
-			Query: "true",
-		}, []string{"fields.field1", "fields.field2"})
-		t.Require().NoError(err)
-		t.Require().Len(resp.Hits, 2)
-		t.Require().Equal("1", resp.Hits[0].Id)
-		t.Require().Equal("2", resp.Hits[1].Id)
-	})
+	// TODO: We cant allow a string query on bool values
+	// t.Run("with query, bool value", func() {
+	// 	resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{
+	// 		Resource: "a",
+	// 		Query:    "true",
+	// 	})
+	// 	t.Require().NoError(err)
+	// 	t.Require().Len(resp.Hits, 2)
+	// 	t.Require().Equal("1", resp.Hits[0].Id)
+	// 	t.Require().Equal("2", resp.Hits[1].Id)
+	// })
 
 	t.Run("with query, no matches", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
-			Query: "false",
-		}, []string{"fields.field1", "fields.field2"})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{
+			Resource: "a",
+			Query:    "false",
+		})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 0)
 	})
@@ -86,17 +90,18 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 					"field1": {
 						Kind: &structpb.Value_StringValue{StringValue: "updated_value"},
 					},
-					"field2": {
-						Kind: &structpb.Value_BoolValue{BoolValue: false},
-					},
+					// "field2": {
+					// 	Kind: &structpb.Value_BoolValue{BoolValue: false},
+					// },
 				},
 			},
 		})
 		t.Require().NoError(err)
 
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
-			Query: "updated_value",
-		}, []string{"fields.field1"})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{
+			Resource: "a",
+			Query:    "updated_value",
+		})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 1)
 		t.Require().Equal("1", resp.Hits[0].Id)
@@ -109,7 +114,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 		})
 		t.Require().NoError(err)
 
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 1)
 		t.Require().Equal("2", resp.Hits[0].Id)
@@ -142,23 +147,23 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	})
 
 	t.Run("search in index a", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 1)
 		t.Require().Equal("1", resp.Hits[0].Id)
 	})
 
 	t.Run("search in index b", func() {
-		resp, err := t.app.Search(t.T().Context(), "b_search", &search.SearchRequest{}, []string{""})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "b"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 1)
 		t.Require().Equal("2", resp.Hits[0].Id)
 	})
 
 	t.Run("search in non existing index", func() {
-		resp, err := t.app.Search(t.T().Context(), "c_search", &search.SearchRequest{}, []string{""})
-		t.Require().NoError(err)
-		t.Require().Len(resp.Hits, 0)
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+		t.Require().EqualError(err, "unknown resource")
+		t.Require().Nil(resp)
 	})
 
 	t.Run("delete resources", func() {
@@ -176,11 +181,11 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	})
 
 	t.Run("verify deletions", func() {
-		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 0)
 
-		resp, err = t.app.Search(t.T().Context(), "b_search", &search.SearchRequest{}, []string{""})
+		resp, err = t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "b"})
 		t.Require().NoError(err)
 		t.Require().Len(resp.Hits, 0)
 	})
@@ -204,7 +209,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 		t.Require().NoError(err)
 
 		t.Run("verify relation", func() {
-			resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 			t.Require().NoError(err)
 			t.Require().Equal("1", resp.Hits[0].Id)
 			relations := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()

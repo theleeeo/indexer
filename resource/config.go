@@ -43,7 +43,7 @@ func (c Config) GetSearchableFields() []string {
 	var fields []string
 	for _, f := range c.Fields {
 		if f.Query.Search == nil || *f.Query.Search {
-			fields = append(fields, f.Name)
+			fields = append(fields, "fields."+f.Name)
 		}
 	}
 
