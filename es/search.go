@@ -5,22 +5,72 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"indexer/gen/search/v1"
 	"io"
 	"time"
+
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
-type SearchResult struct {
-	Total int64
-	Hits  []Hit
-}
+func (c *Client) Search(ctx context.Context, indexAlias string, req *search.SearchRequest, searchFields []string) (*search.SearchResponse, error) {
+	boolQ := map[string]any{
+		"must":   []any{},
+		"filter": []any{},
+	}
 
-type Hit struct {
-	ID     string
-	Score  float64
-	Source map[string]any
-}
+	// Always tenant filter
+	// boolQ["filter"] = append(boolQ["filter"].([]any), map[string]any{
+	// 	"term": map[string]any{"tenant_id": req.TenantId},
+	// })
 
-func (c *Client) Search(ctx context.Context, indexAlias string, body map[string]any) (*SearchResult, error) {
+	// Full-text query (optional)
+	if req.Query != "" {
+		boolQ["must"] = append(boolQ["must"].([]any), map[string]any{
+			"multi_match": map[string]any{
+				"query":  req.Query,
+				"fields": searchFields,
+			},
+		})
+	}
+
+	// Structured filters
+	for _, f := range req.Filters {
+		if f == nil || f.Field == "" {
+			continue
+		}
+		filterClause, err := buildFilterClause(f)
+		if err != nil {
+			return nil, err
+		}
+		boolQ["filter"] = append(boolQ["filter"].([]any), filterClause)
+	}
+
+	body := map[string]any{
+		"query": map[string]any{"bool": boolQ},
+		"from":  req.Page * req.PageSize,
+		"size":  req.PageSize,
+	}
+
+	// Sort (optional). If none provided, ES default scoring applies.
+	if len(req.Sort) > 0 {
+		var sorts []any
+		for _, srt := range req.Sort {
+			if srt == nil || srt.Field == "" {
+				continue
+			}
+			order := "asc"
+			if srt.Desc {
+				order = "desc"
+			}
+			sorts = append(sorts, map[string]any{
+				srt.Field: map[string]any{"order": order},
+			})
+		}
+		if len(sorts) > 0 {
+			body["sort"] = sorts
+		}
+	}
+
 	b, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
@@ -42,7 +92,7 @@ func (c *Client) Search(ctx context.Context, indexAlias string, body map[string]
 	if res.IsError() {
 		if res.StatusCode == 404 {
 			// index not found, return empty result
-			return &SearchResult{Total: 0, Hits: []Hit{}}, nil
+			return &search.SearchResponse{Total: 0, Hits: []*search.SearchHit{}}, nil
 		}
 
 		raw, _ := io.ReadAll(res.Body)
@@ -64,21 +114,57 @@ func (c *Client) Search(ctx context.Context, indexAlias string, body map[string]
 		}
 	}
 
-	hitsArr, _ := hitsObj["hits"].([]any)
-	out := &SearchResult{Total: total}
-
-	for _, h := range hitsArr {
+	out := &search.SearchResponse{Total: total}
+	for _, h := range hitsObj["hits"].([]any) {
 		m, _ := h.(map[string]any)
 		id, _ := m["_id"].(string)
 		score, _ := m["_score"].(float64)
 		src, _ := m["_source"].(map[string]any)
 
-		out.Hits = append(out.Hits, Hit{
-			ID:     id,
+		st, err := structpb.NewStruct(src)
+		if err != nil {
+			// if struct conversion fails, skip rather than fail the whole query
+			continue
+		}
+		out.Hits = append(out.Hits, &search.SearchHit{
+			Id:     id,
 			Score:  score,
-			Source: src,
+			Source: st,
 		})
 	}
 
 	return out, nil
+}
+
+func buildFilterClause(f *search.Filter) (any, error) {
+	var inner any
+
+	switch f.Op {
+	case search.FilterOp_FILTER_OP_EQ:
+		if f.Value == "" {
+			return nil, fmt.Errorf("EQ filter requires value for field %q", f.Field)
+		}
+		inner = map[string]any{"term": map[string]any{f.Field: f.Value}}
+
+	case search.FilterOp_FILTER_OP_IN:
+		if len(f.Values) == 0 {
+			return nil, fmt.Errorf("IN filter requires values for field %q", f.Field)
+		}
+		inner = map[string]any{"terms": map[string]any{f.Field: f.Values}}
+
+	default:
+		return nil, fmt.Errorf("unsupported filter op for field %q", f.Field)
+	}
+
+	// Nested wrapping (optional)
+	if f.NestedPath != "" {
+		return map[string]any{
+			"nested": map[string]any{
+				"path":  f.NestedPath,
+				"query": inner,
+			},
+		}, nil
+	}
+
+	return inner, nil
 }
