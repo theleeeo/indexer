@@ -6,6 +6,7 @@ import (
 	"indexer/gen/index/v1"
 	"indexer/resource"
 	"indexer/store"
+	"log/slog"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -14,10 +15,10 @@ type idStruct struct {
 	Id string `json:"id"`
 }
 
-func buildResourceData(rawData *structpb.Struct, resourceConfig *resource.Config) map[string]any {
+func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) map[string]any {
 	result := make(map[string]interface{})
 
-	for _, fieldConfig := range resourceConfig.Fields {
+	for _, fieldConfig := range fields {
 		fieldValue, exists := rawData.Fields[fieldConfig.Name]
 		if !exists {
 			continue
@@ -30,6 +31,7 @@ func buildResourceData(rawData *structpb.Struct, resourceConfig *resource.Config
 	return result
 }
 
+// TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
 func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
@@ -79,7 +81,7 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	}
 
 	docMap := map[string]any{
-		"fields": buildResourceData(p.Data, r),
+		"fields": buildResourceData(p.Data, r.Fields),
 	}
 
 	resourceMap := map[string][]string{}
@@ -112,7 +114,20 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	}
 
 	for _, relatedResource := range parentResources {
-		if err := a.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, p.Data); err != nil {
+		rrc := a.resolveResourceConfig(relatedResource.Type)
+		if rrc == nil {
+			slog.Warn("related resource does not exist in the schema", "related_resource", relatedResource.Type)
+			continue
+		}
+
+		rf := rrc.GetRelation(p.Resource)
+		if rf == nil {
+			// This can happen if the resource schema is changed and the parent no longer has a relation field for this resource
+			slog.Warn("related resource does not have field for resource", "related_resource", relatedResource.Type, "field", p.Resource)
+			continue
+		}
+
+		if err := a.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, buildResourceData(p.Data, rf.Fields)); err != nil {
 			return fmt.Errorf("upsert parent resource failed: %w", err)
 		}
 	}
@@ -135,7 +150,7 @@ func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
 	}
 
 	// Update the main document
-	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", buildResourceData(p.Data, r)); err != nil {
+	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", buildResourceData(p.Data, r.Fields)); err != nil {
 		return err
 	}
 
@@ -145,7 +160,20 @@ func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
 		return fmt.Errorf("get parent resources failed: %w", err)
 	}
 	for _, relatedResource := range parentResources {
-		if err := a.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, p.Data); err != nil {
+		rrc := a.resolveResourceConfig(relatedResource.Type)
+		if rrc == nil {
+			slog.Warn("related resource does not exist in the schema", "related_resource", relatedResource.Type)
+			continue
+		}
+
+		rf := rrc.GetRelation(p.Resource)
+		if rf == nil {
+			// This can happen if the resource schema is changed and the parent no longer has a relation field for this resource
+			slog.Warn("related resource does not have field for resource", "related_resource", relatedResource.Type, "field", p.Resource)
+			continue
+		}
+
+		if err := a.es.UpsertFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId, buildResourceData(p.Data, rf.Fields)); err != nil {
 			return err
 		}
 	}

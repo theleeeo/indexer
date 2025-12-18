@@ -53,6 +53,15 @@ func (c Config) GetSearchableFields() []string {
 	return fields
 }
 
+func (c Config) GetRelation(resource string) *RelationConfig {
+	for _, r := range c.Relations {
+		if r.Resource == resource {
+			return &r
+		}
+	}
+	return nil
+}
+
 type FieldConfig struct {
 	Name  string      `yaml:"name"`
 	Query QueryConfig `yaml:"query"`
