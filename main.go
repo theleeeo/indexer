@@ -15,6 +15,7 @@ import (
 	"indexer/server"
 	"indexer/store"
 
+	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/goccy/go-yaml"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
@@ -52,14 +53,16 @@ func main() {
 		log.Printf(" - resource %q index %q with %d field/s and %d relation/s", rc.Resource, rc.IndexName, len(rc.Fields), len(rc.Relations))
 	}
 
-	esClient, err := es.New(es.Config{
+	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: esAddrs,
 		Username:  esUser,
 		Password:  esPass,
 	})
 	if err != nil {
-		log.Fatalf("es client: %v", err)
+		log.Fatalf("setting up es client: %v", err)
 	}
+
+	esClientImpl := es.New(esClient, false)
 
 	dbpool, err := pgxpool.New(context.Background(), "postgres://user:pass@localhost:5432/indexer")
 	if err != nil {
@@ -69,7 +72,7 @@ func main() {
 
 	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)
-	app := app.New(st, esClient)
+	app := app.New(st, esClientImpl)
 	idxSrv := server.NewIndexer(app)
 	searchSrv := server.NewSearcher(app)
 

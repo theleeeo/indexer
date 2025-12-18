@@ -1,0 +1,215 @@
+package tests
+
+import (
+	"indexer/gen/index/v1"
+	"indexer/gen/search/v1"
+
+	"google.golang.org/protobuf/types/known/structpb"
+)
+
+func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
+	t.Run("create resources", func() {
+		err := t.app.Create(t.T().Context(), &index.CreatePayload{
+			Resource:   "a",
+			ResourceId: "1",
+			Data: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"field1": {
+						Kind: &structpb.Value_StringValue{StringValue: "value1"},
+					},
+					"field2": {
+						Kind: &structpb.Value_BoolValue{BoolValue: true},
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.Create(t.T().Context(), &index.CreatePayload{
+			Resource:   "a",
+			ResourceId: "2",
+			Data: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"field1": {
+						Kind: &structpb.Value_StringValue{StringValue: "value2"},
+					},
+					"field2": {
+						Kind: &structpb.Value_BoolValue{BoolValue: true},
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("no query or filters", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 2)
+		t.Require().Equal("1", resp.Hits[0].Id)
+		t.Require().Equal("2", resp.Hits[1].Id)
+	})
+
+	t.Run("with query, string value", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
+			Query: "value1",
+		}, []string{"fields.field1"})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+		t.Require().Equal("1", resp.Hits[0].Id)
+	})
+
+	t.Run("with query, bool value", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
+			Query: "true",
+		}, []string{"fields.field1", "fields.field2"})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 2)
+		t.Require().Equal("1", resp.Hits[0].Id)
+		t.Require().Equal("2", resp.Hits[1].Id)
+	})
+
+	t.Run("with query, no matches", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
+			Query: "false",
+		}, []string{"fields.field1", "fields.field2"})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 0)
+	})
+
+	t.Run("update existing resource", func() {
+		err := t.app.Update(t.T().Context(), &index.UpdatePayload{
+			Resource:   "a",
+			ResourceId: "1",
+			Data: &structpb.Struct{
+				Fields: map[string]*structpb.Value{
+					"field1": {
+						Kind: &structpb.Value_StringValue{StringValue: "updated_value"},
+					},
+					"field2": {
+						Kind: &structpb.Value_BoolValue{BoolValue: false},
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{
+			Query: "updated_value",
+		}, []string{"fields.field1"})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+		t.Require().Equal("1", resp.Hits[0].Id)
+	})
+
+	t.Run("delete resource", func() {
+		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+			Resource:   "a",
+			ResourceId: "1",
+		})
+		t.Require().NoError(err)
+
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+		t.Require().Equal("2", resp.Hits[0].Id)
+	})
+
+	t.Run("delete non-existing resource", func() {
+		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+			Resource:   "a",
+			ResourceId: "non_existing_id",
+		})
+		t.Require().NoError(err)
+	})
+}
+
+func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
+	t.Run("create resources in different indices", func() {
+		err := t.app.Create(t.T().Context(), &index.CreatePayload{
+			Resource:   "a",
+			ResourceId: "1",
+			Data:       &structpb.Struct{},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.Create(t.T().Context(), &index.CreatePayload{
+			Resource:   "b",
+			ResourceId: "2",
+			Data:       &structpb.Struct{},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("search in index a", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+		t.Require().Equal("1", resp.Hits[0].Id)
+	})
+
+	t.Run("search in index b", func() {
+		resp, err := t.app.Search(t.T().Context(), "b_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+		t.Require().Equal("2", resp.Hits[0].Id)
+	})
+
+	t.Run("search in non existing index", func() {
+		resp, err := t.app.Search(t.T().Context(), "c_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 0)
+	})
+
+	t.Run("delete resources", func() {
+		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+			Resource:   "a",
+			ResourceId: "1",
+		})
+		t.Require().NoError(err)
+
+		err = t.app.Delete(t.T().Context(), &index.DeletePayload{
+			Resource:   "b",
+			ResourceId: "2",
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("verify deletions", func() {
+		resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 0)
+
+		resp, err = t.app.Search(t.T().Context(), "b_search", &search.SearchRequest{}, []string{""})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 0)
+	})
+}
+
+func (t *TestSuite) Test_Create_WithRelation() {
+	t.Run("create resource with relation", func() {
+		err := t.app.Create(t.T().Context(), &index.CreatePayload{
+			Resource:   "a",
+			ResourceId: "1",
+			Data:       &structpb.Struct{},
+			Relations: []*index.CreateRelationParameters{
+				{
+					RelationToAdd: &index.Relation{
+						Resource:   "b",
+						ResourceId: "1",
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		t.Run("verify relation", func() {
+			resp, err := t.app.Search(t.T().Context(), "a_search", &search.SearchRequest{}, []string{""})
+			t.Require().NoError(err)
+			t.Require().Equal("1", resp.Hits[0].Id)
+			relations := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+			t.Require().Len(relations, 1)
+			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+		})
+	})
+}

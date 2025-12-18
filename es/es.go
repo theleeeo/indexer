@@ -14,24 +14,13 @@ import (
 
 type Client struct {
 	es *elasticsearch.Client
+
+	// Temporary solution to control refresh behavior during tests
+	withRefresh bool
 }
 
-type Config struct {
-	Addresses []string
-	Username  string
-	Password  string
-}
-
-func New(cfg Config) (*Client, error) {
-	es, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: cfg.Addresses,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return &Client{es: es}, nil
+func New(client *elasticsearch.Client, withRefresh bool) *Client {
+	return &Client{es: client, withRefresh: withRefresh}
 }
 
 func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) error {
@@ -40,12 +29,17 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 		return err
 	}
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Index(
 		indexAlias,
 		bytes.NewReader(body),
 		c.es.Index.WithDocumentID(docID),
 		c.es.Index.WithContext(ctx),
-		c.es.Index.WithRefresh("false"),
+		c.es.Index.WithRefresh(refresh),
 		// c.es.Index.WithOpType("create"), // Only create, fail if exists
 	)
 	if err != nil {
@@ -70,12 +64,17 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 // 		return err
 // 	}
 
+// refresh := "false"
+// 	if c.withRefresh {
+// 		refresh = "true"
+// 	}
+
 // 	res, err := c.es.Update(
 // 		indexAlias,
 // 		docID,
 // 		bytes.NewReader(body),
 // 		c.es.Update.WithContext(ctx),
-// 		c.es.Update.WithRefresh("false"),
+// 		c.es.Update.WithRefresh(refresh),
 // 	)
 // 	if err != nil {
 // 		return err
@@ -91,11 +90,16 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 // }
 
 func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Delete(
 		indexAlias,
 		docID,
 		c.es.Delete.WithContext(ctx),
-		c.es.Delete.WithRefresh("false"),
+		c.es.Delete.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err
@@ -140,10 +144,15 @@ func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Bulk(
 		bytes.NewReader(buf.Bytes()),
 		c.es.Bulk.WithContext(ctx),
-		c.es.Bulk.WithRefresh("false"),
+		c.es.Bulk.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err
@@ -169,12 +178,17 @@ func (c *Client) UpdateField(ctx context.Context, indexAlias, docID, field strin
 		return err
 	}
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Update(
 		indexAlias,
 		docID,
 		bytes.NewReader(body),
 		c.es.Update.WithContext(ctx),
-		c.es.Update.WithRefresh("false"),
+		c.es.Update.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err
@@ -236,12 +250,17 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 		return err
 	}
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Update(
 		indexAlias,
 		docID,
 		bytes.NewReader(body),
 		c.es.Update.WithContext(ctx),
-		c.es.Update.WithRefresh("false"),
+		c.es.Update.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err
@@ -285,12 +304,17 @@ func (c *Client) AddFieldResource(ctx context.Context, indexAlias, docID, field 
 		return err
 	}
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Update(
 		indexAlias,
 		docID,
 		bytes.NewReader(body),
 		c.es.Update.WithContext(ctx),
-		c.es.Update.WithRefresh("false"),
+		c.es.Update.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err
@@ -333,12 +357,17 @@ func (c *Client) RemoveFieldResourceById(ctx context.Context, indexAlias, docID,
 		return err
 	}
 
+	refresh := "false"
+	if c.withRefresh {
+		refresh = "true"
+	}
+
 	res, err := c.es.Update(
 		indexAlias,
 		docID,
 		bytes.NewReader(body),
 		c.es.Update.WithContext(ctx),
-		c.es.Update.WithRefresh("false"),
+		c.es.Update.WithRefresh(refresh),
 	)
 	if err != nil {
 		return err

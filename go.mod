@@ -6,8 +6,10 @@ require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/goccy/go-yaml v1.19.0
 	github.com/jackc/pgx/v5 v5.7.6
+	github.com/stretchr/testify v1.11.1
 	github.com/testcontainers/testcontainers-go v0.40.0
 	github.com/testcontainers/testcontainers-go/modules/elasticsearch v0.40.0
+	github.com/testcontainers/testcontainers-go/modules/postgres v0.40.0
 	google.golang.org/grpc v1.75.1
 	google.golang.org/protobuf v1.36.10
 )
@@ -56,7 +58,6 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/shirou/gopsutil/v4 v4.25.6 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/stretchr/testify v1.11.1 // indirect
 	github.com/tklauser/go-sysconf v0.3.12 // indirect
 	github.com/tklauser/numcpus v0.6.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect

@@ -40,6 +40,11 @@ func (c *Client) Search(ctx context.Context, indexAlias string, body map[string]
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if res.StatusCode == 404 {
+			// index not found, return empty result
+			return &SearchResult{Total: 0, Hits: []Hit{}}, nil
+		}
+
 		raw, _ := io.ReadAll(res.Body)
 		return nil, fmt.Errorf("es search error: %s %s", res.Status(), string(raw))
 	}
