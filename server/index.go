@@ -11,12 +11,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const (
-	AIndex = "a_search"
-	BIndex = "b_search"
-	CIndex = "c_search"
-)
-
 type IndexerServer struct {
 	index.UnimplementedIndexServiceServer
 

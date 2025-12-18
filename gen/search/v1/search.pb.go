@@ -72,10 +72,10 @@ func (FilterOp) EnumDescriptor() ([]byte, []int) {
 }
 
 type SearchRequest struct {
-	state   protoimpl.MessageState `protogen:"open.v1"`
-	Index   string                 `protobuf:"bytes,1,opt,name=index,proto3" json:"index,omitempty"`
-	Query   string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
-	Filters []*Filter              `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Resource string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Query    string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	Filters  []*Filter              `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
 	// Pagination (simple from/size)
 	Page          int32   `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`                         // 0-based
 	PageSize      int32   `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // default 25, max 100
@@ -115,9 +115,9 @@ func (*SearchRequest) Descriptor() ([]byte, []int) {
 	return file_search_v1_search_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *SearchRequest) GetIndex() string {
+func (x *SearchRequest) GetResource() string {
 	if x != nil {
-		return x.Index
+		return x.Resource
 	}
 	return ""
 }
@@ -415,9 +415,9 @@ var File_search_v1_search_proto protoreflect.FileDescriptor
 
 const file_search_v1_search_proto_rawDesc = "" +
 	"\n" +
-	"\x16search/v1/search.proto\x12\tsearch.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xe5\x01\n" +
-	"\rSearchRequest\x12\x14\n" +
-	"\x05index\x18\x01 \x01(\tR\x05index\x12\x14\n" +
+	"\x16search/v1/search.proto\x12\tsearch.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xeb\x01\n" +
+	"\rSearchRequest\x12\x1a\n" +
+	"\bresource\x18\x01 \x01(\tR\bresource\x12\x14\n" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12+\n" +
 	"\afilters\x18\x03 \x03(\v2\x11.search.v1.FilterR\afilters\x12\x12\n" +
 	"\x04page\x18\x04 \x01(\x05R\x04page\x12\x1b\n" +

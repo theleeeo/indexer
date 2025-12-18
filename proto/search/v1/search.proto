@@ -11,7 +11,7 @@ service SearchService{
 }
 
 message SearchRequest {
-  string          index          = 1;
+  string          resource       = 1;
 
   string          query          = 2;
   repeated Filter filters        = 3;

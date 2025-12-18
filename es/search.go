@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-func (c *Client) Search(ctx context.Context, indexAlias string, req *search.SearchRequest, searchFields []string) (*search.SearchResponse, error) {
+func (c *Client) Search(ctx context.Context, req *search.SearchRequest, indexAlias string, searchFields []string) (*search.SearchResponse, error) {
 	boolQ := map[string]any{
 		"must":   []any{},
 		"filter": []any{},

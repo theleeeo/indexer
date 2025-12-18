@@ -12,6 +12,7 @@ import (
 	"indexer/es"
 	"indexer/gen/index/v1"
 	"indexer/gen/search/v1"
+	"indexer/resource"
 	"indexer/server"
 	"indexer/store"
 
@@ -72,7 +73,7 @@ func main() {
 
 	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)
-	app := app.New(st, esClientImpl)
+	app := app.New(st, esClientImpl, resources)
 	idxSrv := server.NewIndexer(app)
 	searchSrv := server.NewSearcher(app)
 
@@ -92,17 +93,17 @@ func main() {
 	}
 }
 
-func loadResourceConfig(path string) ([]ResourceConfig, error) {
+func loadResourceConfig(path string) ([]*resource.Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading file: %w", err)
 	}
-	var cfg map[string]ResourceConfig
+	var cfg map[string]*resource.Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
 	}
 
-	resources := make([]ResourceConfig, 0, len(cfg))
+	resources := make([]*resource.Config, 0, len(cfg))
 	for name, rc := range cfg {
 		rc.Resource = name
 		resources = append(resources, rc)

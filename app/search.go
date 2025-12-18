@@ -2,10 +2,15 @@ package app
 
 import (
 	"context"
+	"errors"
 	"indexer/gen/search/v1"
 )
 
-func (a *App) Search(ctx context.Context, indexAlias string, req *search.SearchRequest, searchFields []string) (*search.SearchResponse, error) {
+var (
+	ErrUnknownResource = errors.New("unknown resource")
+)
+
+func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
 	if req.PageSize <= 0 {
 		req.PageSize = 25
 	}
@@ -16,7 +21,12 @@ func (a *App) Search(ctx context.Context, indexAlias string, req *search.SearchR
 		req.Page = 0
 	}
 
-	res, err := a.es.Search(ctx, indexAlias, req, searchFields)
+	r := a.resolveResourceConfig(req.Resource)
+	if r == nil {
+		return nil, ErrUnknownResource
+	}
+
+	res, err := a.es.Search(ctx, req, r.IndexName, r.GetSearchableFields())
 	if err != nil {
 		return nil, err
 	}

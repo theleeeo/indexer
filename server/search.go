@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"indexer/app"
 	"indexer/gen/search/v1"
 
@@ -22,42 +23,12 @@ func NewSearcher(app *app.App) *SearcherServer {
 }
 
 func (s *SearcherServer) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
-	switch req.Index {
-	case "":
-		return nil, status.Error(codes.InvalidArgument, "index is required")
-	case "a":
-		return s.app.Search(ctx, AIndex, req, defaultSearchFieldsA())
-	case "b":
-		return s.app.Search(ctx, BIndex, req, defaultSearchFieldsB())
-	case "c":
-		return s.app.Search(ctx, CIndex, req, defaultSearchFieldsC())
-	default:
-		return nil, status.Errorf(codes.FailedPrecondition, "unknown index %q", req.Index)
+	resp, err := s.app.Search(ctx, req)
+	if err != nil {
+		if errors.Is(err, app.ErrUnknownResource) {
+			return nil, status.Error(codes.FailedPrecondition, app.ErrUnknownResource.Error())
+		}
+		return nil, err
 	}
-}
-
-func defaultSearchFieldsA() []string {
-	// Adjust to what you actually index
-	return []string{
-		"a_id",
-		"a_status",
-		"b.name",
-		"c.type",
-		"c.state",
-	}
-}
-
-func defaultSearchFieldsB() []string {
-	return []string{
-		"b_id",
-		"b_name",
-	}
-}
-
-func defaultSearchFieldsC() []string {
-	return []string{
-		"c_id",
-		"c_type",
-		"c_state",
-	}
+	return resp, err
 }

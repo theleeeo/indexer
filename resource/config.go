@@ -1,15 +1,15 @@
-package main
+package resource
 
 import "fmt"
 
-type ResourceConfig struct {
+type Config struct {
 	Resource  string           `yaml:"resource"`
 	IndexName string           `yaml:"indexName"`
 	Fields    []FieldConfig    `yaml:"fields"`
 	Relations []RelationConfig `yaml:"relations"`
 }
 
-func (c ResourceConfig) Validate() error {
+func (c Config) Validate() error {
 	if c.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -37,6 +37,25 @@ func (c ResourceConfig) Validate() error {
 	}
 
 	return nil
+}
+
+func (c Config) GetSearchableFields() []string {
+	var fields []string
+	for _, f := range c.Fields {
+		if f.Query.Search == nil || *f.Query.Search {
+			fields = append(fields, f.Name)
+		}
+	}
+
+	for _, r := range c.Relations {
+		for _, f := range r.Fields {
+			if f.Query.Search == nil || *f.Query.Search {
+				fields = append(fields, fmt.Sprintf("%s.%s", r.Resource, f.Name))
+			}
+		}
+	}
+
+	return fields
 }
 
 type FieldConfig struct {
