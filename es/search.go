@@ -83,6 +83,7 @@ func (c *Client) Search(ctx context.Context, req *search.SearchRequest, indexAli
 		c.es.Search.WithContext(ctx),
 		c.es.Search.WithIndex(indexAlias),
 		c.es.Search.WithBody(bytes.NewReader(b)),
+		// c.es.Search.WithSource("false"),
 	)
 	if err != nil {
 		return nil, err

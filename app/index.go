@@ -31,6 +31,21 @@ func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) 
 	return result
 }
 
+func buildResourceDataFromMap(rawData map[string]any, fields []resource.FieldConfig) map[string]any {
+	result := make(map[string]interface{})
+
+	for _, fieldConfig := range fields {
+		fieldValue, exists := rawData[fieldConfig.Name]
+		if !exists {
+			continue
+		}
+
+		result[fieldConfig.Name] = fieldValue
+	}
+
+	return result
+}
+
 // TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
 func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
@@ -84,24 +99,45 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 		"fields": buildResourceData(p.Data, r.Fields),
 	}
 
-	resourceMap := map[string][]string{}
+	relationMap := map[string][]string{}
 	for _, rel := range p.Relations {
-		resourceMap[rel.Relation.Resource] = append(resourceMap[rel.Relation.Resource], rel.Relation.ResourceId)
+		relationMap[rel.Relation.Resource] = append(relationMap[rel.Relation.Resource], rel.Relation.ResourceId)
 	}
 
 	// TODO: Weather to make it array or single object should be based on the relation kind from the schema
-	for resType, resIds := range resourceMap {
+	for resType, resIds := range relationMap {
 		// TODO: Until we have proper handling of single vs multiple relations, always use array
 		// if len(resIds) == 1 {
 		// 	docMap[resType] = idStruct{Id: resIds[0]}
 		// 	continue
 		// }
 
-		idStructs := make([]idStruct, 0, len(resIds))
-		for _, rid := range resIds {
-			idStructs = append(idStructs, idStruct{Id: rid})
+		relationConfig := r.GetRelation("")
+		if relationConfig == nil {
+			slog.Warn("relation does not exist in the schema", "related_resource", resType)
+			continue
 		}
-		docMap[resType] = idStructs
+
+		subResources := make([]map[string]any, 0, len(resIds))
+		for _, rid := range resIds {
+			doc, err := a.es.Get(ctx, resType+"_search", resIds[0])
+			if err != nil {
+				return fmt.Errorf("get related doc failed: %w", err)
+			}
+
+			if doc == nil {
+				subResources = append(subResources, map[string]any{"id": rid})
+			} else {
+				doc = buildResourceDataFromMap(doc, relationConfig.Fields)
+
+				// Make sure the ID is always set.
+				// TODO: This might be redundant if the ES document always contains the ID field
+				doc["id"] = rid
+				subResources = append(subResources, doc)
+			}
+		}
+		docMap[resType] = subResources
+
 	}
 
 	if err := a.es.Upsert(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {

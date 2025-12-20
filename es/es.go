@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
@@ -26,7 +26,7 @@ func New(client *elasticsearch.Client, withRefresh bool) *Client {
 func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) error {
 	now := time.Now()
 	defer func() {
-		log.Printf("Upsert: upserted doc (id=%s, index=%s) in %v", docID, indexAlias, time.Since(now))
+		slog.Info("upserted doc", "docID", docID, "index", indexAlias, "duration", time.Since(now))
 	}()
 
 	body, err := json.Marshal(doc)
@@ -59,40 +59,6 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 	return nil
 }
 
-// func (c *Client) UpdateFields(ctx context.Context, indexAlias, docID string, fields map[string]any) error {
-// 	updateBody := map[string]any{
-// 		"doc": fields,
-// 	}
-// 	body, err := json.Marshal(updateBody)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// refresh := "false"
-// 	if c.withRefresh {
-// 		refresh = "true"
-// 	}
-
-// 	res, err := c.es.Update(
-// 		indexAlias,
-// 		docID,
-// 		bytes.NewReader(body),
-// 		c.es.Update.WithContext(ctx),
-// 		c.es.Update.WithRefresh(refresh),
-// 	)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	defer res.Body.Close()
-
-// 	if res.IsError() {
-// 		b, _ := io.ReadAll(res.Body)
-// 		return fmt.Errorf("es update fields error: %s %s", res.Status(), string(b))
-// 	}
-// 	log.Printf("UpdateFields: updated fields in doc (id=%s, index=%s)", docID, indexAlias)
-// 	return nil
-// }
-
 func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 	refresh := "false"
 	if c.withRefresh {
@@ -117,7 +83,7 @@ func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es delete error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("Delete: deleted doc (id=%s, index=%s)", docID, indexAlias)
+	slog.Info("deleted doc", "docID", docID, "index", indexAlias)
 	return nil
 }
 
@@ -167,7 +133,7 @@ func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es bulk error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("BulkUpsert: upserted %d docs", len(items))
+	slog.Info("bulk upserted docs", "count", len(items))
 	return nil
 }
 
@@ -203,7 +169,7 @@ func (c *Client) UpdateField(ctx context.Context, indexAlias, docID, field strin
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("UpdateField: updated doc (id=%s, index=%s, field=%s)", docID, indexAlias, field)
+	slog.Info("updated field", "field", field, "docID", docID, "index", indexAlias)
 	return nil
 }
 
@@ -275,7 +241,7 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("UpsertFieldElementByID: upserted element (id=%v, field=%s, docID=%s, index=%s)", elementId, field, docID, indexAlias)
+	slog.Info("upserted field resource by id", "elementID", elementId, "field", field, "docID", docID, "index", indexAlias)
 	return nil
 }
 
@@ -329,7 +295,7 @@ func (c *Client) AddFieldResource(ctx context.Context, indexAlias, docID, field 
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("AddFieldElement: added element (field=%s, docID=%s, index=%s)", field, docID, indexAlias)
+	slog.Info("added field resource", "field", field, "docID", docID, "index", indexAlias)
 	return nil
 }
 
@@ -382,6 +348,36 @@ func (c *Client) RemoveFieldResourceById(ctx context.Context, indexAlias, docID,
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
 	}
-	log.Printf("DeleteFieldElementByID: deleted element (id=%v, field=%s, docID=%s, index=%s)", elementID, field, docID, indexAlias)
+	slog.Info("removed field resource by id", "elementID", elementID, "field", field, "docID", docID, "index", indexAlias)
 	return nil
+}
+
+func (c *Client) Get(ctx context.Context, indexAlias, docID string) (map[string]any, error) {
+	res, err := c.es.Get(
+		indexAlias,
+		docID,
+		c.es.Get.WithContext(ctx),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == 404 {
+		return nil, nil
+	}
+
+	if res.IsError() {
+		b, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("es get error: %s %s", res.Status(), string(b))
+	}
+
+	var getRes struct {
+		Source map[string]any `json:"_source"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&getRes); err != nil {
+		return nil, err
+	}
+
+	return getRes.Source, nil
 }
