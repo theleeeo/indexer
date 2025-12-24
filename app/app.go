@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"indexer/es"
+	"indexer/jobqueue"
 	"indexer/resource"
 	"indexer/store"
 )
@@ -23,14 +24,17 @@ type App struct {
 	st store.Store
 	es *es.Client
 
+	queue *jobqueue.Queue
+
 	resources []*resource.Config
 }
 
-func New(st store.Store, esClient *es.Client, resources []*resource.Config) *App {
+func New(st store.Store, esClient *es.Client, resources []*resource.Config, queue *jobqueue.Queue) *App {
 	return &App{
 		st:        st,
 		es:        esClient,
 		resources: resources,
+		queue:     queue,
 	}
 }
 

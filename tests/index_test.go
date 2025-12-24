@@ -199,7 +199,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 			Data:       &structpb.Struct{},
 			Relations: []*index.CreateRelationParameters{
 				{
-					RelationToAdd: &index.Relation{
+					Relation: &index.Relation{
 						Resource:   "b",
 						ResourceId: "1",
 					},
