@@ -48,7 +48,7 @@ func buildResourceDataFromMap(rawData map[string]any, fields []resource.FieldCon
 }
 
 // TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
-func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
+func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -71,7 +71,7 @@ func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
 	return nil
 }
 
-func (a *App) HandleCreate(ctx context.Context, p *index.CreatePayload) error {
+func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
