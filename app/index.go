@@ -7,6 +7,7 @@ import (
 	"indexer/resource"
 	"indexer/store"
 	"log/slog"
+	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -48,6 +49,29 @@ func buildResourceDataFromMap(rawData map[string]any, fields []resource.FieldCon
 
 // TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
 func (a *App) Create(ctx context.Context, p *index.CreatePayload) error {
+	if p.Resource == "" {
+		return fmt.Errorf("resource required")
+	}
+
+	r := a.resolveResourceConfig(p.Resource)
+	if r == nil {
+		return ErrUnknownResource
+	}
+
+	if p.ResourceId == "" {
+		return fmt.Errorf("resource_id required")
+	}
+
+	// TODO: Correct "OccurredAt"
+	// TODO: Payload not bound to proto
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "create", time.Now(), p, nil); err != nil {
+		return fmt.Errorf("enqueue create job failed: %w", err)
+	}
+
+	return nil
+}
+
+func (a *App) HandleCreate(ctx context.Context, p *index.CreatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}

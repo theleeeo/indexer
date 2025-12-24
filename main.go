@@ -12,9 +12,11 @@ import (
 	"indexer/es"
 	"indexer/gen/index/v1"
 	"indexer/gen/search/v1"
+	"indexer/jobqueue"
 	"indexer/resource"
 	"indexer/server"
 	"indexer/store"
+	"indexer/worker"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/goccy/go-yaml"
@@ -65,7 +67,8 @@ func main() {
 
 	esClientImpl := es.New(esClient, false)
 
-	dbpool, err := pgxpool.New(context.Background(), "postgres://user:pass@localhost:5432/indexer")
+	pgAddr := env("PG_ADDR", "postgres://user:pass@localhost:5432/indexer")
+	dbpool, err := pgxpool.New(context.Background(), pgAddr)
 	if err != nil {
 		log.Fatalf("pgxpool: %v", err)
 	}
@@ -73,7 +76,17 @@ func main() {
 
 	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)
-	app := app.New(st, esClientImpl, resources)
+
+	queue := jobqueue.NewQueue(dbpool)
+
+	app := app.New(st, esClientImpl, resources, queue)
+
+	handler := worker.NewHandlerFunc(app)
+	worker := jobqueue.NewWorker(dbpool, handler, jobqueue.WorkerConfig{})
+
+	log.Printf("starting job queue worker")
+	worker.Start(context.Background())
+
 	idxSrv := server.NewIndexer(app)
 	searchSrv := server.NewSearcher(app)
 
@@ -91,6 +104,8 @@ func main() {
 	if err := g.Serve(lis); err != nil {
 		log.Fatalf("serve: %v", err)
 	}
+
+	// TODO: graceful shutdown
 }
 
 func loadResourceConfig(path string) ([]*resource.Config, error) {

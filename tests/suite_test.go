@@ -117,8 +117,7 @@ func (t *TestSuite) SetupSuite() {
 
 	resources := []*resource.Config{
 		{
-			IndexName: "a_search",
-			Resource:  "a",
+			Resource: "a",
 			Fields: []resource.FieldConfig{
 				{
 					Name: "field1",
@@ -129,8 +128,7 @@ func (t *TestSuite) SetupSuite() {
 			},
 		},
 		{
-			IndexName: "b_search",
-			Resource:  "b",
+			Resource: "b",
 			Fields: []resource.FieldConfig{
 				{
 					Name: "field1",
@@ -142,7 +140,7 @@ func (t *TestSuite) SetupSuite() {
 		},
 	}
 
-	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources)
+	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources, nil)
 }
 
 func (t *TestSuite) TearDownSuite() {
