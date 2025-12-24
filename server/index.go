@@ -66,15 +66,15 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 	case *index.ChangeEvent_CreatePayload:
 		return s.app.RegisterCreate(ctx, p.CreatePayload)
 	case *index.ChangeEvent_UpdatePayload:
-		return s.app.Update(ctx, p.UpdatePayload)
+		return s.app.RegisterUpdate(ctx, p.UpdatePayload)
 	case *index.ChangeEvent_DeletePayload:
-		return s.app.Delete(ctx, p.DeletePayload)
+		return s.app.RegisterDelete(ctx, p.DeletePayload)
 	case *index.ChangeEvent_SetRelationPayload:
-		return s.app.SetRelation(ctx, p.SetRelationPayload)
+		return s.app.RegisterSetRelation(ctx, p.SetRelationPayload)
 	case *index.ChangeEvent_AddRelationPayload:
-		return s.app.AddRelation(ctx, p.AddRelationPayload)
+		return s.app.RegisterAddRelation(ctx, p.AddRelationPayload)
 	case *index.ChangeEvent_RemoveRelationPayload:
-		return s.app.RemoveRelation(ctx, p.RemoveRelationPayload)
+		return s.app.RegisterRemoveRelation(ctx, p.RemoveRelationPayload)
 	default:
 		return fmt.Errorf("unknown payload")
 	}

@@ -7,7 +7,6 @@ import (
 	"indexer/resource"
 	"indexer/store"
 	"log/slog"
-	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -45,30 +44,6 @@ func buildResourceDataFromMap(rawData map[string]any, fields []resource.FieldCon
 	}
 
 	return result
-}
-
-// TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
-func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
-	}
-
-	// TODO: Correct "OccurredAt"
-	// TODO: Payload not bound to proto
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "create", time.Now(), p, nil); err != nil {
-		return fmt.Errorf("enqueue create job failed: %w", err)
-	}
-
-	return nil
 }
 
 func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
@@ -136,7 +111,7 @@ func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
 		// 	continue
 		// }
 
-		relationConfig := r.GetRelation("")
+		relationConfig := r.GetRelation(resType)
 		if relationConfig == nil {
 			slog.Warn("relation does not exist in the schema", "related_resource", resType)
 			continue
@@ -195,7 +170,7 @@ func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
 	return nil
 }
 
-func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
+func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -241,7 +216,7 @@ func (a *App) Update(ctx context.Context, p *index.UpdatePayload) error {
 	return nil
 }
 
-func (a *App) Delete(ctx context.Context, p *index.DeletePayload) error {
+func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -279,7 +254,8 @@ func (a *App) Delete(ctx context.Context, p *index.DeletePayload) error {
 
 // TODO: Failes if applied on object, not array
 // TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
-func (a *App) AddRelation(ctx context.Context, p *index.AddRelationPayload) error {
+// TODO: Validate relation in schema
+func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -312,7 +288,7 @@ func (a *App) AddRelation(ctx context.Context, p *index.AddRelationPayload) erro
 	return nil
 }
 
-func (a *App) RemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
+func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
@@ -342,7 +318,7 @@ func (a *App) RemoveRelation(ctx context.Context, p *index.RemoveRelationPayload
 	return nil
 }
 
-func (a *App) SetRelation(ctx context.Context, p *index.SetRelationPayload) error {
+func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
 	if p.Resource == "" {
 		return fmt.Errorf("resource required")
 	}

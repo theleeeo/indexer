@@ -18,6 +18,36 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 				return fmt.Errorf("failed to unmarshal payload: %w", err)
 			}
 			return a.handleCreate(ctx, p)
+		case "update":
+			p := &index.UpdatePayload{}
+			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			}
+			return a.handleUpdate(ctx, p)
+		case "delete":
+			p := &index.DeletePayload{}
+			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			}
+			return a.handleDelete(ctx, p)
+		case "add_relation":
+			p := &index.AddRelationPayload{}
+			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			}
+			return a.handleAddRelation(ctx, p)
+		case "remove_relation":
+			p := &index.RemoveRelationPayload{}
+			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			}
+			return a.handleRemoveRelation(ctx, p)
+		case "set_relation":
+			p := &index.SetRelationPayload{}
+			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			}
+			return a.handleSetRelation(ctx, p)
 		default:
 			return fmt.Errorf("unknown job type: %s", job.Type)
 		}

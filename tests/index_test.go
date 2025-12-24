@@ -82,7 +82,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("update existing resource", func() {
-		err := t.app.Update(t.T().Context(), &index.UpdatePayload{
+		err := t.app.RegisterUpdate(t.T().Context(), &index.UpdatePayload{
 			Resource:   "a",
 			ResourceId: "1",
 			Data: &structpb.Struct{
@@ -108,7 +108,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("delete resource", func() {
-		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "1",
 		})
@@ -121,7 +121,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("delete non-existing resource", func() {
-		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "non_existing_id",
 		})
@@ -167,13 +167,13 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	})
 
 	t.Run("delete resources", func() {
-		err := t.app.Delete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "1",
 		})
 		t.Require().NoError(err)
 
-		err = t.app.Delete(t.T().Context(), &index.DeletePayload{
+		err = t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
 			Resource:   "b",
 			ResourceId: "2",
 		})
