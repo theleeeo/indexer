@@ -16,7 +16,6 @@ import (
 	"indexer/resource"
 	"indexer/server"
 	"indexer/store"
-	"indexer/worker"
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/goccy/go-yaml"
@@ -81,8 +80,7 @@ func main() {
 
 	app := app.New(st, esClientImpl, resources, queue)
 
-	handler := worker.NewHandlerFunc(app)
-	worker := jobqueue.NewWorker(dbpool, handler, jobqueue.WorkerConfig{})
+	worker := jobqueue.NewWorker(dbpool, app.HandlerFunc(), jobqueue.WorkerConfig{})
 
 	log.Printf("starting job queue worker")
 	worker.Start(context.Background())

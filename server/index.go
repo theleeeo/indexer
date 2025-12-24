@@ -64,7 +64,7 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, req *index.PublishBatc
 func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) error {
 	switch p := ev.Payload.(type) {
 	case *index.ChangeEvent_CreatePayload:
-		return s.app.Create(ctx, p.CreatePayload)
+		return s.app.RegisterCreate(ctx, p.CreatePayload)
 	case *index.ChangeEvent_UpdatePayload:
 		return s.app.Update(ctx, p.UpdatePayload)
 	case *index.ChangeEvent_DeletePayload:
