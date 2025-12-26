@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"indexer/es"
 	"indexer/jobqueue"
 	"indexer/resource"
@@ -44,5 +45,23 @@ func (a *App) resolveResourceConfig(resourceName string) *resource.Config {
 			return rc
 		}
 	}
+
 	return nil
+}
+
+func (a *App) verifyResourceConfig(resource, resourceId string) (*resource.Config, error) {
+	if resource == "" {
+		return nil, fmt.Errorf("resource required")
+	}
+
+	if resourceId == "" {
+		return nil, fmt.Errorf("resource_id required")
+	}
+
+	r := a.resolveResourceConfig(resource)
+	if r == nil {
+		return nil, ErrUnknownResource
+	}
+
+	return r, nil
 }
