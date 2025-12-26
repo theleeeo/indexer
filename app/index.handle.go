@@ -24,7 +24,6 @@ func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) 
 			continue
 		}
 
-		// result[fieldConfig.Name] = fieldValue.AsInterface()
 		result[fieldConfig.Name] = fieldValue
 	}
 
@@ -47,17 +46,9 @@ func buildResourceDataFromMap(rawData map[string]any, fields []resource.FieldCon
 }
 
 func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	r, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	relations := make([]store.Relation, 0, len(p.Relations))
@@ -171,17 +162,9 @@ func (a *App) handleCreate(ctx context.Context, p *index.CreatePayload) error {
 }
 
 func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	r, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	// Update the main document
@@ -217,17 +200,9 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 }
 
 func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if err := a.es.Delete(ctx, p.Resource+"_search", p.ResourceId); err != nil {
@@ -256,17 +231,9 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 // TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
 // TODO: Validate relation in schema
 func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if err := a.st.AddRelations(ctx,
@@ -289,17 +256,9 @@ func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload
 }
 
 func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if err := a.st.RemoveRelation(ctx,
@@ -319,17 +278,9 @@ func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationP
 }
 
 func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if err := a.st.SetRelation(ctx,

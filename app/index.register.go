@@ -9,17 +9,9 @@ import (
 
 // TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
 func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	// TODO: Correct "OccurredAt"
@@ -32,17 +24,9 @@ func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error 
 }
 
 func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "update", time.Now(), p, nil); err != nil {
@@ -53,17 +37,9 @@ func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error 
 }
 
 func (a *App) RegisterDelete(ctx context.Context, p *index.DeletePayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "delete", time.Now(), p, nil); err != nil {
@@ -74,17 +50,9 @@ func (a *App) RegisterDelete(ctx context.Context, p *index.DeletePayload) error 
 }
 
 func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "add_relation", time.Now(), p, nil); err != nil {
@@ -95,17 +63,9 @@ func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPaylo
 }
 
 func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "remove_relation", time.Now(), p, nil); err != nil {
@@ -116,17 +76,9 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelatio
 }
 
 func (a *App) RegisterSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
-	if p.Resource == "" {
-		return fmt.Errorf("resource required")
-	}
-
-	r := a.resolveResourceConfig(p.Resource)
-	if r == nil {
-		return ErrUnknownResource
-	}
-
-	if p.ResourceId == "" {
-		return fmt.Errorf("resource_id required")
+	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	if err != nil {
+		return err
 	}
 
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "set_relation", time.Now(), p, nil); err != nil {
