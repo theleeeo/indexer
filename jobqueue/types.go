@@ -2,7 +2,7 @@ package jobqueue
 
 import (
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,7 +26,7 @@ type Job struct {
 	RunAfter   time.Time
 
 	Type    string
-	Payload json.RawMessage
+	Payload jsontext.Value
 
 	Attempts    int
 	MaxAttempts int

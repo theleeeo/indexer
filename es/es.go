@@ -3,7 +3,8 @@ package es
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"io"
 	"log/slog"
@@ -54,7 +55,7 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any) 
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es create error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	return nil
 }
@@ -81,7 +82,7 @@ func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 	}
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es delete error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	slog.Info("deleted doc", "docID", docID, "index", indexAlias)
 	return nil
@@ -99,15 +100,16 @@ func (c *Client) BulkUpsert(ctx context.Context, items []BulkItem) error {
 	}
 
 	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
+	enc := jsontext.NewEncoder(&buf)
 
 	for _, it := range items {
 		meta := map[string]any{"index": map[string]any{"_index": it.Index, "_id": it.ID}}
-		if err := enc.Encode(meta); err != nil {
-			return err
+		if err := json.MarshalEncode(enc, meta); err != nil {
+			return fmt.Errorf("marshal index meta: %w", err)
 		}
-		if err := enc.Encode(it.Doc); err != nil {
-			return err
+
+		if err := json.MarshalEncode(enc, it.Doc); err != nil {
+			return fmt.Errorf("marshal doc: %w", err)
 		}
 	}
 
@@ -167,7 +169,7 @@ func (c *Client) UpdateField(ctx context.Context, indexAlias, docID, field strin
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	slog.Info("updated field", "field", field, "docID", docID, "index", indexAlias)
 	return nil
@@ -239,7 +241,7 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	slog.Info("upserted field resource by id", "elementID", elementId, "field", field, "docID", docID, "index", indexAlias)
 	return nil
@@ -293,7 +295,7 @@ func (c *Client) AddFieldResource(ctx context.Context, indexAlias, docID, field 
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	slog.Info("added field resource", "field", field, "docID", docID, "index", indexAlias)
 	return nil
@@ -346,7 +348,7 @@ func (c *Client) RemoveFieldResourceById(ctx context.Context, indexAlias, docID,
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es update error: %s %s", res.Status(), string(b))
+		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 	slog.Info("removed field resource by id", "elementID", elementID, "field", field, "docID", docID, "index", indexAlias)
 	return nil
@@ -369,13 +371,13 @@ func (c *Client) Get(ctx context.Context, indexAlias, docID string) (map[string]
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return nil, fmt.Errorf("es get error: %s %s", res.Status(), string(b))
+		return nil, fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
 
 	var getRes struct {
 		Source map[string]any `json:"_source"`
 	}
-	if err := json.NewDecoder(res.Body).Decode(&getRes); err != nil {
+	if err := json.UnmarshalRead(res.Body, &getRes); err != nil {
 		return nil, err
 	}
 

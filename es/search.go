@@ -3,7 +3,7 @@ package es
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"encoding/json/v2"
 	"fmt"
 	"indexer/gen/search/v1"
 	"io"
@@ -101,7 +101,7 @@ func (c *Client) Search(ctx context.Context, req *search.SearchRequest, indexAli
 	}
 
 	var decoded map[string]any
-	if err := json.NewDecoder(res.Body).Decode(&decoded); err != nil {
+	if err := json.UnmarshalRead(res.Body, &decoded); err != nil {
 		return nil, err
 	}
 
