@@ -3,6 +3,7 @@ syntax = "proto3";
 package index.v1;
 
 import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "indexer/gen/index/v1;index";
 
@@ -25,13 +26,15 @@ message PublishBatchRequest {
 message PublishBatchResponse {}
 
 message ChangeEvent {
+  google.protobuf.Timestamp    occurred_at = 1;
+
   oneof payload {
-    CreatePayload         create_payload          = 1;
-    UpdatePayload         update_payload          = 2;
-    DeletePayload         delete_payload          = 3;
-    AddRelationPayload    add_relation_payload    = 4;
-    RemoveRelationPayload remove_relation_payload = 5;
-    SetRelationPayload    set_relation_payload    = 6;
+    CreatePayload         create_payload          = 2;
+    UpdatePayload         update_payload          = 3;
+    DeletePayload         delete_payload          = 4;
+    AddRelationPayload    add_relation_payload    = 5;
+    RemoveRelationPayload remove_relation_payload = 6;
+    SetRelationPayload    set_relation_payload    = 7;
   }
 }
 
@@ -46,6 +49,7 @@ message CreateRelationParameters {
   Relation relation = 1;
   // If true, the relation is two-way (i.e., reciprocal).
   // IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
+  // TODO: This should be controlled by the schema instead of per-request.
   bool     two_way  = 2;
 }
 

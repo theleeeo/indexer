@@ -77,8 +77,9 @@ type SearchRequest struct {
 	Query    string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	Filters  []*Filter              `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
 	// Pagination (simple from/size)
-	Page          int32   `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`                         // 0-based
-	PageSize      int32   `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"` // default 25, max 100
+	Page     int32 `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize int32 `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// TODO: Multiple fields? Why?
 	Sort          []*Sort `protobuf:"bytes,6,rep,name=sort,proto3" json:"sort,omitempty"`
 	IncludeSource bool    `protobuf:"varint,7,opt,name=include_source,json=includeSource,proto3" json:"include_source,omitempty"`
 	unknownFields protoimpl.UnknownFields
@@ -288,6 +289,7 @@ type Filter struct {
 	Values []string `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty"`
 	// If you need nested filtering (e.g. c is mapped as "nested"):
 	// nested_path="c", field="c.state", op=EQ, value="active"
+	// TODO: Remove. Nested fields are not used
 	NestedPath    string `protobuf:"bytes,5,opt,name=nested_path,json=nestedPath,proto3" json:"nested_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

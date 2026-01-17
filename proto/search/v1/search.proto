@@ -17,9 +17,10 @@ message SearchRequest {
   repeated Filter filters        = 3;
 
   // Pagination (simple from/size)
-  int32           page           = 4; // 0-based
-  int32           page_size      = 5; // default 25, max 100
+  int32           page           = 4; 
+  int32           page_size      = 5; 
 
+  // TODO: Multiple fields? Why?
   repeated Sort   sort           = 6;
 
   bool            include_source = 7;
@@ -59,6 +60,7 @@ message Filter {
 
   // If you need nested filtering (e.g. c is mapped as "nested"):
   // nested_path="c", field="c.state", op=EQ, value="active"
+  // TODO: Remove. Nested fields are not used
   string          nested_path = 5;
 }
 
