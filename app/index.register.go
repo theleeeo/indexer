@@ -18,7 +18,6 @@ func (a *App) RegisterCreate(ctx context.Context, occuredAt time.Time, p *index.
 		occuredAt = time.Now()
 	}
 
-	// TODO: Correct "OccurredAt"
 	// TODO: Payload not bound to proto
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "create", occuredAt, p, nil); err != nil {
 		return fmt.Errorf("enqueue create job failed: %w", err)

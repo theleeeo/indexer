@@ -3,13 +3,14 @@ package tests
 import (
 	"indexer/gen/index/v1"
 	"indexer/gen/search/v1"
+	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
 func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	t.Run("create resources", func() {
-		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+		err := t.app.RegisterCreate(t.T().Context(), time.Now(), &index.CreatePayload{
 			Resource:   "a",
 			ResourceId: "1",
 			Data: &structpb.Struct{
@@ -25,7 +26,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 		})
 		t.Require().NoError(err)
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+		err = t.app.RegisterCreate(t.T().Context(), time.Now(), &index.CreatePayload{
 			Resource:   "a",
 			ResourceId: "2",
 			Data: &structpb.Struct{
@@ -82,7 +83,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("update existing resource", func() {
-		err := t.app.RegisterUpdate(t.T().Context(), &index.UpdatePayload{
+		err := t.app.RegisterUpdate(t.T().Context(), time.Now(), &index.UpdatePayload{
 			Resource:   "a",
 			ResourceId: "1",
 			Data: &structpb.Struct{
@@ -108,7 +109,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("delete resource", func() {
-		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), time.Now(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "1",
 		})
@@ -121,7 +122,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("delete non-existing resource", func() {
-		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), time.Now(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "non_existing_id",
 		})
@@ -131,14 +132,14 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 
 func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	t.Run("create resources in different indices", func() {
-		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+		err := t.app.RegisterCreate(t.T().Context(), time.Now(), &index.CreatePayload{
 			Resource:   "a",
 			ResourceId: "1",
 			Data:       &structpb.Struct{},
 		})
 		t.Require().NoError(err)
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+		err = t.app.RegisterCreate(t.T().Context(), time.Now(), &index.CreatePayload{
 			Resource:   "b",
 			ResourceId: "2",
 			Data:       &structpb.Struct{},
@@ -167,13 +168,13 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	})
 
 	t.Run("delete resources", func() {
-		err := t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
+		err := t.app.RegisterDelete(t.T().Context(), time.Now(), &index.DeletePayload{
 			Resource:   "a",
 			ResourceId: "1",
 		})
 		t.Require().NoError(err)
 
-		err = t.app.RegisterDelete(t.T().Context(), &index.DeletePayload{
+		err = t.app.RegisterDelete(t.T().Context(), time.Now(), &index.DeletePayload{
 			Resource:   "b",
 			ResourceId: "2",
 		})
@@ -193,7 +194,7 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 
 func (t *TestSuite) Test_Create_WithRelation() {
 	t.Run("create resource with relation", func() {
-		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+		err := t.app.RegisterCreate(t.T().Context(), time.Now(), &index.CreatePayload{
 			Resource:   "a",
 			ResourceId: "1",
 			Data:       &structpb.Struct{},
