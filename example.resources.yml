@@ -5,14 +5,9 @@ a:
     - name: secondaryField
   relations:
     - resource: b
-      # Specify the kind of relationship.
-      # With kind: one, this indicates a one-to-one relationship.
-      kind: one
       fields:
         - name: name
     - resource: c
-      # With kind: many, this indicates a one-to-many relationship.
-      kind: many
       fields:
         - name: number
 
@@ -27,11 +22,9 @@ c:
     - name: number
   relations:
     - resource: a
-      kind: one
       fields:
         - name: searchField
     - resource: b
-      kind: one
       fields:
         - name: name
           # Control whether this field is searchable or not.

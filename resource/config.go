@@ -79,30 +79,16 @@ type QueryConfig struct {
 	Search *bool `yaml:"search"`
 }
 
-type RelationKind string
-
-const (
-	RelationKindOne  RelationKind = "one"
-	RelationKindMany RelationKind = "many"
-)
-
 type RelationConfig struct {
-	Resource string        `yaml:"resource"`
-	Kind     RelationKind  `yaml:"kind"`
-	Fields   []FieldConfig `yaml:"fields"`
+	Resource string `yaml:"resource"`
+	// TODO: Implement
+	// Bidirectional bool   `yaml:"bidirectional"`
+	Fields []FieldConfig `yaml:"fields"`
 }
 
 func (c RelationConfig) Validate() error {
 	if c.Resource == "" {
 		return fmt.Errorf("resource required")
-	}
-
-	if c.Kind == "" {
-		return fmt.Errorf("kind required")
-	}
-
-	if c.Kind != RelationKindOne && c.Kind != RelationKindMany {
-		return fmt.Errorf("invalid kind: %s", c.Kind)
 	}
 
 	// TODO: Default to "Use all fields" if none specified?
