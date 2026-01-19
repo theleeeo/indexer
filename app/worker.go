@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json/v2"
 	"fmt"
 	"indexer/gen/index/v1"
 	"indexer/jobqueue"
@@ -13,8 +14,8 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 	return func(ctx context.Context, job jobqueue.Job) error {
 		switch job.Type {
 		case "create":
-			p := &index.CreatePayload{}
-			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+			p := CreatePayload{}
+			if err := json.Unmarshal(job.Payload, &p); err != nil {
 				return fmt.Errorf("failed to unmarshal payload: %w", err)
 			}
 			return a.handleCreate(ctx, p)

@@ -88,6 +88,28 @@ func (s *PostgresStore) GetParentResources(ctx context.Context, childResource Re
 	return parents, nil
 }
 
+func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource Resource) ([]Resource, error) {
+	rows, err := s.pool.Query(
+		ctx,
+		`SELECT related_resource, related_resource_id FROM relations WHERE resource=$1 AND resource_id=$2`,
+		parentResource.Type, parentResource.Id,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var children []Resource
+	for rows.Next() {
+		var childResource, childResourceId string
+		if err := rows.Scan(&childResource, &childResourceId); err != nil {
+			return nil, err
+		}
+		children = append(children, Resource{Type: childResource, Id: childResourceId})
+	}
+	return children, nil
+}
+
 func (s *PostgresStore) RemoveResource(ctx context.Context, resource Resource) error {
 	_, err := s.pool.Exec(
 		ctx,

@@ -67,6 +67,22 @@ func (s *MemoryStore) GetParentResources(_ context.Context, childResource Resour
 	return parents, nil
 }
 
+func (s *MemoryStore) GetChildResources(_ context.Context, parentResource Resource) ([]Resource, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var children []Resource
+	for child, parents := range s.relations {
+		for _, pr := range parents {
+			if pr == parentResource {
+				children = append(children, child)
+				break
+			}
+		}
+	}
+	return children, nil
+}
+
 func (s *MemoryStore) RemoveResource(ctx context.Context, resource Resource) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()

@@ -82,8 +82,8 @@ type QueryConfig struct {
 type RelationConfig struct {
 	Resource string `yaml:"resource"`
 	// TODO: Implement
-	// Bidirectional bool   `yaml:"bidirectional"`
-	Fields []FieldConfig `yaml:"fields"`
+	Bidirectional bool          `yaml:"bidirectional"`
+	Fields        []FieldConfig `yaml:"fields"`
 }
 
 func (c RelationConfig) Validate() error {

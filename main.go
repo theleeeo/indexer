@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net"
 	"os"
 	"strings"
@@ -72,6 +73,8 @@ func main() {
 		log.Fatalf("pgxpool: %v", err)
 	}
 	defer dbpool.Close()
+
+	slog.SetLogLoggerLevel(slog.LevelDebug)
 
 	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)

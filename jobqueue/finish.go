@@ -4,12 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
 func (w *Worker) finish(ctx context.Context, group string, job Job, runErr error) error {
+	logger := slog.With("group", group, "job_id", job.ID)
+
+	if runErr != nil {
+		logger.Error("job failed", "error", runErr)
+	} else {
+		logger.Info("job succeeded")
+	}
+
 	tx, err := w.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return err

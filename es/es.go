@@ -13,6 +13,8 @@ import (
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 )
 
+var ErrNotFound = fmt.Errorf("document not found")
+
 type Client struct {
 	es *elasticsearch.Client
 
@@ -240,6 +242,9 @@ func (c *Client) UpsertFieldResourceById(ctx context.Context, indexAlias, docID,
 	defer res.Body.Close()
 
 	if res.IsError() {
+		if res.StatusCode == 404 {
+			return ErrNotFound
+		}
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
 	}
