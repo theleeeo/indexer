@@ -29,6 +29,7 @@ message ChangeEvent {
   google.protobuf.Timestamp    occurred_at = 1;
 
   oneof payload {
+    // TODO: Merge the create and update payloads into one?
     CreatePayload         create_payload          = 2;
     UpdatePayload         update_payload          = 3;
     DeletePayload         delete_payload          = 4;

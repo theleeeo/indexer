@@ -1,4 +1,4 @@
--- todo: do in the app
+-- todo: do in the app. Both timestamps and uuids
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS job_groups (

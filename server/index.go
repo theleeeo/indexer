@@ -53,6 +53,8 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, req *index.PublishBatc
 		if ev == nil {
 			continue
 		}
+
+		// TODO: Apply in a transaction
 		if err := s.applyOne(ctx, ev); err != nil {
 			return nil, err
 		}
