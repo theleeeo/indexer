@@ -109,7 +109,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 
 		subResources := make([]map[string]any, 0, len(resIds))
 		for _, rid := range resIds {
-			doc, err := a.es.Get(ctx, resType+"_search", rid)
+			doc, err := a.es.Get(ctx, resType+"_search", rid, []string{"fields"})
 			if err != nil {
 				return fmt.Errorf("get related doc failed: %w", err)
 			}

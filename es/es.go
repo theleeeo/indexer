@@ -359,11 +359,12 @@ func (c *Client) RemoveFieldResourceById(ctx context.Context, indexAlias, docID,
 	return nil
 }
 
-func (c *Client) Get(ctx context.Context, indexAlias, docID string) (map[string]any, error) {
+func (c *Client) Get(ctx context.Context, indexAlias, docID string, includeFields []string) (map[string]any, error) {
 	res, err := c.es.Get(
 		indexAlias,
 		docID,
 		c.es.Get.WithContext(ctx),
+		c.es.Get.WithSourceIncludes(includeFields...),
 	)
 	if err != nil {
 		return nil, err
