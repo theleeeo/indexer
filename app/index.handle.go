@@ -44,19 +44,53 @@ type CreateRelationPayload struct {
 }
 
 func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
-	logger := slog.With("resource", p.Resource, "resource_id", p.ResourceId)
+	logger := slog.With(slog.Group("resource", "type", p.Resource, "id", p.ResourceId))
 
 	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
+		// TODO: Persistent errors, non retryable
 		return err
 	}
 
-	relations := make([]store.Relation, 0, len(p.Relations)*2)
-	for _, crp := range p.Relations {
+	relations := convertCreateRelationPayloads(p.Resource, p.ResourceId, p.Relations)
+
+	if err := a.st.AddRelations(ctx, relations); err != nil {
+		return fmt.Errorf("store relations: %w", err)
+	}
+
+	// We must load all child resources from the store instead of using the ones passed in the payload,
+	// because there might be existing relations from previously that were not included in the create payload.
+	// Example: Create resource A with a bidirectional relation to resource B. When you later create resource B the relation to A exists in the store but not in the payload.
+	children, err := a.st.GetChildResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	if err != nil {
+		return fmt.Errorf("get child resources: %w", err)
+	}
+
+	docMap, err := a.buildDocument(ctx, rCfg, p.Data, children)
+	if err != nil {
+		return fmt.Errorf("build document: %w", err)
+	}
+
+	if err := a.es.Upsert(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
+		return fmt.Errorf("upsert: %w", err)
+	}
+
+	logger.Info("created resource")
+
+	if err := a.addResourceToParents(ctx, p.Resource, p.ResourceId, p.Data); err != nil {
+		return fmt.Errorf("add resource to parents: %w", err)
+	}
+
+	return nil
+}
+
+func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelationPayload) []store.Relation {
+	relations := make([]store.Relation, 0, len(cp))
+	for _, crp := range cp {
 		relations = append(relations, store.Relation{
 			Parent: store.Resource{
-				Type: p.Resource,
-				Id:   p.ResourceId,
+				Type: resource,
+				Id:   resourceId,
 			},
 			Children: store.Resource{
 				Type: crp.RelatedResource,
@@ -71,27 +105,18 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 					Id:   crp.RelatedResourceId,
 				},
 				Children: store.Resource{
-					Type: p.Resource,
-					Id:   p.ResourceId,
+					Type: resource,
+					Id:   resourceId,
 				},
 			})
 		}
 	}
+	return relations
+}
 
-	if err := a.st.AddRelations(ctx, relations); err != nil {
-		return fmt.Errorf("store relations failed: %w", err)
-	}
-
-	// We must load all child resources from the store instead of using the ones passed in the payload,
-	// because there might be existing relations from previously that were not included in the create payload.
-	// Example: Create resource A with a bidirectional relation to resource B. When you later create resource B the relation to A exists in the store but not in the payload.
-	children, err := a.st.GetChildResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
-	if err != nil {
-		return fmt.Errorf("get child resources failed: %w", err)
-	}
-
+func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields map[string]any, children []store.Resource) (map[string]any, error) {
 	docMap := map[string]any{
-		"fields": p.Data,
+		"fields": fields,
 	}
 
 	childRelationMap := map[string][]string{}
@@ -103,7 +128,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 		relationConfig := rCfg.GetRelation(resType)
 		if relationConfig == nil {
 			// This can happen if the resource schema is changed and the relation no longer exists
-			logger.Warn("relation does not exist in the schema", "related_resource", resType)
+			slog.Warn("relation does not exist in the schema", "related_resource", resType)
 			continue
 		}
 
@@ -111,7 +136,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 		for _, rid := range resIds {
 			doc, err := a.es.Get(ctx, resType+"_search", rid, []string{"fields"})
 			if err != nil {
-				return fmt.Errorf("get related doc failed: %w", err)
+				return nil, fmt.Errorf("get related doc: %w", err)
 			}
 
 			if doc == nil {
@@ -130,35 +155,35 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 
 	}
 
-	if err := a.es.Upsert(ctx, p.Resource+"_search", p.ResourceId, docMap); err != nil {
-		return fmt.Errorf("upsert failed: %w", err)
-	}
-	logger.Info("created resource")
+	return docMap, nil
+}
 
-	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId string, data map[string]any) error {
+	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: resourceType, Id: resourceId})
 	if err != nil {
-		return fmt.Errorf("get parent resources failed: %w", err)
+		return fmt.Errorf("get parent resources: %w", err)
 	}
 
 	for _, parentResource := range parentResources {
 		relRCfg := a.resolveResourceConfig(parentResource.Type)
 		if relRCfg == nil {
-			logger.Warn("parent resource does not exist in the schema", "parent_resource", parentResource.Type)
+			// TODO: Investigate better handling/warnings in these cases
+			slog.Warn("parent resource does not exist in the schema", "parent_resource", parentResource.Type)
 			continue
 		}
 
-		rf := relRCfg.GetRelation(p.Resource)
+		rf := relRCfg.GetRelation(resourceType)
 		if rf == nil {
-			logger.Warn("related resource does not have field for resource", "related_resource", parentResource.Type, "field", p.Resource)
+			slog.Warn("related resource does not have field for resource", "related_resource", parentResource.Type, "field", resourceType)
 			continue
 		}
 
-		if err := a.es.UpsertFieldResourceById(ctx, parentResource.Type+"_search", parentResource.Id, p.Resource, p.ResourceId, buildResourceDataFromMap(p.Data, rf.Fields)); err != nil {
+		if err := a.es.UpsertFieldResourceById(ctx, parentResource.Type+"_search", parentResource.Id, resourceType, resourceId, buildResourceDataFromMap(data, rf.Fields)); err != nil {
 			if errors.Is(err, es.ErrNotFound) {
-				logger.Warn("parent resource document not found in index", "parent_resource", parentResource.Type, "parent_resource_id", parentResource.Id)
+				slog.Warn("parent resource document not found in index", "parent_resource", parentResource.Type, "parent_resource_id", parentResource.Id)
 				continue
 			}
-			return fmt.Errorf("upsert parent resource failed: %w", err)
+			return fmt.Errorf("upsert parent resource: %w", err)
 		}
 	}
 
@@ -181,7 +206,7 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 	// Update parent documents
 	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
 	if err != nil {
-		return fmt.Errorf("get parent resources failed: %w", err)
+		return fmt.Errorf("get parent resources: %w", err)
 	}
 	for _, parentResource := range parentResources {
 		relRCfg := a.resolveResourceConfig(parentResource.Type)
@@ -218,16 +243,16 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 	// TODO: Flag for cascade delete?
 	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
 	if err != nil {
-		return fmt.Errorf("get parent resources failed: %w", err)
+		return fmt.Errorf("get parent resources: %w", err)
 	}
 	for _, relatedResource := range parentResources {
 		if err := a.es.RemoveFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId); err != nil {
-			return fmt.Errorf("remove from parent resource failed: %w", err)
+			return fmt.Errorf("remove from parent resource: %w", err)
 		}
 	}
 
 	if err := a.st.RemoveResource(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId}); err != nil {
-		return fmt.Errorf("remove relations failed: %w", err)
+		return fmt.Errorf("remove relations: %w", err)
 	}
 
 	return nil
@@ -249,7 +274,7 @@ func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload
 				Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 			},
 		}); err != nil {
-		return fmt.Errorf("store relations failed: %w", err)
+		return fmt.Errorf("store relations: %w", err)
 	}
 
 	if err := a.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, map[string]any{
@@ -273,7 +298,7 @@ func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationP
 			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
-		return fmt.Errorf("remove relation failed: %w", err)
+		return fmt.Errorf("remove relation: %w", err)
 	}
 
 	if err := a.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, p.Relation.ResourceId); err != nil {
@@ -295,7 +320,7 @@ func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload
 			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
-		return fmt.Errorf("set relation failed: %w", err)
+		return fmt.Errorf("set relation: %w", err)
 	}
 
 	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, idStruct{Id: p.Relation.ResourceId}); err != nil {
