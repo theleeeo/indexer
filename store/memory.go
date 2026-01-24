@@ -26,7 +26,7 @@ func (s *MemoryStore) AddRelations(_ context.Context, relations []Relation) erro
 	defer s.mu.Unlock()
 
 	for _, rl := range relations {
-		s.relations[rl.Children] = append(s.relations[rl.Children], rl.Parent)
+		s.relations[rl.Child] = append(s.relations[rl.Child], rl.Parent)
 	}
 
 	return nil
@@ -36,7 +36,7 @@ func (s *MemoryStore) RemoveRelation(ctx context.Context, relation Relation) err
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	parents, ok := s.relations[relation.Children]
+	parents, ok := s.relations[relation.Child]
 	if !ok {
 		return nil
 	}
@@ -47,14 +47,14 @@ func (s *MemoryStore) RemoveRelation(ctx context.Context, relation Relation) err
 			newParents = append(newParents, pr)
 		}
 	}
-	s.relations[relation.Children] = newParents
+	s.relations[relation.Child] = newParents
 	return nil
 }
 
 func (s *MemoryStore) SetRelation(ctx context.Context, relation Relation) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.relations[relation.Children] = []model.Resource{relation.Parent}
+	s.relations[relation.Child] = []model.Resource{relation.Parent}
 	return nil
 }
 

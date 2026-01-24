@@ -94,7 +94,7 @@ func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelat
 				Type: resource,
 				Id:   resourceId,
 			},
-			Children: model.Resource{
+			Child: model.Resource{
 				Type: crp.RelatedResource,
 				Id:   crp.RelatedResourceId,
 			},
@@ -106,7 +106,7 @@ func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelat
 					Type: crp.RelatedResource,
 					Id:   crp.RelatedResourceId,
 				},
-				Children: model.Resource{
+				Child: model.Resource{
 					Type: resource,
 					Id:   resourceId,
 				},
@@ -272,8 +272,8 @@ func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload
 	if err := a.st.AddRelations(ctx,
 		[]store.Relation{
 			{
-				Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
-				Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+				Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
+				Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 			},
 		}); err != nil {
 		return fmt.Errorf("store relations: %w", err)
@@ -297,8 +297,8 @@ func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationP
 
 	if err := a.st.RemoveRelation(ctx,
 		store.Relation{
-			Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
+			Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("remove relation: %w", err)
@@ -319,8 +319,8 @@ func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload
 
 	if err := a.st.SetRelation(ctx,
 		store.Relation{
-			Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
+			Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("set relation: %w", err)

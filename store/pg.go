@@ -24,7 +24,7 @@ func (s *PostgresStore) AddRelations(ctx context.Context, relations []Relation) 
 		pgx.Identifier{"relations"},
 		[]string{"resource", "resource_id", "related_resource", "related_resource_id"},
 		pgx.CopyFromSlice(len(relations), func(i int) ([]any, error) {
-			return []any{relations[i].Parent.Type, relations[i].Parent.Id, relations[i].Children.Type, relations[i].Children.Id}, nil
+			return []any{relations[i].Parent.Type, relations[i].Parent.Id, relations[i].Child.Type, relations[i].Child.Id}, nil
 		}),
 	)
 	return err
@@ -34,7 +34,7 @@ func (s *PostgresStore) RemoveRelation(ctx context.Context, relation Relation) e
 	_, err := s.pool.Exec(
 		ctx,
 		`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
-		relation.Children.Type, relation.Children.Id, relation.Parent.Type, relation.Parent.Id,
+		relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
 	)
 	return err
 }
@@ -49,7 +49,7 @@ func (s *PostgresStore) SetRelation(ctx context.Context, relation Relation) erro
 	_, err = tx.Exec(
 		ctx,
 		`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2`,
-		relation.Children.Type, relation.Children.Id,
+		relation.Child.Type, relation.Child.Id,
 	)
 	if err != nil {
 		return err
@@ -58,7 +58,7 @@ func (s *PostgresStore) SetRelation(ctx context.Context, relation Relation) erro
 	_, err = tx.Exec(
 		ctx,
 		`INSERT INTO relations (related_resource, related_resource_id, resource, resource_id) VALUES ($1, $2, $3, $4)`,
-		relation.Children.Type, relation.Children.Id, relation.Parent.Type, relation.Parent.Id,
+		relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
 	)
 	if err != nil {
 		return err

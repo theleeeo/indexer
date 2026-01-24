@@ -6,8 +6,8 @@ import (
 )
 
 type Relation struct {
-	Parent   model.Resource
-	Children model.Resource
+	Parent model.Resource
+	Child  model.Resource
 }
 
 type Store interface {
