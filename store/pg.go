@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"indexer/model"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -66,7 +67,7 @@ func (s *PostgresStore) SetRelation(ctx context.Context, relation Relation) erro
 	return tx.Commit(ctx)
 }
 
-func (s *PostgresStore) GetParentResources(ctx context.Context, childResource Resource) ([]Resource, error) {
+func (s *PostgresStore) GetParentResources(ctx context.Context, childResource model.Resource) ([]model.Resource, error) {
 	rows, err := s.pool.Query(
 		ctx,
 		`SELECT resource, resource_id FROM relations WHERE related_resource=$1 AND related_resource_id=$2`,
@@ -77,18 +78,18 @@ func (s *PostgresStore) GetParentResources(ctx context.Context, childResource Re
 	}
 	defer rows.Close()
 
-	var parents []Resource
+	var parents []model.Resource
 	for rows.Next() {
 		var parentResource, parentResourceId string
 		if err := rows.Scan(&parentResource, &parentResourceId); err != nil {
 			return nil, err
 		}
-		parents = append(parents, Resource{Type: parentResource, Id: parentResourceId})
+		parents = append(parents, model.Resource{Type: parentResource, Id: parentResourceId})
 	}
 	return parents, nil
 }
 
-func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource Resource) ([]Resource, error) {
+func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource model.Resource) ([]model.Resource, error) {
 	rows, err := s.pool.Query(
 		ctx,
 		`SELECT related_resource, related_resource_id FROM relations WHERE resource=$1 AND resource_id=$2`,
@@ -99,18 +100,18 @@ func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource Re
 	}
 	defer rows.Close()
 
-	var children []Resource
+	var children []model.Resource
 	for rows.Next() {
 		var childResource, childResourceId string
 		if err := rows.Scan(&childResource, &childResourceId); err != nil {
 			return nil, err
 		}
-		children = append(children, Resource{Type: childResource, Id: childResourceId})
+		children = append(children, model.Resource{Type: childResource, Id: childResourceId})
 	}
 	return children, nil
 }
 
-func (s *PostgresStore) RemoveResource(ctx context.Context, resource Resource) error {
+func (s *PostgresStore) RemoveResource(ctx context.Context, resource model.Resource) error {
 	_, err := s.pool.Exec(
 		ctx,
 		`DELETE FROM relations WHERE resource=$1 AND resource_id=$2`,

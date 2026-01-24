@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"indexer/model"
 	"sync"
 )
 
@@ -11,12 +12,12 @@ type MemoryStore struct {
 	mu sync.RWMutex
 
 	// child: parents
-	relations map[Resource][]Resource
+	relations map[model.Resource][]model.Resource
 }
 
 func NewMemoryStore() *MemoryStore {
 	return &MemoryStore{
-		relations: map[Resource][]Resource{},
+		relations: map[model.Resource][]model.Resource{},
 	}
 }
 
@@ -40,7 +41,7 @@ func (s *MemoryStore) RemoveRelation(ctx context.Context, relation Relation) err
 		return nil
 	}
 
-	newParents := []Resource{}
+	newParents := []model.Resource{}
 	for _, pr := range parents {
 		if pr != relation.Parent {
 			newParents = append(newParents, pr)
@@ -53,25 +54,25 @@ func (s *MemoryStore) RemoveRelation(ctx context.Context, relation Relation) err
 func (s *MemoryStore) SetRelation(ctx context.Context, relation Relation) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.relations[relation.Children] = []Resource{relation.Parent}
+	s.relations[relation.Children] = []model.Resource{relation.Parent}
 	return nil
 }
 
-func (s *MemoryStore) GetParentResources(_ context.Context, childResource Resource) ([]Resource, error) {
+func (s *MemoryStore) GetParentResources(_ context.Context, childResource model.Resource) ([]model.Resource, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	parents, ok := s.relations[childResource]
 	if !ok {
-		return []Resource{}, nil
+		return []model.Resource{}, nil
 	}
 	return parents, nil
 }
 
-func (s *MemoryStore) GetChildResources(_ context.Context, parentResource Resource) ([]Resource, error) {
+func (s *MemoryStore) GetChildResources(_ context.Context, parentResource model.Resource) ([]model.Resource, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var children []Resource
+	var children []model.Resource
 	for child, parents := range s.relations {
 		for _, pr := range parents {
 			if pr == parentResource {
@@ -83,7 +84,7 @@ func (s *MemoryStore) GetChildResources(_ context.Context, parentResource Resour
 	return children, nil
 }
 
-func (s *MemoryStore) RemoveResource(ctx context.Context, resource Resource) error {
+func (s *MemoryStore) RemoveResource(ctx context.Context, resource model.Resource) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

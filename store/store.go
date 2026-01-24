@@ -2,23 +2,19 @@ package store
 
 import (
 	"context"
+	"indexer/model"
 )
 
-type Resource struct {
-	Type string
-	Id   string
-}
-
 type Relation struct {
-	Parent   Resource
-	Children Resource
+	Parent   model.Resource
+	Children model.Resource
 }
 
 type Store interface {
 	AddRelations(ctx context.Context, relations []Relation) error
 	RemoveRelation(ctx context.Context, relation Relation) error
 	SetRelation(ctx context.Context, relation Relation) error
-	GetParentResources(ctx context.Context, childResource Resource) ([]Resource, error)
-	GetChildResources(ctx context.Context, parentResource Resource) ([]Resource, error)
-	RemoveResource(ctx context.Context, resource Resource) error
+	GetParentResources(ctx context.Context, childResource model.Resource) ([]model.Resource, error)
+	GetChildResources(ctx context.Context, parentResource model.Resource) ([]model.Resource, error)
+	RemoveResource(ctx context.Context, resource model.Resource) error
 }

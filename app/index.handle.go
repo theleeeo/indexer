@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"indexer/es"
 	"indexer/gen/index/v1"
+	"indexer/model"
 	"indexer/resource"
 	"indexer/store"
 	"log/slog"
@@ -40,7 +41,8 @@ type CreatePayload struct {
 type CreateRelationPayload struct {
 	RelatedResource   string
 	RelatedResourceId string
-	Bidirectional     bool
+	// TODO: This should not be be set by the receiver and be part of the payload.
+	Bidirectional bool
 }
 
 func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
@@ -61,7 +63,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 	// We must load all child resources from the store instead of using the ones passed in the payload,
 	// because there might be existing relations from previously that were not included in the create payload.
 	// Example: Create resource A with a bidirectional relation to resource B. When you later create resource B the relation to A exists in the store but not in the payload.
-	children, err := a.st.GetChildResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	children, err := a.st.GetChildResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
 	if err != nil {
 		return fmt.Errorf("get child resources: %w", err)
 	}
@@ -88,11 +90,11 @@ func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelat
 	relations := make([]store.Relation, 0, len(cp))
 	for _, crp := range cp {
 		relations = append(relations, store.Relation{
-			Parent: store.Resource{
+			Parent: model.Resource{
 				Type: resource,
 				Id:   resourceId,
 			},
-			Children: store.Resource{
+			Children: model.Resource{
 				Type: crp.RelatedResource,
 				Id:   crp.RelatedResourceId,
 			},
@@ -100,11 +102,11 @@ func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelat
 
 		if crp.Bidirectional {
 			relations = append(relations, store.Relation{
-				Parent: store.Resource{
+				Parent: model.Resource{
 					Type: crp.RelatedResource,
 					Id:   crp.RelatedResourceId,
 				},
-				Children: store.Resource{
+				Children: model.Resource{
 					Type: resource,
 					Id:   resourceId,
 				},
@@ -114,7 +116,7 @@ func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelat
 	return relations
 }
 
-func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields map[string]any, children []store.Resource) (map[string]any, error) {
+func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields map[string]any, children []model.Resource) (map[string]any, error) {
 	docMap := map[string]any{
 		"fields": fields,
 	}
@@ -159,7 +161,7 @@ func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields m
 }
 
 func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId string, data map[string]any) error {
-	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: resourceType, Id: resourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: resourceType, Id: resourceId})
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -204,7 +206,7 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 	}
 
 	// Update parent documents
-	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -241,7 +243,7 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 	}
 
 	// TODO: Flag for cascade delete?
-	parentResources, err := a.st.GetParentResources(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -251,7 +253,7 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 		}
 	}
 
-	if err := a.st.RemoveResource(ctx, store.Resource{Type: p.Resource, Id: p.ResourceId}); err != nil {
+	if err := a.st.RemoveResource(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}); err != nil {
 		return fmt.Errorf("remove relations: %w", err)
 	}
 
@@ -270,13 +272,14 @@ func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload
 	if err := a.st.AddRelations(ctx,
 		[]store.Relation{
 			{
-				Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-				Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+				Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
+				Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 			},
 		}); err != nil {
 		return fmt.Errorf("store relations: %w", err)
 	}
 
+	// TODO: This should load the related resource data from the store instead of passing only the ID.
 	if err := a.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, map[string]any{
 		"id": p.Relation.ResourceId,
 	}); err != nil {
@@ -294,8 +297,8 @@ func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationP
 
 	if err := a.st.RemoveRelation(ctx,
 		store.Relation{
-			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
+			Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("remove relation: %w", err)
@@ -316,8 +319,8 @@ func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload
 
 	if err := a.st.SetRelation(ctx,
 		store.Relation{
-			Parent:   store.Resource{Type: p.Resource, Id: p.ResourceId},
-			Children: store.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Parent:   model.Resource{Type: p.Resource, Id: p.ResourceId},
+			Children: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
 	); err != nil {
 		return fmt.Errorf("set relation: %w", err)
