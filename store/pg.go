@@ -19,15 +19,30 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 }
 
 func (s *PostgresStore) AddRelations(ctx context.Context, relations []Relation) error {
-	_, err := s.pool.CopyFrom(
-		ctx,
-		pgx.Identifier{"relations"},
-		[]string{"resource", "resource_id", "related_resource", "related_resource_id"},
-		pgx.CopyFromSlice(len(relations), func(i int) ([]any, error) {
-			return []any{relations[i].Parent.Type, relations[i].Parent.Id, relations[i].Child.Type, relations[i].Child.Id}, nil
-		}),
-	)
-	return err
+	if len(relations) == 0 {
+		return nil
+	}
+
+	batch := &pgx.Batch{}
+	for _, relation := range relations {
+		batch.Queue(
+			`INSERT INTO relations (resource, resource_id, related_resource, related_resource_id) 
+			 VALUES ($1, $2, $3, $4) 
+			 ON CONFLICT DO NOTHING`,
+			relation.Parent.Type, relation.Parent.Id, relation.Child.Type, relation.Child.Id,
+		)
+	}
+
+	br := s.pool.SendBatch(ctx, batch)
+	defer br.Close()
+
+	for range relations {
+		if _, err := br.Exec(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *PostgresStore) RemoveRelation(ctx context.Context, relation Relation) error {
@@ -36,7 +51,10 @@ func (s *PostgresStore) RemoveRelation(ctx context.Context, relation Relation) e
 		`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
 		relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *PostgresStore) SetRelation(ctx context.Context, relation Relation) error {
