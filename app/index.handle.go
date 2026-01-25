@@ -324,12 +324,12 @@ func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload
 		return err
 	}
 
-	if err := a.st.SetRelation(ctx,
-		store.Relation{
+	if err := a.st.SetRelations(ctx, []store.Relation{
+		{
 			Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
 			Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 		},
-	); err != nil {
+	}); err != nil {
 		return fmt.Errorf("set relation: %w", err)
 	}
 

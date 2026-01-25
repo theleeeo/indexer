@@ -22,7 +22,7 @@ func (e *InvalidArgumentError) Error() string {
 }
 
 type App struct {
-	st store.Store
+	st *store.PostgresStore
 	es *es.Client
 
 	queue *jobqueue.Queue
@@ -30,7 +30,7 @@ type App struct {
 	resources []*resource.Config
 }
 
-func New(st store.Store, esClient *es.Client, resources []*resource.Config, queue *jobqueue.Queue) *App {
+func New(st *store.PostgresStore, esClient *es.Client, resources []*resource.Config, queue *jobqueue.Queue) *App {
 	return &App{
 		st:        st,
 		es:        esClient,
