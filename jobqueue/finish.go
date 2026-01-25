@@ -11,7 +11,7 @@ import (
 )
 
 func (w *Worker) finish(ctx context.Context, group string, job Job, runErr error) error {
-	logger := slog.With("group", group, "job_id", job.ID)
+	logger := slog.With("group", group, "job_id", job.ID, "job_type", job.Type)
 
 	if runErr != nil {
 		logger.Error("job failed", "error", runErr)
