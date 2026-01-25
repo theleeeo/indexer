@@ -318,17 +318,15 @@ func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationP
 	return nil
 }
 
+// TODO: Load related resource data from store instead of only passing the ID.
 func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
 	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
 		return err
 	}
 
-	if err := a.st.SetRelations(ctx, []store.Relation{
-		{
-			Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
-			Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
-		},
+	if err := a.st.SetRelations(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}, []model.Resource{
+		{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
 	}); err != nil {
 		return fmt.Errorf("set relation: %w", err)
 	}

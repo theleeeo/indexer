@@ -5,10 +5,17 @@ import (
 	"indexer/model"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var _ Store = (*PostgresStore)(nil)
+type batchSender interface {
+	SendBatch(ctx context.Context, b *pgx.Batch) pgx.BatchResults
+}
+
+type executor interface {
+	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+}
 
 type PostgresStore struct {
 	pool *pgxpool.Pool
@@ -19,6 +26,10 @@ func NewPostgresStore(pool *pgxpool.Pool) *PostgresStore {
 }
 
 func (s *PostgresStore) AddRelations(ctx context.Context, relations []Relation) error {
+	return s.addRelationsBatch(ctx, s.pool, relations)
+}
+
+func (s *PostgresStore) addRelationsBatch(ctx context.Context, sender batchSender, relations []Relation) error {
 	if len(relations) == 0 {
 		return nil
 	}
@@ -33,52 +44,63 @@ func (s *PostgresStore) AddRelations(ctx context.Context, relations []Relation) 
 		)
 	}
 
-	br := s.pool.SendBatch(ctx, batch)
-	defer br.Close()
-
-	for range relations {
-		if _, err := br.Exec(); err != nil {
-			return err
-		}
+	br := sender.SendBatch(ctx, batch)
+	if err := br.Close(); err != nil {
+		return err
 	}
 
 	return nil
 }
 
 func (s *PostgresStore) RemoveRelation(ctx context.Context, relation Relation) error {
-	_, err := s.pool.Exec(
-		ctx,
-		`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
-		relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
-	)
-	if err != nil {
+	return s.removeRelationsBatch(ctx, s.pool, []Relation{relation})
+}
+
+func (s *PostgresStore) removeRelationsBatch(ctx context.Context, sender batchSender, relations []Relation) error {
+	if len(relations) == 0 {
+		return nil
+	}
+
+	batch := &pgx.Batch{}
+	for _, relation := range relations {
+		batch.Queue(
+			`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
+			relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
+		)
+	}
+
+	br := sender.SendBatch(ctx, batch)
+	if err := br.Close(); err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func (s *PostgresStore) SetRelation(ctx context.Context, relation Relation) error {
+func (s *PostgresStore) SetRelations(ctx context.Context, resource model.Resource, relatedResources []model.Resource) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback(ctx)
 
-	_, err = tx.Exec(
-		ctx,
-		`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2`,
-		relation.Child.Type, relation.Child.Id,
-	)
-	if err != nil {
+	if err := s.removeResource(ctx, tx, resource); err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(
-		ctx,
-		`INSERT INTO relations (related_resource, related_resource_id, resource, resource_id) VALUES ($1, $2, $3, $4)`,
-		relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
-	)
-	if err != nil {
+	if len(relatedResources) == 0 {
+		return nil
+	}
+
+	relations := make([]Relation, 0, len(relatedResources))
+	for _, rr := range relatedResources {
+		relations = append(relations, Relation{
+			Parent: resource,
+			Child:  rr,
+		})
+	}
+
+	if err := s.addRelationsBatch(ctx, tx, relations); err != nil {
 		return err
 	}
 
@@ -130,7 +152,11 @@ func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource mo
 }
 
 func (s *PostgresStore) RemoveResource(ctx context.Context, resource model.Resource) error {
-	_, err := s.pool.Exec(
+	return s.removeResource(ctx, s.pool, resource)
+}
+
+func (s *PostgresStore) removeResource(ctx context.Context, sender executor, resource model.Resource) error {
+	_, err := sender.Exec(
 		ctx,
 		`DELETE FROM relations WHERE resource=$1 AND resource_id=$2`,
 		resource.Type, resource.Id,

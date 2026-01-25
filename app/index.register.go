@@ -154,6 +154,10 @@ func (a *App) RegisterSetRelation(ctx context.Context, occuredAt time.Time, p *i
 		return err
 	}
 
+	if p.Relation == nil {
+		return &InvalidArgumentError{Msg: "relation is missing the related resource"}
+	}
+
 	if occuredAt.IsZero() {
 		occuredAt = time.Now()
 	}
