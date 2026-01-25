@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"indexer/gen/index/v1"
+	"indexer/model"
 	"indexer/resource"
 	"time"
 
@@ -101,6 +102,10 @@ func (a *App) RegisterDelete(ctx context.Context, occuredAt time.Time, p *index.
 }
 
 func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *index.AddRelationPayload) error {
+	if p.Relation == nil {
+		return &InvalidArgumentError{Msg: "relation is missing the related resource"}
+	}
+
 	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
 		return err
@@ -110,7 +115,16 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 		occuredAt = time.Now()
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "add_relation", occuredAt, p, nil); err != nil {
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "add_relation", occuredAt, AddRelationPayload{
+		Parent: model.Resource{
+			Type: p.Resource,
+			Id:   p.ResourceId,
+		},
+		Child: model.Resource{
+			Type: p.Relation.Resource,
+			Id:   p.Relation.ResourceId,
+		},
+	}, nil); err != nil {
 		return fmt.Errorf("enqueue add relation job failed: %w", err)
 	}
 

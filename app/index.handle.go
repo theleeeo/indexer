@@ -160,6 +160,7 @@ func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields m
 	return docMap, nil
 }
 
+// TODO: No, this should be a job on the parent
 func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId string, data map[string]any) error {
 	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: resourceType, Id: resourceId})
 	if err != nil {
@@ -260,29 +261,35 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 	return nil
 }
 
+type AddRelationPayload struct {
+	Parent model.Resource
+	Child  model.Resource
+}
+
 // TODO: Failes if applied on object, not array
 // TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
 // TODO: Validate relation in schema
-func (a *App) handleAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error {
+	_, err := a.verifyResourceConfig(p.Parent.Type, p.Parent.Id)
 	if err != nil {
 		return err
 	}
 
 	if err := a.st.AddRelations(ctx,
-		[]store.Relation{
-			{
-				Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
-				Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
-			},
-		}); err != nil {
+		[]store.Relation{store.Relation(p)}); err != nil {
 		return fmt.Errorf("store relations: %w", err)
 	}
 
+	doc, err := a.es.Get(ctx, p.Child.Type+"_search", p.Child.Id, []string{"fields"})
+	if err != nil {
+		return fmt.Errorf("get child document: %w", err)
+	}
+
+	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resolveResourceConfig(p.Child.Type).Fields)
+	doc["id"] = p.Child.Id
+
 	// TODO: This should load the related resource data from the store instead of passing only the ID.
-	if err := a.es.AddFieldResource(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, map[string]any{
-		"id": p.Relation.ResourceId,
-	}); err != nil {
+	if err := a.es.AddFieldResource(ctx, p.Parent.Type+"_search", p.Parent.Id, p.Child.Type, doc); err != nil {
 		return err
 	}
 
