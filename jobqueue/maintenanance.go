@@ -76,7 +76,7 @@ func (q *Queue) purgeJobsByRetention(
 				AND finished_at < now() - ($2::bigint * interval '1 microsecond')
 			  ORDER BY finished_at
 			  LIMIT $3
-			  FOR UPDATE SKIP LOCKED≈
+			  FOR UPDATE SKIP LOCKED
 			)
 		`, status, thresholdMicros, batchSize)
 		if err != nil {
