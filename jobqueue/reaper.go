@@ -10,7 +10,9 @@ func (w *Worker) reaperLoop(ctx context.Context) {
 			return
 		}
 
-		_ = w.q.ReapExpiredRunning(ctx)
+		if err := w.q.ReapExpiredRunning(ctx); err != nil {
+			w.logf("reaper error: %v", err)
+		}
 
 		// sleep with jitter
 		pct := w.cfg.ReapJitterPct
