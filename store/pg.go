@@ -163,3 +163,18 @@ func (s *PostgresStore) removeResource(ctx context.Context, sender executor, res
 	)
 	return err
 }
+
+func (s *PostgresStore) RelationExists(ctx context.Context, relation Relation) (bool, error) {
+	row := s.pool.QueryRow(
+		ctx,
+		`SELECT COUNT(1) FROM relations WHERE resource=$1 AND resource_id=$2 AND related_resource=$3 AND related_resource_id=$4`,
+		relation.Parent.Type, relation.Parent.Id, relation.Child.Type, relation.Child.Id,
+	)
+
+	var count int64
+	if err := row.Scan(&count); err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}

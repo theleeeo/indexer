@@ -41,7 +41,7 @@ type CreatePayload struct {
 }
 
 func (a *App) handleCreate(ctx context.Context, occuredAt time.Time, p CreatePayload) error {
-	logger := slog.With(slog.Group("resource", "type", p.Resource, "id", p.ResourceId))
+	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Resource, "id", p.ResourceId))
 
 	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
@@ -244,14 +244,21 @@ type AddRelationPayload struct {
 // TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
 // TODO: Validate relation in schema
 func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error {
+	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Parent.Type, "id", p.Parent.Id), slog.Group("related_resource", "type", p.Child.Type, "id", p.Child.Id))
+
 	_, err := a.verifyResourceConfig(p.Parent.Type, p.Parent.Id)
 	if err != nil {
 		return err
 	}
 
-	if err := a.st.AddRelations(ctx,
-		[]store.Relation{store.Relation(p)}); err != nil {
-		return fmt.Errorf("store relations: %w", err)
+	exists, err := a.st.RelationExists(ctx, store.Relation{Parent: p.Parent, Child: p.Child})
+	if err != nil {
+		return fmt.Errorf("check relation exists: %w", err)
+	}
+
+	if !exists {
+		logger.Info("the relation was removed before it could be processed, skipping")
+		return nil
 	}
 
 	doc, err := a.es.Get(ctx, p.Child.Type+"_search", p.Child.Id, []string{"fields"})
