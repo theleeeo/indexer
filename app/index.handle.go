@@ -10,6 +10,7 @@ import (
 	"indexer/resource"
 	"indexer/store"
 	"log/slog"
+	"time"
 )
 
 type idStruct struct {
@@ -35,29 +36,17 @@ type CreatePayload struct {
 	Resource   string
 	ResourceId string
 	Data       map[string]any
-	Relations  []CreateRelationPayload
+	// ParentRelations are the relations where this resource is the child
+	ParentResources []model.Resource
 }
 
-type CreateRelationPayload struct {
-	RelatedResource   string
-	RelatedResourceId string
-	// TODO: This should not be be set by the receiver and be part of the payload.
-	Bidirectional bool
-}
-
-func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
+func (a *App) handleCreate(ctx context.Context, occuredAt time.Time, p CreatePayload) error {
 	logger := slog.With(slog.Group("resource", "type", p.Resource, "id", p.ResourceId))
 
 	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
 		// TODO: Persistent errors, non retryable
 		return err
-	}
-
-	relations := convertCreateRelationPayloads(p.Resource, p.ResourceId, p.Relations)
-
-	if err := a.st.AddRelations(ctx, relations); err != nil {
-		return fmt.Errorf("store relations: %w", err)
 	}
 
 	// We must load all child resources from the store instead of using the ones passed in the payload,
@@ -79,41 +68,26 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 
 	logger.Info("created resource")
 
-	if err := a.addResourceToParents(ctx, p.Resource, p.ResourceId, p.Data); err != nil {
-		return fmt.Errorf("add resource to parents: %w", err)
+	// if err := a.addResourceToParents(ctx, p.Resource, p.ResourceId, p.Data); err != nil {
+	// 	return fmt.Errorf("add resource to parents: %w", err)
+	// }
+
+	for _, r := range p.ParentResources {
+		if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", r.Type, r.Id), "add_relation", occuredAt, AddRelationPayload{
+			Parent: model.Resource{
+				Type: r.Type,
+				Id:   r.Id,
+			},
+			Child: model.Resource{
+				Type: p.Resource,
+				Id:   p.ResourceId,
+			},
+		}, nil); err != nil {
+			return fmt.Errorf("enqueue add relation job failed: %w", err)
+		}
 	}
 
 	return nil
-}
-
-func convertCreateRelationPayloads(resource, resourceId string, cp []CreateRelationPayload) []store.Relation {
-	relations := make([]store.Relation, 0, len(cp))
-	for _, crp := range cp {
-		relations = append(relations, store.Relation{
-			Parent: model.Resource{
-				Type: resource,
-				Id:   resourceId,
-			},
-			Child: model.Resource{
-				Type: crp.RelatedResource,
-				Id:   crp.RelatedResourceId,
-			},
-		})
-
-		if crp.Bidirectional {
-			relations = append(relations, store.Relation{
-				Parent: model.Resource{
-					Type: crp.RelatedResource,
-					Id:   crp.RelatedResourceId,
-				},
-				Child: model.Resource{
-					Type: resource,
-					Id:   resourceId,
-				},
-			})
-		}
-	}
-	return relations
 }
 
 func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields map[string]any, children []model.Resource) (map[string]any, error) {

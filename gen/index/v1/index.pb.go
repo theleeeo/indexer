@@ -302,6 +302,7 @@ type isChangeEvent_Payload interface {
 }
 
 type ChangeEvent_CreatePayload struct {
+	// TODO: Merge the create and update payloads into one?
 	CreatePayload *CreatePayload `protobuf:"bytes,2,opt,name=create_payload,json=createPayload,proto3,oneof"`
 }
 
@@ -406,12 +407,8 @@ func (x *CreatePayload) GetRelations() []*CreateRelationParameters {
 }
 
 type CreateRelationParameters struct {
-	state    protoimpl.MessageState `protogen:"open.v1"`
-	Relation *Relation              `protobuf:"bytes,1,opt,name=relation,proto3" json:"relation,omitempty"`
-	// If true, the relation is two-way (i.e., reciprocal).
-	// IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
-	// TODO: This should be controlled by the schema instead of per-request.
-	TwoWay        bool `protobuf:"varint,2,opt,name=two_way,json=twoWay,proto3" json:"two_way,omitempty"`
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Relation      *Relation              `protobuf:"bytes,1,opt,name=relation,proto3" json:"relation,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -451,13 +448,6 @@ func (x *CreateRelationParameters) GetRelation() *Relation {
 		return x.Relation
 	}
 	return nil
-}
-
-func (x *CreateRelationParameters) GetTwoWay() bool {
-	if x != nil {
-		return x.TwoWay
-	}
-	return false
 }
 
 type UpdatePayload struct {
@@ -830,10 +820,9 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\x12+\n" +
 	"\x04data\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x04data\x12@\n" +
-	"\trelations\x18\x04 \x03(\v2\".index.v1.CreateRelationParametersR\trelations\"c\n" +
+	"\trelations\x18\x04 \x03(\v2\".index.v1.CreateRelationParametersR\trelations\"J\n" +
 	"\x18CreateRelationParameters\x12.\n" +
-	"\brelation\x18\x01 \x01(\v2\x12.index.v1.RelationR\brelation\x12\x17\n" +
-	"\atwo_way\x18\x02 \x01(\bR\x06twoWay\"y\n" +
+	"\brelation\x18\x01 \x01(\v2\x12.index.v1.RelationR\brelation\"y\n" +
 	"\rUpdatePayload\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +

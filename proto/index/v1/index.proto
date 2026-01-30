@@ -12,78 +12,73 @@ service IndexService {
   rpc PublishBatch(PublishBatchRequest) returns (PublishBatchResponse);
 }
 
-message PublishRequest {
-  ChangeEvent event = 1;
-}
-
+message PublishRequest { ChangeEvent event = 1; }
 
 message PublishResponse {}
 
-message PublishBatchRequest {
-  repeated ChangeEvent events = 1;
-}
+message PublishBatchRequest { repeated ChangeEvent events = 1; }
 
 message PublishBatchResponse {}
 
 message ChangeEvent {
-  google.protobuf.Timestamp    occurred_at = 1;
+  google.protobuf.Timestamp occurred_at = 1;
 
   oneof payload {
     // TODO: Merge the create and update payloads into one?
-    CreatePayload         create_payload          = 2;
-    UpdatePayload         update_payload          = 3;
-    DeletePayload         delete_payload          = 4;
-    AddRelationPayload    add_relation_payload    = 5;
+    CreatePayload create_payload = 2;
+    UpdatePayload update_payload = 3;
+    DeletePayload delete_payload = 4;
+    AddRelationPayload add_relation_payload = 5;
     RemoveRelationPayload remove_relation_payload = 6;
-    SetRelationPayload    set_relation_payload    = 7;
+    SetRelationPayload set_relation_payload = 7;
   }
 }
 
 message CreatePayload {
-  string                            resource    = 1;
-  string                            resource_id = 2;
-  google.protobuf.Struct            data        = 3;
-  repeated CreateRelationParameters relations   = 4;
+  string resource = 1;
+  string resource_id = 2;
+  google.protobuf.Struct data = 3;
+  repeated CreateRelationParameters relations = 4;
 }
 
-message CreateRelationParameters {
-  Relation relation = 1;
-  // If true, the relation is two-way (i.e., reciprocal).
-  // IE: If a relation to B:1 is added to A:1, then A:1 is also added to B:1.
-  // TODO: This should be controlled by the schema instead of per-request.
-  bool     two_way  = 2;
-}
+message CreateRelationParameters { Relation relation = 1; }
 
 message UpdatePayload {
-  string                 resource    = 1;
-  string                 resource_id = 2;
-  google.protobuf.Struct data        = 3;
+  string resource = 1;
+  string resource_id = 2;
+  google.protobuf.Struct data = 3;
 }
 
 message DeletePayload {
-  string resource    = 1;
+  string resource = 1;
   string resource_id = 2;
 }
 
 message AddRelationPayload {
-  string   resource    = 1;
-  string   resource_id = 2;
-  Relation relation    = 3;
+  string resource = 1;
+  string resource_id = 2;
+  Relation relation = 3;
 }
 
 message RemoveRelationPayload {
-  string   resource    = 1;
-  string   resource_id = 2;
-  Relation relation    = 3;
+  string resource = 1;
+  string resource_id = 2;
+  Relation relation = 3;
 }
 
 message SetRelationPayload {
-  string   resource    = 1;
-  string   resource_id = 2;
-  Relation relation    = 3;
+  string resource = 1;
+  string resource_id = 2;
+  Relation relation = 3;
 }
 
 message Relation {
-  string resource    = 1;
+  string resource = 1;
   string resource_id = 2;
 }
+
+// TODO
+// message Resource {
+//   string type = 1;
+//   string id = 2;
+// }

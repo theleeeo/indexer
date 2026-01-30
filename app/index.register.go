@@ -6,6 +6,7 @@ import (
 	"indexer/gen/index/v1"
 	"indexer/model"
 	"indexer/resource"
+	"indexer/store"
 	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
@@ -33,38 +34,79 @@ func (a *App) RegisterCreate(ctx context.Context, occuredAt time.Time, p *index.
 		return err
 	}
 
-	relations := make([]CreateRelationPayload, 0, len(p.Relations))
-	for _, crp := range p.Relations {
-		if crp.Relation == nil {
-			return &InvalidArgumentError{Msg: "relation is missing the related resource"}
-		}
-
-		rCfgRel := rCfg.GetRelation(crp.Relation.Resource)
-		if rCfgRel == nil {
-			return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", crp.Relation.Resource, p.Resource)}
-		}
-
-		relations = append(relations, CreateRelationPayload{
-			RelatedResource:   crp.Relation.Resource,
-			RelatedResourceId: crp.Relation.ResourceId,
-			Bidirectional:     rCfgRel.Bidirectional,
-		})
-	}
-
 	if occuredAt.IsZero() {
 		occuredAt = time.Now()
 	}
 
+	relations, parentResources, err := convertCreateRelationParameters(rCfg, model.Resource{Type: p.Resource, Id: p.ResourceId}, p.Relations)
+	if err != nil {
+		return fmt.Errorf("converting relations: %w", err)
+	}
+
+	// TODO: Do transactionally with the enqueue
+	if err := a.st.AddRelations(ctx, relations); err != nil {
+		return fmt.Errorf("adding relations failed: %w", err)
+	}
+
 	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "create", occuredAt, CreatePayload{
-		Resource:   p.Resource,
-		ResourceId: p.ResourceId,
-		Data:       buildResourceData(p.Data, rCfg.Fields),
-		Relations:  relations,
+		Resource:        p.Resource,
+		ResourceId:      p.ResourceId,
+		Data:            buildResourceData(p.Data, rCfg.Fields),
+		ParentResources: parentResources,
 	}, nil); err != nil {
 		return fmt.Errorf("enqueue create job failed: %w", err)
 	}
 
 	return nil
+}
+
+func convertCreateRelationParameters(rCfg *resource.Config, resource model.Resource, createRelationsParams []*index.CreateRelationParameters) (relations []store.Relation, parentResources []model.Resource, err error) {
+	relations = make([]store.Relation, 0, len(createRelationsParams))
+	parentResources = make([]model.Resource, 0, len(createRelationsParams))
+	for _, crp := range createRelationsParams {
+		if crp.Relation == nil {
+			return nil, nil, &InvalidArgumentError{Msg: "relation is missing the related resource"}
+		}
+
+		rCfgRel := rCfg.GetRelation(crp.Relation.Resource)
+		if rCfgRel == nil {
+			return nil, nil, &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", crp.Relation.Resource, resource.Type)}
+		}
+
+		relations = append(relations, store.Relation{
+			Parent: model.Resource{
+				Type: resource.Type,
+				Id:   resource.Id,
+			},
+			Child: model.Resource{
+				Type: crp.Relation.Resource,
+				Id:   crp.Relation.ResourceId,
+			},
+		})
+
+		if rCfgRel.Bidirectional {
+			parentResource := model.Resource{
+				Type: crp.Relation.Resource,
+				Id:   crp.Relation.ResourceId,
+			}
+
+			rel := store.Relation{
+				Parent: parentResource,
+				Child: model.Resource{
+					Type: resource.Type,
+					Id:   resource.Id,
+				},
+			}
+
+			relations = append(relations, rel)
+			parentResources = append(parentResources, model.Resource{
+				Type: crp.Relation.Resource,
+				Id:   crp.Relation.ResourceId,
+			})
+		}
+	}
+
+	return relations, parentResources, nil
 }
 
 func (a *App) RegisterUpdate(ctx context.Context, occuredAt time.Time, p *index.UpdatePayload) error {

@@ -18,7 +18,7 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 			if err := json.Unmarshal(job.Payload, &p); err != nil {
 				return fmt.Errorf("failed to unmarshal payload: %w", err)
 			}
-			return a.handleCreate(ctx, p)
+			return a.handleCreate(ctx, job.OccurredAt, p)
 		case "update":
 			p := &index.UpdatePayload{}
 			if err := protojson.Unmarshal(job.Payload, p); err != nil {
