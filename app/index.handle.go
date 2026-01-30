@@ -240,8 +240,6 @@ type AddRelationPayload struct {
 	Child  model.Resource
 }
 
-// TODO: Failes if applied on object, not array
-// TODO: Validate that the relation does not alrady exists. Can be done by store.UpdateRelations
 // TODO: Validate relation in schema
 func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error {
 	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Parent.Type, "id", p.Parent.Id), slog.Group("related_resource", "type", p.Child.Type, "id", p.Child.Id))
@@ -277,22 +275,29 @@ func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error
 	return nil
 }
 
-func (a *App) handleRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+type RemoveRelationPayload struct {
+	Relation store.Relation
+}
+
+func (a *App) handleRemoveRelation(ctx context.Context, p RemoveRelationPayload) error {
+	logger := slog.With(slog.String("jobType", "remove_relation"), slog.Group("resource", "type", p.Relation.Parent.Type, "id", p.Relation.Parent.Id), slog.Group("related_resource", "type", p.Relation.Child.Type, "id", p.Relation.Child.Id))
+
+	_, err := a.verifyResourceConfig(p.Relation.Parent.Type, p.Relation.Parent.Id)
 	if err != nil {
 		return err
 	}
 
-	if err := a.st.RemoveRelation(ctx,
-		store.Relation{
-			Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
-			Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
-		},
-	); err != nil {
-		return fmt.Errorf("remove relation: %w", err)
+	exists, err := a.st.RelationExists(ctx, p.Relation)
+	if err != nil {
+		return fmt.Errorf("check relation exists: %w", err)
 	}
 
-	if err := a.es.RemoveFieldResourceById(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, p.Relation.ResourceId); err != nil {
+	if exists {
+		logger.Info("the relation was re-added before it could be processed, skipping")
+		return nil
+	}
+
+	if err := a.es.RemoveFieldResourceById(ctx, p.Relation.Parent.Type+"_search", p.Relation.Parent.Id, p.Relation.Child.Type, p.Relation.Child.Id); err != nil {
 		return err
 	}
 

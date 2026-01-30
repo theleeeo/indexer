@@ -27,7 +27,6 @@ func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) 
 	return result
 }
 
-// TODO: Both here and when creating/setting relations, we need to validate that the relations exist in the schema
 func (a *App) RegisterCreate(ctx context.Context, occuredAt time.Time, p *index.CreatePayload) error {
 	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
@@ -174,17 +173,52 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 }
 
 func (a *App) RegisterRemoveRelation(ctx context.Context, occuredAt time.Time, p *index.RemoveRelationPayload) error {
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
 		return err
+	}
+
+	relCrfg := rCfg.GetRelation(p.Relation.Resource)
+	if relCrfg == nil {
+		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
 	if occuredAt.IsZero() {
 		occuredAt = time.Now()
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "remove_relation", occuredAt, p, nil); err != nil {
-		return fmt.Errorf("enqueue remove relation job failed: %w", err)
+	if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+		Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
+		Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+	},
+	); err != nil {
+		return fmt.Errorf("remove relation: %w", err)
+	}
+
+	if relCrfg.Bidirectional {
+		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+			Parent: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Child:  model.Resource{Type: p.Resource, Id: p.ResourceId},
+		},
+		); err != nil {
+			return fmt.Errorf("remove bidirectional relation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) persistRemoveRelation(ctx context.Context, occuredAt time.Time, relation store.Relation) error {
+	if err := a.st.RemoveRelation(ctx,
+		relation,
+	); err != nil {
+		return fmt.Errorf("remove bidirectional relation: %w", err)
+	}
+
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "remove_relation", occuredAt, RemoveRelationPayload{
+		Relation: relation,
+	}, nil); err != nil {
+		return fmt.Errorf("enqueue remove bidirectional relation job failed: %w", err)
 	}
 
 	return nil

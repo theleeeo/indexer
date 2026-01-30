@@ -38,8 +38,8 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 			}
 			return a.handleAddRelation(ctx, p)
 		case "remove_relation":
-			p := &index.RemoveRelationPayload{}
-			if err := protojson.Unmarshal(job.Payload, p); err != nil {
+			p := RemoveRelationPayload{}
+			if err := json.Unmarshal(job.Payload, &p); err != nil {
 				return fmt.Errorf("failed to unmarshal payload: %w", err)
 			}
 			return a.handleRemoveRelation(ctx, p)
