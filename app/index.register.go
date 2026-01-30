@@ -147,26 +147,55 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 		return &InvalidArgumentError{Msg: "relation is missing the related resource"}
 	}
 
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
 	if err != nil {
 		return err
+	}
+
+	relCrfg := rCfg.GetRelation(p.Relation.Resource)
+	if relCrfg == nil {
+		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
 	if occuredAt.IsZero() {
 		occuredAt = time.Now()
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource, p.ResourceId), "add_relation", occuredAt, AddRelationPayload{
-		Parent: model.Resource{
-			Type: p.Resource,
-			Id:   p.ResourceId,
+	if err := a.persistAddRelation(ctx, occuredAt, store.Relation{
+		Parent: model.Resource{Type: p.Resource, Id: p.ResourceId},
+		Child:  model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+	},
+	); err != nil {
+		return fmt.Errorf("add relation: %w", err)
+	}
+
+	if relCrfg.Bidirectional {
+		if err := a.persistAddRelation(ctx, occuredAt, store.Relation{
+			Parent: model.Resource{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+			Child:  model.Resource{Type: p.Resource, Id: p.ResourceId},
 		},
-		Child: model.Resource{
-			Type: p.Relation.Resource,
-			Id:   p.Relation.ResourceId,
+		); err != nil {
+			return fmt.Errorf("add bidirectional relation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) persistAddRelation(ctx context.Context, occuredAt time.Time, relation store.Relation) error {
+	if err := a.st.AddRelations(ctx,
+		[]store.Relation{relation},
+	); err != nil {
+		return fmt.Errorf("add bidirectional relation: %w", err)
+	}
+
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "add_relation", occuredAt, AddRelationPayload{
+		Relation: store.Relation{
+			Parent: relation.Parent,
+			Child:  relation.Child,
 		},
 	}, nil); err != nil {
-		return fmt.Errorf("enqueue add relation job failed: %w", err)
+		return fmt.Errorf("enqueue add bidirectional relation job failed: %w", err)
 	}
 
 	return nil

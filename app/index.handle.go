@@ -74,13 +74,15 @@ func (a *App) handleCreate(ctx context.Context, occuredAt time.Time, p CreatePay
 
 	for _, r := range p.ParentResources {
 		if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", r.Type, r.Id), "add_relation", occuredAt, AddRelationPayload{
-			Parent: model.Resource{
-				Type: r.Type,
-				Id:   r.Id,
-			},
-			Child: model.Resource{
-				Type: p.Resource,
-				Id:   p.ResourceId,
+			Relation: store.Relation{
+				Parent: model.Resource{
+					Type: r.Type,
+					Id:   r.Id,
+				},
+				Child: model.Resource{
+					Type: p.Resource,
+					Id:   p.ResourceId,
+				},
 			},
 		}, nil); err != nil {
 			return fmt.Errorf("enqueue add relation job failed: %w", err)
@@ -236,20 +238,19 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 }
 
 type AddRelationPayload struct {
-	Parent model.Resource
-	Child  model.Resource
+	Relation store.Relation
 }
 
 // TODO: Validate relation in schema
 func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error {
-	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Parent.Type, "id", p.Parent.Id), slog.Group("related_resource", "type", p.Child.Type, "id", p.Child.Id))
+	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Relation.Parent.Type, "id", p.Relation.Parent.Id), slog.Group("related_resource", "type", p.Relation.Child.Type, "id", p.Relation.Child.Id))
 
-	_, err := a.verifyResourceConfig(p.Parent.Type, p.Parent.Id)
+	_, err := a.verifyResourceConfig(p.Relation.Parent.Type, p.Relation.Parent.Id)
 	if err != nil {
 		return err
 	}
 
-	exists, err := a.st.RelationExists(ctx, store.Relation{Parent: p.Parent, Child: p.Child})
+	exists, err := a.st.RelationExists(ctx, p.Relation)
 	if err != nil {
 		return fmt.Errorf("check relation exists: %w", err)
 	}
@@ -259,16 +260,16 @@ func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error
 		return nil
 	}
 
-	doc, err := a.es.Get(ctx, p.Child.Type+"_search", p.Child.Id, []string{"fields"})
+	doc, err := a.es.Get(ctx, p.Relation.Child.Type+"_search", p.Relation.Child.Id, []string{"fields"})
 	if err != nil {
 		return fmt.Errorf("get child document: %w", err)
 	}
 
-	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resolveResourceConfig(p.Child.Type).Fields)
-	doc["id"] = p.Child.Id
+	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resolveResourceConfig(p.Relation.Child.Type).Fields)
+	doc["id"] = p.Relation.Child.Id
 
 	// TODO: This should load the related resource data from the store instead of passing only the ID.
-	if err := a.es.AddFieldResource(ctx, p.Parent.Type+"_search", p.Parent.Id, p.Child.Type, doc); err != nil {
+	if err := a.es.AddFieldResource(ctx, p.Relation.Parent.Type+"_search", p.Relation.Parent.Id, p.Relation.Child.Type, doc); err != nil {
 		return err
 	}
 
