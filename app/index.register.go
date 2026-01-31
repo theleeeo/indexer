@@ -27,7 +27,7 @@ func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) 
 }
 
 func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error {
-	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	rCfg, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -102,7 +102,7 @@ func convertCreateRelationParameters(rCfg *resource.Config, resource model.Resou
 }
 
 func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error {
-	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	_, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -115,7 +115,7 @@ func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error 
 }
 
 func (a *App) RegisterDelete(ctx context.Context, p *index.DeletePayload) error {
-	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	_, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPaylo
 		return &InvalidArgumentError{Msg: "relation is missing the related resource"}
 	}
 
-	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	rCfg, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -183,7 +183,7 @@ func (a *App) persistAddRelation(ctx context.Context, relation store.Relation) e
 }
 
 func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
-	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	rCfg, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -214,6 +214,7 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelatio
 	return nil
 }
 
+// TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) persistRemoveRelation(ctx context.Context, relation store.Relation) error {
 	if err := a.st.RemoveRelation(ctx,
 		relation,
@@ -231,7 +232,7 @@ func (a *App) persistRemoveRelation(ctx context.Context, relation store.Relation
 }
 
 func (a *App) RegisterSetRelations(ctx context.Context, p *index.SetRelationsPayload) error {
-	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	rCfg, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
 		return err
 	}
@@ -260,6 +261,7 @@ func (a *App) RegisterSetRelations(ctx context.Context, p *index.SetRelationsPay
 	return nil
 }
 
+// TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) removeChildRelations(ctx context.Context, resource model.Resource) error {
 	existingChildResources, err := a.st.GetChildResources(ctx, resource)
 	if err != nil {
@@ -278,6 +280,7 @@ func (a *App) removeChildRelations(ctx context.Context, resource model.Resource)
 	return nil
 }
 
+// TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) removeParentRelations(ctx context.Context, resource model.Resource) error {
 	existingParentResources, err := a.st.GetParentResources(ctx, resource)
 	if err != nil {
