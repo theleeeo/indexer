@@ -68,17 +68,17 @@ func (s *IndexerServer) PublishBatch(ctx context.Context, req *index.PublishBatc
 func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) error {
 	switch p := ev.Payload.(type) {
 	case *index.ChangeEvent_CreatePayload:
-		return s.app.RegisterCreate(ctx, zeroTimeIfNil(ev.OccurredAt), p.CreatePayload)
+		return s.app.RegisterCreate(ctx, p.CreatePayload)
 	case *index.ChangeEvent_UpdatePayload:
-		return s.app.RegisterUpdate(ctx, zeroTimeIfNil(ev.OccurredAt), p.UpdatePayload)
+		return s.app.RegisterUpdate(ctx, p.UpdatePayload)
 	case *index.ChangeEvent_DeletePayload:
-		return s.app.RegisterDelete(ctx, zeroTimeIfNil(ev.OccurredAt), p.DeletePayload)
+		return s.app.RegisterDelete(ctx, p.DeletePayload)
 	case *index.ChangeEvent_SetRelationsPayload:
-		return s.app.RegisterSetRelations(ctx, zeroTimeIfNil(ev.OccurredAt), p.SetRelationsPayload)
+		return s.app.RegisterSetRelations(ctx, p.SetRelationsPayload)
 	case *index.ChangeEvent_AddRelationPayload:
-		return s.app.RegisterAddRelation(ctx, zeroTimeIfNil(ev.OccurredAt), p.AddRelationPayload)
+		return s.app.RegisterAddRelation(ctx, p.AddRelationPayload)
 	case *index.ChangeEvent_RemoveRelationPayload:
-		return s.app.RegisterRemoveRelation(ctx, zeroTimeIfNil(ev.OccurredAt), p.RemoveRelationPayload)
+		return s.app.RegisterRemoveRelation(ctx, p.RemoveRelationPayload)
 	default:
 		return fmt.Errorf("unknown payload")
 	}

@@ -22,8 +22,8 @@ type Job struct {
 	ID       uuid.UUID
 	JobGroup string
 
-	OccurredAt time.Time
-	RunAfter   time.Time
+	OrderingSeq int64
+	RunAfter    time.Time
 
 	Type    string
 	Payload jsontext.Value

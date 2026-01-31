@@ -10,7 +10,6 @@ import (
 	"indexer/resource"
 	"indexer/store"
 	"log/slog"
-	"time"
 )
 
 type idStruct struct {
@@ -40,7 +39,7 @@ type CreatePayload struct {
 	ParentResources []model.Resource
 }
 
-func (a *App) handleCreate(ctx context.Context, occuredAt time.Time, p CreatePayload) error {
+func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 	logger := slog.With(slog.String("jobType", "create"), slog.Group("resource", "type", p.Resource, "id", p.ResourceId))
 
 	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
@@ -73,7 +72,7 @@ func (a *App) handleCreate(ctx context.Context, occuredAt time.Time, p CreatePay
 	// }
 
 	for _, r := range p.ParentResources {
-		if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", r.Type, r.Id), "add_relation", occuredAt, AddRelationPayload{
+		if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", r.Type, r.Id), "add_relation", AddRelationPayload{
 			Relation: store.Relation{
 				Parent: model.Resource{
 					Type: r.Type,

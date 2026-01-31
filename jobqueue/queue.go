@@ -27,7 +27,6 @@ func (q *Queue) Enqueue(
 	ctx context.Context,
 	jobGroup string,
 	jobType string,
-	occurredAt time.Time,
 	payload any,
 	opts *EnqueueOptions,
 ) (uuid.UUID, error) {
@@ -60,10 +59,10 @@ func (q *Queue) Enqueue(
 
 	var id uuid.UUID
 	err = q.pool.QueryRow(ctx, `
-		INSERT INTO jobs(job_group, type, occurred_at, run_after, status, payload, max_attempts)
-		VALUES ($1, $2, $3, $4, 'queued', $5::jsonb, $6)
+		INSERT INTO jobs(job_group, type, run_after, status, payload, max_attempts)
+		VALUES ($1, $2, $3, 'queued', $4::jsonb, $5)
 		RETURNING id
-	`, jobGroup, jobType, occurredAt, runAfter, b, maxAttempts).Scan(&id)
+	`, jobGroup, jobType, runAfter, b, maxAttempts).Scan(&id)
 	if err != nil {
 		return uuid.Nil, err
 	}

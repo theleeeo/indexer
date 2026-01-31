@@ -2,16 +2,13 @@ package jobqueue
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 type JobSort string
 
 const (
-	SortOccurredAsc  JobSort = "occurred_asc"
-	SortOccurredDesc JobSort = "occurred_desc"
-	// SortCreatedDesc  JobSort = "created_desc" // requires created_at
+	SortOrderAsc     JobSort = "ordering_seq_asc"
+	SortOrderDesc    JobSort = "ordering_seq_desc"
 	SortStartedDesc  JobSort = "started_desc"
 	SortFinishedDesc JobSort = "finished_desc"
 )
@@ -57,8 +54,6 @@ type GroupCounts struct {
 	Queued   int64
 	Running  int64
 	Dead     int64
-	// The next queued job’s occurred_at (helps show backlog ordering in UI).
-	NextOccurredAt *time.Time
 }
 
 type ErrorSummary struct {
@@ -69,25 +64,4 @@ type ErrorSummary struct {
 	ErrorText string // truncated text for display
 	Count     int64
 	LastSeen  time.Time
-}
-
-type JobBasic struct {
-	ID         uuid.UUID
-	JobGroup   string
-	Type       string
-	Status     JobStatus
-	OccurredAt time.Time
-	RunAfter   time.Time
-
-	Attempts    int
-	MaxAttempts int
-
-	LockedBy    *string
-	LockedUntil *time.Time
-
-	StartedAt  *time.Time
-	FinishedAt *time.Time
-	LastError  *string
-
-	CreatedAt *time.Time // nil if column not present / not selected
 }

@@ -19,7 +19,7 @@ func scanJob(row pgx.Row) (Job, error) {
 		&j.ID,
 		&j.JobGroup,
 		&j.Type,
-		&j.OccurredAt,
+		&j.OrderingSeq,
 		&j.RunAfter,
 		&j.Status,
 		&j.Payload,

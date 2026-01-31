@@ -17,11 +17,11 @@ func (w *Worker) claimGroup(ctx context.Context) (string, error) {
 
 	leaseMicros := micros(w.cfg.LeaseDuration)
 
-	// Pick an unlocked group that has queued runnable jobs; prefer the group whose next occurred_at is smallest.
+	// Pick an unlocked group that has queued runnable jobs; prefer the group whose next ordering_seq is smallest.
 	var group string
 	err = tx.QueryRow(ctx, `
 		WITH q AS (
-		  SELECT job_group, min(occurred_at) AS next_ts
+		  SELECT job_group, min(ordering_seq) AS next_ts
 		  FROM jobs
 		  WHERE status='queued' AND run_after <= now()
 		  GROUP BY job_group
@@ -87,7 +87,7 @@ func (w *Worker) claimNextJobInGroup(ctx context.Context, group string) (Job, er
 		return Job{}, ErrLeaseLost
 	}
 
-	// Claim earliest queued runnable job by occurred_at within this group.
+	// Claim earliest queued runnable job by ordering_seq within this group.
 	row := tx.QueryRow(ctx, `
 	UPDATE jobs
 	SET status='running',
@@ -101,12 +101,12 @@ func (w *Worker) claimNextJobInGroup(ctx context.Context, group string) (Job, er
 		WHERE job_group = $3
 		AND status='queued'
 		AND run_after <= now()
-		ORDER BY occurred_at, id
+		ORDER BY ordering_seq
 		LIMIT 1
 		FOR UPDATE SKIP LOCKED
 	)
 	RETURNING
-		id, job_group, type, occurred_at, run_after, status, payload,
+		id, job_group, type, ordering_seq, run_after, status, payload,
 		attempts, max_attempts, locked_by, locked_until, started_at, finished_at, last_error
 	`, w.cfg.WorkerID, leaseMicros, group)
 

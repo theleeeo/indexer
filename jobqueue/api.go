@@ -84,6 +84,7 @@ func (q *Queue) GetTypeStatusCounts(ctx context.Context, f JobQuery, limitTypes 
 }
 
 // ListGroups returns top groups by queued backlog, plus next occurred_at.
+// TODO: Remove occurred_at
 func (q *Queue) ListGroups(ctx context.Context, jobType string, limit, offset int) ([]GroupCounts, error) {
 	if limit <= 0 {
 		limit = 50
@@ -110,7 +111,6 @@ func (q *Queue) ListGroups(ctx context.Context, jobType string, limit, offset in
 		  COALESCE(SUM(CASE WHEN j.status='queued' THEN 1 ELSE 0 END),0) AS queued,
 		  COALESCE(SUM(CASE WHEN j.status='running' THEN 1 ELSE 0 END),0) AS running,
 		  COALESCE(SUM(CASE WHEN j.status='dead' THEN 1 ELSE 0 END),0) AS dead,
-		  MIN(CASE WHEN j.status='queued' THEN j.occurred_at ELSE NULL END) AS next_occurred_at
 		FROM job_groups g
 		LEFT JOIN jobs j ON j.job_group=g.job_group
 		` + where + `
@@ -128,7 +128,7 @@ func (q *Queue) ListGroups(ctx context.Context, jobType string, limit, offset in
 	var out []GroupCounts
 	for rows.Next() {
 		var r GroupCounts
-		if err := rows.Scan(&r.JobGroup, &r.Queued, &r.Running, &r.Dead, &r.NextOccurredAt); err != nil {
+		if err := rows.Scan(&r.JobGroup, &r.Queued, &r.Running, &r.Dead); err != nil {
 			return nil, err
 		}
 		out = append(out, r)
@@ -212,7 +212,7 @@ func (q *Queue) ListJobs(ctx context.Context, f JobQuery) (JobListPage, error) {
 		f.Offset = 0
 	}
 	if f.Sort == "" {
-		f.Sort = SortOccurredDesc
+		f.Sort = SortOrderDesc
 	}
 
 	where, args := buildWhere(f, 1, true)
@@ -302,8 +302,8 @@ func buildWhere(f JobQuery, startArg int, allowTime bool) (string, []any) {
 	}
 
 	if allowTime && (f.Since != nil || f.Until != nil) {
-		// Time filter uses finished_at if sorting by finished, started_at if started, else occurred_at.
-		col := "occurred_at"
+		// Time filter uses finished_at if sorting by finished, started_at if started, else ordering_seq.
+		col := "ordering_seq"
 		switch f.Sort {
 		case SortFinishedDesc:
 			col = "finished_at"
@@ -347,16 +347,14 @@ func buildWhere(f JobQuery, startArg int, allowTime bool) (string, []any) {
 
 func sortClause(s JobSort) (string, error) {
 	switch s {
-	case SortOccurredAsc:
-		return "ORDER BY occurred_at ASC, id ASC", nil
-	case SortOccurredDesc:
-		return "ORDER BY occurred_at DESC, id DESC", nil
+	case SortOrderAsc:
+		return "ORDER BY ordering_seq ASC", nil
+	case SortOrderDesc:
+		return "ORDER BY ordering_seq DESC", nil
 	case SortStartedDesc:
-		return "ORDER BY started_at DESC NULLS LAST, id DESC", nil
+		return "ORDER BY started_at DESC NULLS LAST", nil
 	case SortFinishedDesc:
-		return "ORDER BY finished_at DESC NULLS LAST, id DESC", nil
-	// case SortCreatedDesc:
-	// 	return "ORDER BY created_at DESC, id DESC", nil
+		return "ORDER BY finished_at DESC NULLS LAST", nil
 	default:
 		return "", fmt.Errorf("pgjobq: unknown sort %q", s)
 	}

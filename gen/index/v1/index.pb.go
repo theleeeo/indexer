@@ -10,7 +10,6 @@ import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	structpb "google.golang.org/protobuf/types/known/structpb"
-	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -184,8 +183,7 @@ func (*PublishBatchResponse) Descriptor() ([]byte, []int) {
 }
 
 type ChangeEvent struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	OccurredAt *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Payload:
 	//
 	//	*ChangeEvent_CreatePayload
@@ -227,13 +225,6 @@ func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ChangeEvent.ProtoReflect.Descriptor instead.
 func (*ChangeEvent) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *ChangeEvent) GetOccurredAt() *timestamppb.Timestamp {
-	if x != nil {
-		return x.OccurredAt
-	}
-	return nil
 }
 
 func (x *ChangeEvent) GetPayload() isChangeEvent_Payload {
@@ -302,27 +293,27 @@ type isChangeEvent_Payload interface {
 }
 
 type ChangeEvent_CreatePayload struct {
-	CreatePayload *CreatePayload `protobuf:"bytes,2,opt,name=create_payload,json=createPayload,proto3,oneof"`
+	CreatePayload *CreatePayload `protobuf:"bytes,1,opt,name=create_payload,json=createPayload,proto3,oneof"`
 }
 
 type ChangeEvent_UpdatePayload struct {
-	UpdatePayload *UpdatePayload `protobuf:"bytes,3,opt,name=update_payload,json=updatePayload,proto3,oneof"`
+	UpdatePayload *UpdatePayload `protobuf:"bytes,2,opt,name=update_payload,json=updatePayload,proto3,oneof"`
 }
 
 type ChangeEvent_DeletePayload struct {
-	DeletePayload *DeletePayload `protobuf:"bytes,4,opt,name=delete_payload,json=deletePayload,proto3,oneof"`
+	DeletePayload *DeletePayload `protobuf:"bytes,3,opt,name=delete_payload,json=deletePayload,proto3,oneof"`
 }
 
 type ChangeEvent_AddRelationPayload struct {
-	AddRelationPayload *AddRelationPayload `protobuf:"bytes,5,opt,name=add_relation_payload,json=addRelationPayload,proto3,oneof"`
+	AddRelationPayload *AddRelationPayload `protobuf:"bytes,4,opt,name=add_relation_payload,json=addRelationPayload,proto3,oneof"`
 }
 
 type ChangeEvent_RemoveRelationPayload struct {
-	RemoveRelationPayload *RemoveRelationPayload `protobuf:"bytes,6,opt,name=remove_relation_payload,json=removeRelationPayload,proto3,oneof"`
+	RemoveRelationPayload *RemoveRelationPayload `protobuf:"bytes,5,opt,name=remove_relation_payload,json=removeRelationPayload,proto3,oneof"`
 }
 
 type ChangeEvent_SetRelationsPayload struct {
-	SetRelationsPayload *SetRelationsPayload `protobuf:"bytes,7,opt,name=set_relations_payload,json=setRelationsPayload,proto3,oneof"`
+	SetRelationsPayload *SetRelationsPayload `protobuf:"bytes,6,opt,name=set_relations_payload,json=setRelationsPayload,proto3,oneof"`
 }
 
 func (*ChangeEvent_CreatePayload) isChangeEvent_Payload() {}
@@ -749,22 +740,20 @@ var File_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_index_v1_index_proto_rawDesc = "" +
 	"\n" +
-	"\x14index/v1/index.proto\x12\bindex.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"=\n" +
+	"\x14index/v1/index.proto\x12\bindex.v1\x1a\x1cgoogle/protobuf/struct.proto\"=\n" +
 	"\x0ePublishRequest\x12+\n" +
 	"\x05event\x18\x01 \x01(\v2\x15.index.v1.ChangeEventR\x05event\"\x11\n" +
 	"\x0fPublishResponse\"D\n" +
 	"\x13PublishBatchRequest\x12-\n" +
 	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\x16\n" +
-	"\x14PublishBatchResponse\"\x9d\x04\n" +
-	"\vChangeEvent\x12;\n" +
-	"\voccurred_at\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"occurredAt\x12@\n" +
-	"\x0ecreate_payload\x18\x02 \x01(\v2\x17.index.v1.CreatePayloadH\x00R\rcreatePayload\x12@\n" +
-	"\x0eupdate_payload\x18\x03 \x01(\v2\x17.index.v1.UpdatePayloadH\x00R\rupdatePayload\x12@\n" +
-	"\x0edelete_payload\x18\x04 \x01(\v2\x17.index.v1.DeletePayloadH\x00R\rdeletePayload\x12P\n" +
-	"\x14add_relation_payload\x18\x05 \x01(\v2\x1c.index.v1.AddRelationPayloadH\x00R\x12addRelationPayload\x12Y\n" +
-	"\x17remove_relation_payload\x18\x06 \x01(\v2\x1f.index.v1.RemoveRelationPayloadH\x00R\x15removeRelationPayload\x12S\n" +
-	"\x15set_relations_payload\x18\a \x01(\v2\x1d.index.v1.SetRelationsPayloadH\x00R\x13setRelationsPayloadB\t\n" +
+	"\x14PublishBatchResponse\"\xe0\x03\n" +
+	"\vChangeEvent\x12@\n" +
+	"\x0ecreate_payload\x18\x01 \x01(\v2\x17.index.v1.CreatePayloadH\x00R\rcreatePayload\x12@\n" +
+	"\x0eupdate_payload\x18\x02 \x01(\v2\x17.index.v1.UpdatePayloadH\x00R\rupdatePayload\x12@\n" +
+	"\x0edelete_payload\x18\x03 \x01(\v2\x17.index.v1.DeletePayloadH\x00R\rdeletePayload\x12P\n" +
+	"\x14add_relation_payload\x18\x04 \x01(\v2\x1c.index.v1.AddRelationPayloadH\x00R\x12addRelationPayload\x12Y\n" +
+	"\x17remove_relation_payload\x18\x05 \x01(\v2\x1f.index.v1.RemoveRelationPayloadH\x00R\x15removeRelationPayload\x12S\n" +
+	"\x15set_relations_payload\x18\x06 \x01(\v2\x1d.index.v1.SetRelationsPayloadH\x00R\x13setRelationsPayloadB\t\n" +
 	"\apayload\"\x9e\x01\n" +
 	"\rCreatePayload\x12.\n" +
 	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12+\n" +
@@ -822,41 +811,39 @@ var file_index_v1_index_proto_goTypes = []any{
 	(*SetRelationsPayload)(nil),   // 10: index.v1.SetRelationsPayload
 	(*Relation)(nil),              // 11: index.v1.Relation
 	(*Resource)(nil),              // 12: index.v1.Resource
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
-	(*structpb.Struct)(nil),       // 14: google.protobuf.Struct
+	(*structpb.Struct)(nil),       // 13: google.protobuf.Struct
 }
 var file_index_v1_index_proto_depIdxs = []int32{
 	4,  // 0: index.v1.PublishRequest.event:type_name -> index.v1.ChangeEvent
 	4,  // 1: index.v1.PublishBatchRequest.events:type_name -> index.v1.ChangeEvent
-	13, // 2: index.v1.ChangeEvent.occurred_at:type_name -> google.protobuf.Timestamp
-	5,  // 3: index.v1.ChangeEvent.create_payload:type_name -> index.v1.CreatePayload
-	6,  // 4: index.v1.ChangeEvent.update_payload:type_name -> index.v1.UpdatePayload
-	7,  // 5: index.v1.ChangeEvent.delete_payload:type_name -> index.v1.DeletePayload
-	8,  // 6: index.v1.ChangeEvent.add_relation_payload:type_name -> index.v1.AddRelationPayload
-	9,  // 7: index.v1.ChangeEvent.remove_relation_payload:type_name -> index.v1.RemoveRelationPayload
-	10, // 8: index.v1.ChangeEvent.set_relations_payload:type_name -> index.v1.SetRelationsPayload
-	12, // 9: index.v1.CreatePayload.Resource:type_name -> index.v1.Resource
-	14, // 10: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
-	11, // 11: index.v1.CreatePayload.relations:type_name -> index.v1.Relation
-	12, // 12: index.v1.UpdatePayload.Resource:type_name -> index.v1.Resource
-	14, // 13: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
-	12, // 14: index.v1.DeletePayload.Resource:type_name -> index.v1.Resource
-	12, // 15: index.v1.AddRelationPayload.Resource:type_name -> index.v1.Resource
-	11, // 16: index.v1.AddRelationPayload.relation:type_name -> index.v1.Relation
-	12, // 17: index.v1.RemoveRelationPayload.Resource:type_name -> index.v1.Resource
-	11, // 18: index.v1.RemoveRelationPayload.relation:type_name -> index.v1.Relation
-	12, // 19: index.v1.SetRelationsPayload.Resource:type_name -> index.v1.Resource
-	11, // 20: index.v1.SetRelationsPayload.Relations:type_name -> index.v1.Relation
-	12, // 21: index.v1.Relation.resource:type_name -> index.v1.Resource
-	0,  // 22: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
-	2,  // 23: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest
-	1,  // 24: index.v1.IndexService.Publish:output_type -> index.v1.PublishResponse
-	3,  // 25: index.v1.IndexService.PublishBatch:output_type -> index.v1.PublishBatchResponse
-	24, // [24:26] is the sub-list for method output_type
-	22, // [22:24] is the sub-list for method input_type
-	22, // [22:22] is the sub-list for extension type_name
-	22, // [22:22] is the sub-list for extension extendee
-	0,  // [0:22] is the sub-list for field type_name
+	5,  // 2: index.v1.ChangeEvent.create_payload:type_name -> index.v1.CreatePayload
+	6,  // 3: index.v1.ChangeEvent.update_payload:type_name -> index.v1.UpdatePayload
+	7,  // 4: index.v1.ChangeEvent.delete_payload:type_name -> index.v1.DeletePayload
+	8,  // 5: index.v1.ChangeEvent.add_relation_payload:type_name -> index.v1.AddRelationPayload
+	9,  // 6: index.v1.ChangeEvent.remove_relation_payload:type_name -> index.v1.RemoveRelationPayload
+	10, // 7: index.v1.ChangeEvent.set_relations_payload:type_name -> index.v1.SetRelationsPayload
+	12, // 8: index.v1.CreatePayload.Resource:type_name -> index.v1.Resource
+	13, // 9: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
+	11, // 10: index.v1.CreatePayload.relations:type_name -> index.v1.Relation
+	12, // 11: index.v1.UpdatePayload.Resource:type_name -> index.v1.Resource
+	13, // 12: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
+	12, // 13: index.v1.DeletePayload.Resource:type_name -> index.v1.Resource
+	12, // 14: index.v1.AddRelationPayload.Resource:type_name -> index.v1.Resource
+	11, // 15: index.v1.AddRelationPayload.relation:type_name -> index.v1.Relation
+	12, // 16: index.v1.RemoveRelationPayload.Resource:type_name -> index.v1.Resource
+	11, // 17: index.v1.RemoveRelationPayload.relation:type_name -> index.v1.Relation
+	12, // 18: index.v1.SetRelationsPayload.Resource:type_name -> index.v1.Resource
+	11, // 19: index.v1.SetRelationsPayload.Relations:type_name -> index.v1.Relation
+	12, // 20: index.v1.Relation.resource:type_name -> index.v1.Resource
+	0,  // 21: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
+	2,  // 22: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest
+	1,  // 23: index.v1.IndexService.Publish:output_type -> index.v1.PublishResponse
+	3,  // 24: index.v1.IndexService.PublishBatch:output_type -> index.v1.PublishBatchResponse
+	23, // [23:25] is the sub-list for method output_type
+	21, // [21:23] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_index_v1_index_proto_init() }

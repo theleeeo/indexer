@@ -7,7 +7,6 @@ import (
 	"indexer/model"
 	"indexer/resource"
 	"indexer/store"
-	"time"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
@@ -27,14 +26,10 @@ func buildResourceData(rawData *structpb.Struct, fields []resource.FieldConfig) 
 	return result
 }
 
-func (a *App) RegisterCreate(ctx context.Context, occuredAt time.Time, p *index.CreatePayload) error {
+func (a *App) RegisterCreate(ctx context.Context, p *index.CreatePayload) error {
 	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
-	}
-
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
 	}
 
 	relations, parentResources, err := convertCreateRelationParameters(rCfg, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, p.Relations)
@@ -48,7 +43,7 @@ func (a *App) RegisterCreate(ctx context.Context, occuredAt time.Time, p *index.
 		return fmt.Errorf("adding relations failed: %w", err)
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "create", occuredAt, CreatePayload{
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "create", CreatePayload{
 		Resource:        p.Resource.Type,
 		ResourceId:      p.Resource.Id,
 		Data:            buildResourceData(p.Data, rCfg.Fields),
@@ -106,41 +101,33 @@ func convertCreateRelationParameters(rCfg *resource.Config, resource model.Resou
 	return relations, parentResources, nil
 }
 
-func (a *App) RegisterUpdate(ctx context.Context, occuredAt time.Time, p *index.UpdatePayload) error {
+func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error {
 	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
 	}
 
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
-	}
-
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "update", occuredAt, p, nil); err != nil {
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "update", p, nil); err != nil {
 		return fmt.Errorf("enqueue update job failed: %w", err)
 	}
 
 	return nil
 }
 
-func (a *App) RegisterDelete(ctx context.Context, occuredAt time.Time, p *index.DeletePayload) error {
+func (a *App) RegisterDelete(ctx context.Context, p *index.DeletePayload) error {
 	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
 	}
 
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
-	}
-
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "delete", occuredAt, p, nil); err != nil {
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "delete", p, nil); err != nil {
 		return fmt.Errorf("enqueue delete job failed: %w", err)
 	}
 
 	return nil
 }
 
-func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *index.AddRelationPayload) error {
+func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPayload) error {
 	if p.Relation == nil {
 		return &InvalidArgumentError{Msg: "relation is missing the related resource"}
 	}
@@ -155,11 +142,7 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
-	}
-
-	if err := a.persistAddRelation(ctx, occuredAt, store.Relation{
+	if err := a.persistAddRelation(ctx, store.Relation{
 		Parent: model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
 		Child:  model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 	},
@@ -168,7 +151,7 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 	}
 
 	if relCrfg.Bidirectional {
-		if err := a.persistAddRelation(ctx, occuredAt, store.Relation{
+		if err := a.persistAddRelation(ctx, store.Relation{
 			Parent: model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 			Child:  model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
 		},
@@ -180,14 +163,14 @@ func (a *App) RegisterAddRelation(ctx context.Context, occuredAt time.Time, p *i
 	return nil
 }
 
-func (a *App) persistAddRelation(ctx context.Context, occuredAt time.Time, relation store.Relation) error {
+func (a *App) persistAddRelation(ctx context.Context, relation store.Relation) error {
 	if err := a.st.AddRelations(ctx,
 		[]store.Relation{relation},
 	); err != nil {
 		return fmt.Errorf("add bidirectional relation: %w", err)
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "add_relation", occuredAt, AddRelationPayload{
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "add_relation", AddRelationPayload{
 		Relation: store.Relation{
 			Parent: relation.Parent,
 			Child:  relation.Child,
@@ -199,7 +182,7 @@ func (a *App) persistAddRelation(ctx context.Context, occuredAt time.Time, relat
 	return nil
 }
 
-func (a *App) RegisterRemoveRelation(ctx context.Context, occuredAt time.Time, p *index.RemoveRelationPayload) error {
+func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelationPayload) error {
 	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
@@ -210,11 +193,7 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, occuredAt time.Time, p
 		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
-	}
-
-	if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+	if err := a.persistRemoveRelation(ctx, store.Relation{
 		Parent: model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
 		Child:  model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 	},
@@ -223,7 +202,7 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, occuredAt time.Time, p
 	}
 
 	if relCrfg.Bidirectional {
-		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+		if err := a.persistRemoveRelation(ctx, store.Relation{
 			Parent: model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 			Child:  model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
 		},
@@ -235,14 +214,14 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, occuredAt time.Time, p
 	return nil
 }
 
-func (a *App) persistRemoveRelation(ctx context.Context, occuredAt time.Time, relation store.Relation) error {
+func (a *App) persistRemoveRelation(ctx context.Context, relation store.Relation) error {
 	if err := a.st.RemoveRelation(ctx,
 		relation,
 	); err != nil {
 		return fmt.Errorf("remove bidirectional relation: %w", err)
 	}
 
-	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "remove_relation", occuredAt, RemoveRelationPayload{
+	if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", relation.Parent.Type, relation.Parent.Id), "remove_relation", RemoveRelationPayload{
 		Relation: relation,
 	}, nil); err != nil {
 		return fmt.Errorf("enqueue remove bidirectional relation job failed: %w", err)
@@ -251,23 +230,19 @@ func (a *App) persistRemoveRelation(ctx context.Context, occuredAt time.Time, re
 	return nil
 }
 
-func (a *App) RegisterSetRelations(ctx context.Context, occuredAt time.Time, p *index.SetRelationsPayload) error {
+func (a *App) RegisterSetRelations(ctx context.Context, p *index.SetRelationsPayload) error {
 	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
 	}
 
-	if occuredAt.IsZero() {
-		occuredAt = time.Now()
-	}
-
 	resource := model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}
 
-	if err := a.removeChildRelations(ctx, resource, occuredAt); err != nil {
+	if err := a.removeChildRelations(ctx, resource); err != nil {
 		return fmt.Errorf("removing child relations: %w", err)
 	}
 
-	if err := a.removeParentRelations(ctx, resource, occuredAt); err != nil {
+	if err := a.removeParentRelations(ctx, resource); err != nil {
 		return fmt.Errorf("removing parent relations: %w", err)
 	}
 
@@ -277,7 +252,7 @@ func (a *App) RegisterSetRelations(ctx context.Context, occuredAt time.Time, p *
 	}
 
 	for _, relation := range relations {
-		if err := a.persistAddRelation(ctx, occuredAt, relation); err != nil {
+		if err := a.persistAddRelation(ctx, relation); err != nil {
 			return fmt.Errorf("adding relation: %w", err)
 		}
 	}
@@ -285,14 +260,14 @@ func (a *App) RegisterSetRelations(ctx context.Context, occuredAt time.Time, p *
 	return nil
 }
 
-func (a *App) removeChildRelations(ctx context.Context, resource model.Resource, occuredAt time.Time) error {
+func (a *App) removeChildRelations(ctx context.Context, resource model.Resource) error {
 	existingChildResources, err := a.st.GetChildResources(ctx, resource)
 	if err != nil {
 		return fmt.Errorf("getting existing child resources: %w", err)
 	}
 
 	for _, existingChildResource := range existingChildResources {
-		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+		if err := a.persistRemoveRelation(ctx, store.Relation{
 			Parent: resource,
 			Child:  existingChildResource,
 		}); err != nil {
@@ -303,14 +278,14 @@ func (a *App) removeChildRelations(ctx context.Context, resource model.Resource,
 	return nil
 }
 
-func (a *App) removeParentRelations(ctx context.Context, resource model.Resource, occuredAt time.Time) error {
+func (a *App) removeParentRelations(ctx context.Context, resource model.Resource) error {
 	existingParentResources, err := a.st.GetParentResources(ctx, resource)
 	if err != nil {
 		return fmt.Errorf("getting existing parent resources: %w", err)
 	}
 
 	for _, existingParentResource := range existingParentResources {
-		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+		if err := a.persistRemoveRelation(ctx, store.Relation{
 			Parent: existingParentResource,
 			Child:  resource,
 		}); err != nil {

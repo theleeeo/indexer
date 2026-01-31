@@ -3,7 +3,6 @@ syntax = "proto3";
 package index.v1;
 
 import "google/protobuf/struct.proto";
-import "google/protobuf/timestamp.proto";
 
 option go_package = "indexer/gen/index/v1;index";
 
@@ -21,15 +20,13 @@ message PublishBatchRequest { repeated ChangeEvent events = 1; }
 message PublishBatchResponse {}
 
 message ChangeEvent {
-  google.protobuf.Timestamp occurred_at = 1;
-
   oneof payload {
-    CreatePayload create_payload = 2;
-    UpdatePayload update_payload = 3;
-    DeletePayload delete_payload = 4;
-    AddRelationPayload add_relation_payload = 5;
-    RemoveRelationPayload remove_relation_payload = 6;
-    SetRelationsPayload set_relations_payload = 7;
+    CreatePayload create_payload = 1;
+    UpdatePayload update_payload = 2;
+    DeletePayload delete_payload = 3;
+    AddRelationPayload add_relation_payload = 4;
+    RemoveRelationPayload remove_relation_payload = 5;
+    SetRelationsPayload set_relations_payload = 6;
   }
 }
 
