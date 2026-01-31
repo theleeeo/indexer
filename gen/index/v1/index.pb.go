@@ -600,7 +600,7 @@ func (x *RemoveRelationPayload) GetRelation() *Relation {
 type SetRelationsPayload struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Relation      []*Relation            `protobuf:"bytes,2,rep,name=Relation,proto3" json:"Relation,omitempty"`
+	Relations     []*Relation            `protobuf:"bytes,2,rep,name=Relations,proto3" json:"Relations,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -642,9 +642,9 @@ func (x *SetRelationsPayload) GetResource() *Resource {
 	return nil
 }
 
-func (x *SetRelationsPayload) GetRelation() []*Relation {
+func (x *SetRelationsPayload) GetRelations() []*Relation {
 	if x != nil {
-		return x.Relation
+		return x.Relations
 	}
 	return nil
 }
@@ -780,10 +780,10 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\brelation\x18\x02 \x01(\v2\x12.index.v1.RelationR\brelation\"w\n" +
 	"\x15RemoveRelationPayload\x12.\n" +
 	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12.\n" +
-	"\brelation\x18\x02 \x01(\v2\x12.index.v1.RelationR\brelation\"u\n" +
+	"\brelation\x18\x02 \x01(\v2\x12.index.v1.RelationR\brelation\"w\n" +
 	"\x13SetRelationsPayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12.\n" +
-	"\bRelation\x18\x02 \x03(\v2\x12.index.v1.RelationR\bRelation\":\n" +
+	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x120\n" +
+	"\tRelations\x18\x02 \x03(\v2\x12.index.v1.RelationR\tRelations\":\n" +
 	"\bRelation\x12.\n" +
 	"\bresource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bresource\".\n" +
 	"\bResource\x12\x12\n" +
@@ -846,7 +846,7 @@ var file_index_v1_index_proto_depIdxs = []int32{
 	12, // 17: index.v1.RemoveRelationPayload.Resource:type_name -> index.v1.Resource
 	11, // 18: index.v1.RemoveRelationPayload.relation:type_name -> index.v1.Relation
 	12, // 19: index.v1.SetRelationsPayload.Resource:type_name -> index.v1.Resource
-	11, // 20: index.v1.SetRelationsPayload.Relation:type_name -> index.v1.Relation
+	11, // 20: index.v1.SetRelationsPayload.Relations:type_name -> index.v1.Relation
 	12, // 21: index.v1.Relation.resource:type_name -> index.v1.Resource
 	0,  // 22: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
 	2,  // 23: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest

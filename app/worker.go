@@ -43,13 +43,6 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 				return fmt.Errorf("failed to unmarshal payload: %w", err)
 			}
 			return a.handleRemoveRelation(ctx, p)
-		case "set_relation":
-			// p := SetRelationsPayload{}
-			// if err := json.Unmarshal(job.Payload, &p); err != nil {
-			// 	return fmt.Errorf("failed to unmarshal payload: %w", err)
-			// }
-			// return a.handleSetRelation(ctx, p)
-			return fmt.Errorf("set_relation job type not implemented yet")
 		default:
 			return fmt.Errorf("unknown job type: %s", job.Type)
 		}

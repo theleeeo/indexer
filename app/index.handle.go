@@ -268,8 +268,7 @@ func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error
 	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resolveResourceConfig(p.Relation.Child.Type).Fields)
 	doc["id"] = p.Relation.Child.Id
 
-	// TODO: This should load the related resource data from the store instead of passing only the ID.
-	if err := a.es.AddFieldResource(ctx, p.Relation.Parent.Type+"_search", p.Relation.Parent.Id, p.Relation.Child.Type, doc); err != nil {
+	if err := a.es.UpsertFieldResourceById(ctx, p.Relation.Parent.Type+"_search", p.Relation.Parent.Id, p.Relation.Child.Type, p.Relation.Child.Id, doc); err != nil {
 		return err
 	}
 
@@ -304,29 +303,3 @@ func (a *App) handleRemoveRelation(ctx context.Context, p RemoveRelationPayload)
 
 	return nil
 }
-
-//TODO
-// type SetRelationsPayload struct {
-// 	Resource  model.Resource
-// 	Relations []store.Relation
-// }
-
-// // TODO: Load related resource data from store instead of only passing the ID.
-// func (a *App) handleSetRelation(ctx context.Context, p SetRelationsPayload) error {
-// 	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	if err := a.st.SetRelations(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}, []model.Resource{
-// 		{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
-// 	}); err != nil {
-// 		return fmt.Errorf("set relation: %w", err)
-// 	}
-
-// 	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, idStruct{Id: p.Relation.ResourceId}); err != nil {
-// 		return err
-// 	}
-
-// 	return nil
-// }

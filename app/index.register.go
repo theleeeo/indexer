@@ -252,22 +252,71 @@ func (a *App) persistRemoveRelation(ctx context.Context, occuredAt time.Time, re
 }
 
 func (a *App) RegisterSetRelations(ctx context.Context, occuredAt time.Time, p *index.SetRelationsPayload) error {
-	// _, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
-	// if err != nil {
-	// 	return err
-	// }
+	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+	if err != nil {
+		return err
+	}
 
-	// if p.Relation == nil {
-	// 	return &InvalidArgumentError{Msg: "relation is missing the related resource"}
-	// }
+	if occuredAt.IsZero() {
+		occuredAt = time.Now()
+	}
 
-	// if occuredAt.IsZero() {
-	// 	occuredAt = time.Now()
-	// }
+	resource := model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}
 
-	// if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", p.Resource.Type, p.Resource.Id), "set_relation", occuredAt, p, nil); err != nil {
-	// 	return fmt.Errorf("enqueue set relation job failed: %w", err)
-	// }
+	if err := a.removeChildRelations(ctx, resource, occuredAt); err != nil {
+		return fmt.Errorf("removing child relations: %w", err)
+	}
+
+	if err := a.removeParentRelations(ctx, resource, occuredAt); err != nil {
+		return fmt.Errorf("removing parent relations: %w", err)
+	}
+
+	relations, _, err := convertCreateRelationParameters(rCfg, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, p.Relations)
+	if err != nil {
+		return fmt.Errorf("converting relations: %w", err)
+	}
+
+	for _, relation := range relations {
+		if err := a.persistAddRelation(ctx, occuredAt, relation); err != nil {
+			return fmt.Errorf("adding relation: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) removeChildRelations(ctx context.Context, resource model.Resource, occuredAt time.Time) error {
+	existingChildResources, err := a.st.GetChildResources(ctx, resource)
+	if err != nil {
+		return fmt.Errorf("getting existing child resources: %w", err)
+	}
+
+	for _, existingChildResource := range existingChildResources {
+		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+			Parent: resource,
+			Child:  existingChildResource,
+		}); err != nil {
+			return fmt.Errorf("removing existing relation to child resource '%s|%s': %w", existingChildResource.Type, existingChildResource.Id, err)
+		}
+	}
+
+	return nil
+}
+
+func (a *App) removeParentRelations(ctx context.Context, resource model.Resource, occuredAt time.Time) error {
+	existingParentResources, err := a.st.GetParentResources(ctx, resource)
+	if err != nil {
+		return fmt.Errorf("getting existing parent resources: %w", err)
+	}
+
+	for _, existingParentResource := range existingParentResources {
+		if err := a.persistRemoveRelation(ctx, occuredAt, store.Relation{
+			Parent: existingParentResource,
+			Child:  resource,
+		}); err != nil {
+			return fmt.Errorf("removing existing relation from parent resource '%s|%s': %w", existingParentResource.Type, existingParentResource.Id, err)
+		}
+	}
 
 	return nil
 }

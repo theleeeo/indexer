@@ -58,7 +58,7 @@ message RemoveRelationPayload {
 
 message SetRelationsPayload {
   Resource Resource = 1;
-  repeated Relation Relation = 2;
+  repeated Relation Relations = 2;
 }
 
 message Relation { Resource resource = 1; }
