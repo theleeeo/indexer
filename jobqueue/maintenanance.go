@@ -10,6 +10,42 @@ import (
 // Optionally expose pool via Queue (if not already).
 func (q *Queue) Pool() *pgxpool.Pool { return q.pool }
 
+func (w *Worker) cleanerLoop(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err := w.q.CleanupOnce(
+			ctx,
+			w.cfg.RetainSucceeded,
+			w.cfg.RetainDead,
+			w.cfg.CleanBatchSize,
+			w.cfg.MaxBatchesPerClean,
+		); err != nil {
+			w.logf("cleanup error: %v", err)
+		}
+
+		sleepWithJitter(ctx, w.cfg.CleanInterval, w.cfg.CleanJitterPct)
+	}
+}
+
+func (w *Worker) reaperLoop(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		if err := w.q.ReapExpiredRunning(ctx); err != nil {
+			w.logf("reaper error: %v", err)
+		}
+
+		// sleep with jitter
+		pct := w.cfg.ReapJitterPct
+		sleepWithJitter(ctx, w.cfg.ReapInterval, pct)
+	}
+}
+
 // ReapExpiredRunning requeues jobs stuck in running whose lease expired.
 func (q *Queue) ReapExpiredRunning(ctx context.Context) error {
 	_, err := q.pool.Exec(ctx, `

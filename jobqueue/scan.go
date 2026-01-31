@@ -3,7 +3,6 @@ package jobqueue
 import (
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -43,5 +42,3 @@ func scanJob(row pgx.Row) (Job, error) {
 	j.LastError = lastError
 	return j, nil
 }
-
-var _ = uuid.Nil

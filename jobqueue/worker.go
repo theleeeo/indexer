@@ -118,21 +118,17 @@ func NewWorker(pool *pgxpool.Pool, handler Handler, cfg WorkerConfig) *Worker {
 	}
 }
 
-// Start begins worker loops and (optionally) the reaper. It returns immediately.
 func (w *Worker) Start(ctx context.Context) {
-	// Worker loops
 	for i := 0; i < w.cfg.Concurrency; i++ {
 		w.loopsWG.Go(func() {
 			w.loop(ctx)
 		})
 	}
 
-	// Reaper loop
 	w.loopsWG.Go(func() {
 		w.reaperLoop(ctx)
 	})
 
-	// Cleanup loop
 	w.loopsWG.Go(func() {
 		w.cleanerLoop(ctx)
 	})
