@@ -170,20 +170,20 @@ func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId
 }
 
 func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
-	logger := slog.With("resource", p.Resource, "resource_id", p.ResourceId)
+	logger := slog.With(slog.String("jobType", "update"), slog.Group("resource", "type", p.Resource.Type, "id", p.Resource.Id))
 
-	rCfg, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	rCfg, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
 	}
 
 	// Update the main document
-	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, "fields", buildResourceData(p.Data, rCfg.Fields)); err != nil {
+	if err := a.es.UpdateField(ctx, p.Resource.Type+"_search", p.Resource.Id, "fields", buildResourceData(p.Data, rCfg.Fields)); err != nil {
 		return err
 	}
 
 	// Update parent documents
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id})
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -194,14 +194,14 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 			continue
 		}
 
-		rf := relRCfg.GetRelation(p.Resource)
+		rf := relRCfg.GetRelation(p.Resource.Type)
 		if rf == nil {
 			// This can happen if the resource schema is changed and the parent no longer has a relation field for this resource
-			logger.Warn("parent resource does not have field for resource", "parent_resource", parentResource.Type, "field", p.Resource)
+			logger.Warn("parent resource does not have field for resource", "parent_resource", parentResource.Type, "field", p.Resource.Type)
 			continue
 		}
 
-		if err := a.es.UpsertFieldResourceById(ctx, parentResource.Type+"_search", parentResource.Id, p.Resource, p.ResourceId, buildResourceData(p.Data, rf.Fields)); err != nil {
+		if err := a.es.UpsertFieldResourceById(ctx, parentResource.Type+"_search", parentResource.Id, p.Resource.Type, p.Resource.Id, buildResourceData(p.Data, rf.Fields)); err != nil {
 			return err
 		}
 	}
@@ -210,27 +210,27 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 }
 
 func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
+	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
 	if err != nil {
 		return err
 	}
 
-	if err := a.es.Delete(ctx, p.Resource+"_search", p.ResourceId); err != nil {
+	if err := a.es.Delete(ctx, p.Resource.Type+"_search", p.Resource.Id); err != nil {
 		return err
 	}
 
 	// TODO: Flag for cascade delete?
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id})
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
 	for _, relatedResource := range parentResources {
-		if err := a.es.RemoveFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource, p.ResourceId); err != nil {
+		if err := a.es.RemoveFieldResourceById(ctx, relatedResource.Type+"_search", relatedResource.Id, p.Resource.Type, p.Resource.Id); err != nil {
 			return fmt.Errorf("remove from parent resource: %w", err)
 		}
 	}
 
-	if err := a.st.RemoveResource(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}); err != nil {
+	if err := a.st.RemoveResource(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}); err != nil {
 		return fmt.Errorf("remove relations: %w", err)
 	}
 
@@ -305,22 +305,28 @@ func (a *App) handleRemoveRelation(ctx context.Context, p RemoveRelationPayload)
 	return nil
 }
 
-// TODO: Load related resource data from store instead of only passing the ID.
-func (a *App) handleSetRelation(ctx context.Context, p *index.SetRelationPayload) error {
-	_, err := a.verifyResourceConfig(p.Resource, p.ResourceId)
-	if err != nil {
-		return err
-	}
+//TODO
+// type SetRelationsPayload struct {
+// 	Resource  model.Resource
+// 	Relations []store.Relation
+// }
 
-	if err := a.st.SetRelations(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}, []model.Resource{
-		{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
-	}); err != nil {
-		return fmt.Errorf("set relation: %w", err)
-	}
+// // TODO: Load related resource data from store instead of only passing the ID.
+// func (a *App) handleSetRelation(ctx context.Context, p SetRelationsPayload) error {
+// 	_, err := a.verifyResourceConfig(p.Resource.Type, p.Resource.Id)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, idStruct{Id: p.Relation.ResourceId}); err != nil {
-		return err
-	}
+// 	if err := a.st.SetRelations(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}, []model.Resource{
+// 		{Type: p.Relation.Resource, Id: p.Relation.ResourceId},
+// 	}); err != nil {
+// 		return fmt.Errorf("set relation: %w", err)
+// 	}
 
-	return nil
-}
+// 	if err := a.es.UpdateField(ctx, p.Resource+"_search", p.ResourceId, p.Relation.Resource, idStruct{Id: p.Relation.ResourceId}); err != nil {
+// 		return err
+// 	}
+
+// 	return nil
+// }

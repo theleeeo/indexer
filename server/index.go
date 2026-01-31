@@ -73,8 +73,8 @@ func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) err
 		return s.app.RegisterUpdate(ctx, zeroTimeIfNil(ev.OccurredAt), p.UpdatePayload)
 	case *index.ChangeEvent_DeletePayload:
 		return s.app.RegisterDelete(ctx, zeroTimeIfNil(ev.OccurredAt), p.DeletePayload)
-	case *index.ChangeEvent_SetRelationPayload:
-		return s.app.RegisterSetRelation(ctx, zeroTimeIfNil(ev.OccurredAt), p.SetRelationPayload)
+	case *index.ChangeEvent_SetRelationsPayload:
+		return s.app.RegisterSetRelations(ctx, zeroTimeIfNil(ev.OccurredAt), p.SetRelationsPayload)
 	case *index.ChangeEvent_AddRelationPayload:
 		return s.app.RegisterAddRelation(ctx, zeroTimeIfNil(ev.OccurredAt), p.AddRelationPayload)
 	case *index.ChangeEvent_RemoveRelationPayload:

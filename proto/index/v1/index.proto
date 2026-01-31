@@ -24,61 +24,46 @@ message ChangeEvent {
   google.protobuf.Timestamp occurred_at = 1;
 
   oneof payload {
-    // TODO: Merge the create and update payloads into one?
     CreatePayload create_payload = 2;
     UpdatePayload update_payload = 3;
     DeletePayload delete_payload = 4;
     AddRelationPayload add_relation_payload = 5;
     RemoveRelationPayload remove_relation_payload = 6;
-    SetRelationPayload set_relation_payload = 7;
+    SetRelationsPayload set_relations_payload = 7;
   }
 }
 
 message CreatePayload {
-  string resource = 1;
-  string resource_id = 2;
-  google.protobuf.Struct data = 3;
-  repeated CreateRelationParameters relations = 4;
+  Resource Resource = 1;
+  google.protobuf.Struct data = 2;
+  repeated Relation relations = 3;
 }
-
-message CreateRelationParameters { Relation relation = 1; }
 
 message UpdatePayload {
-  string resource = 1;
-  string resource_id = 2;
-  google.protobuf.Struct data = 3;
+  Resource Resource = 1;
+  google.protobuf.Struct data = 2;
 }
 
-message DeletePayload {
-  string resource = 1;
-  string resource_id = 2;
-}
+message DeletePayload { Resource Resource = 1; }
 
 message AddRelationPayload {
-  string resource = 1;
-  string resource_id = 2;
-  Relation relation = 3;
+  Resource Resource = 1;
+  Relation relation = 2;
 }
 
 message RemoveRelationPayload {
-  string resource = 1;
-  string resource_id = 2;
-  Relation relation = 3;
+  Resource Resource = 1;
+  Relation relation = 2;
 }
 
-message SetRelationPayload {
-  string resource = 1;
-  string resource_id = 2;
-  Relation relation = 3;
+message SetRelationsPayload {
+  Resource Resource = 1;
+  repeated Relation Relation = 2;
 }
 
-message Relation {
-  string resource = 1;
-  string resource_id = 2;
-}
+message Relation { Resource resource = 1; }
 
-// TODO
-// message Resource {
-//   string type = 1;
-//   string id = 2;
-// }
+message Resource {
+  string type = 1;
+  string id = 2;
+}
