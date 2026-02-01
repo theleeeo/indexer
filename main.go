@@ -7,7 +7,9 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"os/signal"
 	"strings"
+	"sync"
 
 	"indexer/app"
 	"indexer/es"
@@ -87,9 +89,6 @@ func main() {
 		Logger: log.Default(),
 	})
 
-	log.Printf("starting job queue worker")
-	worker.Start(context.Background())
-
 	idxSrv := server.NewIndexer(app)
 	searchSrv := server.NewSearcher(app)
 
@@ -103,12 +102,42 @@ func main() {
 	search.RegisterSearchServiceServer(g, searchSrv)
 	reflection.Register(g)
 
-	log.Printf("indexer listening on %s", grpcAddr)
-	if err := g.Serve(lis); err != nil {
-		log.Fatalf("serve: %v", err)
-	}
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt)
 
-	// TODO: graceful shutdown
+	wg := sync.WaitGroup{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	wg.Go(func() {
+		log.Printf("starting job queue worker")
+		worker.Run(ctx)
+		log.Printf("job queue worker stopped")
+	})
+
+	wg.Go(func() {
+		log.Printf("gRPC server listening on %s", grpcAddr)
+		if err := g.Serve(lis); err != nil {
+			log.Printf("gRPC server error: %v", err)
+		}
+		log.Printf("gRPC server stopped")
+	})
+
+	<-stopChan
+	log.Printf("shutting down")
+
+	go func() {
+		<-stopChan
+		log.Printf("force shutdown")
+		os.Exit(1)
+	}()
+
+	cancel()
+
+	g.GracefulStop()
+
+	wg.Wait()
 }
 
 func loadResourceConfig(path string) ([]*resource.Config, error) {

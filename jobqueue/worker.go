@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -98,8 +97,6 @@ type Worker struct {
 	handler Handler
 	cfg     WorkerConfig
 
-	stopFetch atomic.Bool
-
 	loopsWG sync.WaitGroup
 
 	// Track in-flight job cancels so Stop(ctx) can force-cancel if deadline hits.
@@ -118,7 +115,7 @@ func NewWorker(pool *pgxpool.Pool, handler Handler, cfg WorkerConfig) *Worker {
 	}
 }
 
-func (w *Worker) Start(ctx context.Context) {
+func (w *Worker) Run(ctx context.Context) {
 	for i := 0; i < w.cfg.Concurrency; i++ {
 		w.loopsWG.Go(func() {
 			w.loop(ctx)
@@ -132,39 +129,41 @@ func (w *Worker) Start(ctx context.Context) {
 	w.loopsWG.Go(func() {
 		w.cleanerLoop(ctx)
 	})
+
+	w.loopsWG.Wait()
 }
 
 // Stop gracefully stops fetching new jobs and waits until all loops exit.
 // If stopCtx expires, it force-cancels in-flight jobs (so handlers can stop), and then returns.
-func (w *Worker) Stop(stopCtx context.Context) error {
-	w.stopFetch.Store(true)
+// func (w *Worker) Stop(stopCtx context.Context) error {
+// 	w.stopFetch.Store(true)
 
-	done := make(chan struct{})
-	go func() {
-		w.loopsWG.Wait()
-		close(done)
-	}()
+// 	done := make(chan struct{})
+// 	go func() {
+// 		w.loopsWG.Wait()
+// 		close(done)
+// 	}()
 
-	select {
-	case <-done:
-		return nil
-	case <-stopCtx.Done():
-		// Force cancel any in-flight jobs
-		w.inFlightMu.Lock()
-		for _, cancel := range w.inFlight {
-			cancel()
-		}
-		w.inFlightMu.Unlock()
+// 	select {
+// 	case <-done:
+// 		return nil
+// 	case <-stopCtx.Done():
+// 		// Force cancel any in-flight jobs
+// 		w.inFlightMu.Lock()
+// 		for _, cancel := range w.inFlight {
+// 			cancel()
+// 		}
+// 		w.inFlightMu.Unlock()
 
-		// Wait a little for loops to actually exit
-		select {
-		case <-done:
-			return nil
-		case <-time.After(2 * time.Second):
-			return stopCtx.Err()
-		}
-	}
-}
+// 		// Wait a little for loops to actually exit
+// 		select {
+// 		case <-done:
+// 			return nil
+// 		case <-time.After(2 * time.Second):
+// 			return stopCtx.Err()
+// 		}
+// 	}
+// }
 
 // Wait blocks until all loops exit (useful if you drive shutdown via ctx cancel).
 func (w *Worker) Wait() {
@@ -186,10 +185,6 @@ func (w *Worker) loop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
-		if w.stopFetch.Load() {
-			w.logf("stopping fetch loop")
-			return
-		}
 
 		group, err := w.claimGroup(ctx)
 		if err != nil {
@@ -206,10 +201,6 @@ func (w *Worker) loop(ctx context.Context) {
 		for n := 0; n < w.cfg.MaxBatchPerGroup; n++ {
 			if ctx.Err() != nil {
 				_ = w.releaseGroup(context.Background(), group) // best-effort
-				return
-			}
-			if w.stopFetch.Load() {
-				_ = w.releaseGroup(context.Background(), group)
 				return
 			}
 
