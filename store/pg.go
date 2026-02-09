@@ -37,9 +37,9 @@ func (s *PostgresStore) addRelationsBatch(ctx context.Context, sender batchSende
 	batch := &pgx.Batch{}
 	for _, relation := range relations {
 		batch.Queue(
-			`INSERT INTO relations (resource, resource_id, related_resource, related_resource_id) 
-			 VALUES ($1, $2, $3, $4) 
-			 ON CONFLICT DO NOTHING`,
+			`INSERT INTO relations (resource, resource_id, related_resource, related_resource_id, pending_deletion) 
+			 VALUES ($1, $2, $3, $4, false) 
+			 ON CONFLICT (resource, resource_id, related_resource, related_resource_id) DO UPDATE SET pending_deletion = false`,
 			relation.Parent.Type, relation.Parent.Id, relation.Child.Type, relation.Child.Id,
 		)
 	}
@@ -52,11 +52,11 @@ func (s *PostgresStore) addRelationsBatch(ctx context.Context, sender batchSende
 	return nil
 }
 
-func (s *PostgresStore) RemoveRelation(ctx context.Context, relation Relation) error {
-	return s.removeRelationsBatch(ctx, s.pool, []Relation{relation})
+func (s *PostgresStore) MarkRemoveRelation(ctx context.Context, relation Relation) error {
+	return s.markRemoveRelationsBatch(ctx, s.pool, []Relation{relation})
 }
 
-func (s *PostgresStore) removeRelationsBatch(ctx context.Context, sender batchSender, relations []Relation) error {
+func (s *PostgresStore) markRemoveRelationsBatch(ctx context.Context, sender batchSender, relations []Relation) error {
 	if len(relations) == 0 {
 		return nil
 	}
@@ -64,7 +64,7 @@ func (s *PostgresStore) removeRelationsBatch(ctx context.Context, sender batchSe
 	batch := &pgx.Batch{}
 	for _, relation := range relations {
 		batch.Queue(
-			`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
+			`UPDATE relations SET pending_deletion = true WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4`,
 			relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
 		)
 	}
@@ -167,7 +167,7 @@ func (s *PostgresStore) removeResource(ctx context.Context, sender executor, res
 func (s *PostgresStore) RelationExists(ctx context.Context, relation Relation) (bool, error) {
 	row := s.pool.QueryRow(
 		ctx,
-		`SELECT COUNT(1) FROM relations WHERE resource=$1 AND resource_id=$2 AND related_resource=$3 AND related_resource_id=$4`,
+		`SELECT COUNT(1) FROM relations WHERE resource=$1 AND resource_id=$2 AND related_resource=$3 AND related_resource_id=$4 AND pending_deletion = false`,
 		relation.Parent.Type, relation.Parent.Id, relation.Child.Type, relation.Child.Id,
 	)
 
@@ -177,4 +177,29 @@ func (s *PostgresStore) RelationExists(ctx context.Context, relation Relation) (
 	}
 
 	return count > 0, nil
+}
+
+func (s *PostgresStore) PersistRemoveRelation(ctx context.Context, relation Relation) error {
+	return s.persistRemoveRelationsBatch(ctx, s.pool, []Relation{relation})
+}
+
+func (s *PostgresStore) persistRemoveRelationsBatch(ctx context.Context, sender batchSender, relations []Relation) error {
+	if len(relations) == 0 {
+		return nil
+	}
+
+	batch := &pgx.Batch{}
+	for _, relation := range relations {
+		batch.Queue(
+			`DELETE FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3 AND resource_id=$4 AND pending_deletion = true`,
+			relation.Child.Type, relation.Child.Id, relation.Parent.Type, relation.Parent.Id,
+		)
+	}
+
+	br := sender.SendBatch(ctx, batch)
+	if err := br.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }

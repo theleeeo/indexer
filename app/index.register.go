@@ -114,6 +114,7 @@ func (a *App) RegisterUpdate(ctx context.Context, p *index.UpdatePayload) error 
 	return nil
 }
 
+// TODO: Do the relation deletions here and not in the job-handler
 func (a *App) RegisterDelete(ctx context.Context, p *index.DeletePayload) error {
 	_, err := a.verifyResourceConfig(p.Resource.GetType(), p.Resource.GetId())
 	if err != nil {
@@ -216,7 +217,7 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelatio
 
 // TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) persistRemoveRelation(ctx context.Context, relation store.Relation) error {
-	if err := a.st.RemoveRelation(ctx,
+	if err := a.st.MarkRemoveRelation(ctx,
 		relation,
 	); err != nil {
 		return fmt.Errorf("remove bidirectional relation: %w", err)

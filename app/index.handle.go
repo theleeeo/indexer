@@ -300,5 +300,9 @@ func (a *App) handleRemoveRelation(ctx context.Context, p RemoveRelationPayload)
 		return err
 	}
 
+	if err := a.st.PersistRemoveRelation(ctx, p.Relation); err != nil {
+		return fmt.Errorf("persist remove relation: %w", err)
+	}
+
 	return nil
 }
