@@ -107,10 +107,15 @@ func (s *PostgresStore) SetRelations(ctx context.Context, resource model.Resourc
 	return tx.Commit(ctx)
 }
 
-func (s *PostgresStore) GetParentResources(ctx context.Context, childResource model.Resource) ([]model.Resource, error) {
+func (s *PostgresStore) GetParentResources(ctx context.Context, childResource model.Resource, includeDeleting bool) ([]model.Resource, error) {
+	query := `SELECT resource, resource_id FROM relations WHERE related_resource=$1 AND related_resource_id=$2`
+	if !includeDeleting {
+		query += ` AND pending_deletion = false`
+	}
+
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT resource, resource_id FROM relations WHERE related_resource=$1 AND related_resource_id=$2`,
+		query,
 		childResource.Type, childResource.Id,
 	)
 	if err != nil {
@@ -129,10 +134,15 @@ func (s *PostgresStore) GetParentResources(ctx context.Context, childResource mo
 	return parents, nil
 }
 
-func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource model.Resource) ([]model.Resource, error) {
+func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource model.Resource, includeDeleting bool) ([]model.Resource, error) {
+	query := `SELECT related_resource, related_resource_id FROM relations WHERE resource=$1 AND resource_id=$2`
+	if !includeDeleting {
+		query += ` AND pending_deletion = false`
+	}
+
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT related_resource, related_resource_id FROM relations WHERE resource=$1 AND resource_id=$2`,
+		query,
 		parentResource.Type, parentResource.Id,
 	)
 	if err != nil {

@@ -264,7 +264,7 @@ func (a *App) RegisterSetRelations(ctx context.Context, p *index.SetRelationsPay
 
 // TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) removeChildRelations(ctx context.Context, resource model.Resource) error {
-	existingChildResources, err := a.st.GetChildResources(ctx, resource)
+	existingChildResources, err := a.st.GetChildResources(ctx, resource, true)
 	if err != nil {
 		return fmt.Errorf("getting existing child resources: %w", err)
 	}
@@ -283,7 +283,7 @@ func (a *App) removeChildRelations(ctx context.Context, resource model.Resource)
 
 // TODO: This have to be done in a transaction to avoid corrupted state
 func (a *App) removeParentRelations(ctx context.Context, resource model.Resource) error {
-	existingParentResources, err := a.st.GetParentResources(ctx, resource)
+	existingParentResources, err := a.st.GetParentResources(ctx, resource, true)
 	if err != nil {
 		return fmt.Errorf("getting existing parent resources: %w", err)
 	}

@@ -51,7 +51,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 	// We must load all child resources from the store instead of using the ones passed in the payload,
 	// because there might be existing relations from previously that were not included in the create payload.
 	// Example: Create resource A with a bidirectional relation to resource B. When you later create resource B the relation to A exists in the store but not in the payload.
-	children, err := a.st.GetChildResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId})
+	children, err := a.st.GetChildResources(ctx, model.Resource{Type: p.Resource, Id: p.ResourceId}, false)
 	if err != nil {
 		return fmt.Errorf("get child resources: %w", err)
 	}
@@ -137,7 +137,7 @@ func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields m
 
 // TODO: No, this should be a job on the parent
 func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId string, data map[string]any) error {
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: resourceType, Id: resourceId})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: resourceType, Id: resourceId}, false)
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -182,7 +182,7 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 	}
 
 	// Update parent documents
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, false)
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
@@ -219,7 +219,7 @@ func (a *App) handleDelete(ctx context.Context, p *index.DeletePayload) error {
 	}
 
 	// TODO: Flag for cascade delete?
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id})
+	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, false)
 	if err != nil {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
