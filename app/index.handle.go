@@ -149,7 +149,7 @@ func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
 		return fmt.Errorf("get parent resources: %w", err)
 	}
 	for _, parentResource := range parentResources {
-		relRCfg := a.resolveResourceConfig(parentResource.Type)
+		relRCfg := a.resources.Get(parentResource.Type)
 		if relRCfg == nil {
 			logger.Warn("parent resource does not exist in the schema", "parent_resource", parentResource.Type)
 			continue
@@ -226,7 +226,7 @@ func (a *App) handleAddRelation(ctx context.Context, p AddRelationPayload) error
 		return fmt.Errorf("get child document: %w", err)
 	}
 
-	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resolveResourceConfig(p.Relation.Child.Type).Fields)
+	doc = buildResourceDataFromMap(doc["fields"].(map[string]any), a.resources.Get(p.Relation.Child.Type).Fields)
 	doc["id"] = p.Relation.Child.Id
 
 	if err := a.es.UpsertFieldResourceById(ctx, p.Relation.Parent.Type+"_search", p.Relation.Parent.Id, p.Relation.Child.Type, p.Relation.Child.Id, doc); err != nil {

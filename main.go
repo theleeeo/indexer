@@ -47,10 +47,8 @@ func main() {
 		log.Fatalf("load resource config: %v", err)
 	}
 
-	for _, rc := range resources {
-		if err := rc.Validate(); err != nil {
-			log.Fatalf("error validating resource %q: %v", rc.Resource, err)
-		}
+	if err := resources.Validate(); err != nil {
+		log.Fatalf("invalid resource config: %v", err)
 	}
 
 	log.Printf("loaded %d resource configurations", len(resources))
@@ -140,7 +138,7 @@ func main() {
 	wg.Wait()
 }
 
-func loadResourceConfig(path string) ([]*resource.Config, error) {
+func loadResourceConfig(path string) (resource.Configs, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("reading file: %w", err)

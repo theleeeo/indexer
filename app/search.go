@@ -11,7 +11,7 @@ func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.Se
 		return nil, errors.New("resource is required")
 	}
 
-	r := a.resolveResourceConfig(req.Resource)
+	r := a.resources.Get(req.Resource)
 	if r == nil {
 		return nil, ErrUnknownResource
 	}
