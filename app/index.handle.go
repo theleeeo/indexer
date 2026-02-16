@@ -2,9 +2,7 @@ package app
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"indexer/es"
 	"indexer/gen/index/v1"
 	"indexer/model"
 	"indexer/resource"
@@ -67,10 +65,7 @@ func (a *App) handleCreate(ctx context.Context, p CreatePayload) error {
 
 	logger.Info("created resource")
 
-	// if err := a.addResourceToParents(ctx, p.Resource, p.ResourceId, p.Data); err != nil {
-	// 	return fmt.Errorf("add resource to parents: %w", err)
-	// }
-
+	// Update parent documents
 	for _, r := range p.ParentResources {
 		if _, err := a.queue.Enqueue(ctx, fmt.Sprintf("%s|%s", r.Type, r.Id), "add_relation", AddRelationPayload{
 			Relation: store.Relation{
@@ -133,39 +128,6 @@ func (a *App) buildDocument(ctx context.Context, rCfg *resource.Config, fields m
 	}
 
 	return docMap, nil
-}
-
-// TODO: No, this should be a job on the parent
-func (a *App) addResourceToParents(ctx context.Context, resourceType, resourceId string, data map[string]any) error {
-	parentResources, err := a.st.GetParentResources(ctx, model.Resource{Type: resourceType, Id: resourceId}, false)
-	if err != nil {
-		return fmt.Errorf("get parent resources: %w", err)
-	}
-
-	for _, parentResource := range parentResources {
-		relRCfg := a.resolveResourceConfig(parentResource.Type)
-		if relRCfg == nil {
-			// TODO: Investigate better handling/warnings in these cases
-			slog.Warn("parent resource does not exist in the schema", "parent_resource", parentResource.Type)
-			continue
-		}
-
-		rf := relRCfg.GetRelation(resourceType)
-		if rf == nil {
-			slog.Warn("related resource does not have field for resource", "related_resource", parentResource.Type, "field", resourceType)
-			continue
-		}
-
-		if err := a.es.UpsertFieldResourceById(ctx, parentResource.Type+"_search", parentResource.Id, resourceType, resourceId, buildResourceDataFromMap(data, rf.Fields)); err != nil {
-			if errors.Is(err, es.ErrNotFound) {
-				slog.Warn("parent resource document not found in index", "parent_resource", parentResource.Type, "parent_resource_id", parentResource.Id)
-				continue
-			}
-			return fmt.Errorf("upsert parent resource: %w", err)
-		}
-	}
-
-	return nil
 }
 
 func (a *App) handleUpdate(ctx context.Context, p *index.UpdatePayload) error {
