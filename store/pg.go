@@ -161,6 +161,60 @@ func (s *PostgresStore) GetChildResources(ctx context.Context, parentResource mo
 	return children, nil
 }
 
+func (s *PostgresStore) GetChildResourcesOfType(ctx context.Context, parentResource model.Resource, childType string, includeDeleting bool) ([]model.Resource, error) {
+	query := `SELECT related_resource_id FROM relations WHERE resource=$1 AND resource_id=$2 AND related_resource=$3`
+	if !includeDeleting {
+		query += ` AND pending_deletion = false`
+	}
+
+	rows, err := s.pool.Query(
+		ctx,
+		query,
+		parentResource.Type, parentResource.Id, childType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var children []model.Resource
+	for rows.Next() {
+		var childResourceId string
+		if err := rows.Scan(&childResourceId); err != nil {
+			return nil, err
+		}
+		children = append(children, model.Resource{Type: childType, Id: childResourceId})
+	}
+	return children, nil
+}
+
+func (s *PostgresStore) GetParentResourcesOfType(ctx context.Context, childResource model.Resource, parentType string, includeDeleting bool) ([]model.Resource, error) {
+	query := `SELECT resource_id FROM relations WHERE related_resource=$1 AND related_resource_id=$2 AND resource=$3`
+	if !includeDeleting {
+		query += ` AND pending_deletion = false`
+	}
+
+	rows, err := s.pool.Query(
+		ctx,
+		query,
+		childResource.Type, childResource.Id, parentType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var parents []model.Resource
+	for rows.Next() {
+		var parentResourceId string
+		if err := rows.Scan(&parentResourceId); err != nil {
+			return nil, err
+		}
+		parents = append(parents, model.Resource{Type: parentType, Id: parentResourceId})
+	}
+	return parents, nil
+}
+
 func (s *PostgresStore) RemoveResource(ctx context.Context, resource model.Resource) error {
 	return s.removeResource(ctx, s.pool, resource)
 }

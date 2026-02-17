@@ -138,8 +138,8 @@ func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPaylo
 		return err
 	}
 
-	relCrfg := rCfg.GetRelation(p.Relation.Resource.Type)
-	if relCrfg == nil {
+	relCfg := rCfg.GetRelation(p.Relation.Resource.Type)
+	if relCfg == nil {
 		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
@@ -151,13 +151,69 @@ func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPaylo
 		return fmt.Errorf("add relation: %w", err)
 	}
 
-	if relCrfg.Bidirectional {
+	if relCfg.Bidirectional {
 		if err := a.persistAddRelation(ctx, store.Relation{
 			Parent: model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 			Child:  model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
 		},
 		); err != nil {
 			return fmt.Errorf("add bidirectional relation: %w", err)
+		}
+	}
+
+	if err := a.addDependentRelations(ctx, relCfg.UpdateResources, p); err != nil {
+		return fmt.Errorf("updating dependant resources: %w", err)
+	}
+
+	return nil
+}
+
+// TODO: Error handling includes the resource currently being worked on?
+func (a *App) addDependentRelations(ctx context.Context, updateResources []string, p *index.AddRelationPayload) error {
+	fmt.Printf("Updating dependent relations for resource '%s|%s' and relation to '%s|%s'. Dependent resources to update: %v\n", p.Resource.Type, p.Resource.Id, p.Relation.Resource.Type, p.Relation.Resource.Id, updateResources)
+	for _, resToUpdate := range updateResources {
+		for _, rel := range a.resources.Get(resToUpdate).Relations { // Schema validation ensures that this resource exists
+			if rel.Dependance != p.Resource.Type {
+				continue
+			}
+
+			// The resource to update is the parent of the current relation.
+			if resToUpdate == p.Resource.Type {
+				// Whe know the one parent relation to add the dependant resources to. We need to figure out the child resources to add the relation for.
+				panic("not implemented yet")
+
+				// relatedResources, err := a.st.GetChildResourcesOfType(ctx, model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id}, resToUpdate, false)
+				// if err != nil {
+				// 	return fmt.Errorf("getting child resources: %w", err)
+				// }
+
+				// for _, rr := range relatedResources {
+				// 	if err := a.persistAddRelation(ctx, store.Relation{
+				// 		Parent: model.Resource{Type: resToUpdate, Id: p.Resource.Id},
+				// 		Child:  model.Resource{Type: rr.Type, Id: rr.Id},
+				// 	},
+				// 	); err != nil {
+				// 		return fmt.Errorf("add relation to dependant resource: %w", err)
+				// 	}
+				// }
+			} else {
+				// The resource to update is the child of the current relation. We need to figure out the parent resources to add the relation for.
+				relatedResources, err := a.st.GetParentResourcesOfType(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, resToUpdate, false)
+				if err != nil {
+					return fmt.Errorf("getting parent resources: %w", err)
+				}
+				fmt.Printf("parents: %v\n", relatedResources)
+
+				for _, rr := range relatedResources {
+					if err := a.persistAddRelation(ctx, store.Relation{
+						Parent: model.Resource{Type: resToUpdate, Id: rr.Id},
+						Child:  model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
+					},
+					); err != nil {
+						return fmt.Errorf("add relation to dependant resource: %w", err)
+					}
+				}
+			}
 		}
 	}
 
@@ -189,8 +245,8 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelatio
 		return err
 	}
 
-	relCrfg := rCfg.GetRelation(p.Relation.Resource.Type)
-	if relCrfg == nil {
+	relCfg := rCfg.GetRelation(p.Relation.Resource.Type)
+	if relCfg == nil {
 		return &InvalidArgumentError{Msg: fmt.Sprintf("relation to resource '%s' is not defined in the schema for resource '%s'", p.Relation.Resource, p.Resource)}
 	}
 
@@ -202,7 +258,7 @@ func (a *App) RegisterRemoveRelation(ctx context.Context, p *index.RemoveRelatio
 		return fmt.Errorf("remove relation: %w", err)
 	}
 
-	if relCrfg.Bidirectional {
+	if relCfg.Bidirectional {
 		if err := a.persistRemoveRelation(ctx, store.Relation{
 			Parent: model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
 			Child:  model.Resource{Type: p.Resource.Type, Id: p.Resource.Id},
