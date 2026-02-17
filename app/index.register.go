@@ -170,48 +170,49 @@ func (a *App) RegisterAddRelation(ctx context.Context, p *index.AddRelationPaylo
 
 // TODO: Error handling includes the resource currently being worked on?
 func (a *App) addDependentRelations(ctx context.Context, updateResources []string, p *index.AddRelationPayload) error {
-	fmt.Printf("Updating dependent relations for resource '%s|%s' and relation to '%s|%s'. Dependent resources to update: %v\n", p.Resource.Type, p.Resource.Id, p.Relation.Resource.Type, p.Relation.Resource.Id, updateResources)
 	for _, resToUpdate := range updateResources {
-		for _, rel := range a.resources.Get(resToUpdate).Relations { // Schema validation ensures that this resource exists
-			if rel.Dependance != p.Resource.Type {
-				continue
+		rCfg := a.resources.Get(resToUpdate) // Schema validation ensures that this resource exists
+
+		// The resource to update is the parent of the current relation.
+		if resToUpdate == p.Resource.Type {
+			var depRel string
+			for _, r := range rCfg.Relations {
+				if r.Dependance == p.Relation.Resource.Type {
+					depRel = r.Resource
+					break
+				}
 			}
 
-			// The resource to update is the parent of the current relation.
-			if resToUpdate == p.Resource.Type {
-				// Whe know the one parent relation to add the dependant resources to. We need to figure out the child resources to add the relation for.
-				panic("not implemented yet")
+			// We know the one parent relation to add the dependant resources to. We need to figure out the child resources to add the relation for.
+			relatedResources, err := a.st.GetChildResourcesOfType(ctx, model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id}, depRel, false)
+			if err != nil {
+				return fmt.Errorf("getting child resources: %w", err)
+			}
 
-				// relatedResources, err := a.st.GetChildResourcesOfType(ctx, model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id}, resToUpdate, false)
-				// if err != nil {
-				// 	return fmt.Errorf("getting child resources: %w", err)
-				// }
-
-				// for _, rr := range relatedResources {
-				// 	if err := a.persistAddRelation(ctx, store.Relation{
-				// 		Parent: model.Resource{Type: resToUpdate, Id: p.Resource.Id},
-				// 		Child:  model.Resource{Type: rr.Type, Id: rr.Id},
-				// 	},
-				// 	); err != nil {
-				// 		return fmt.Errorf("add relation to dependant resource: %w", err)
-				// 	}
-				// }
-			} else {
-				// The resource to update is the child of the current relation. We need to figure out the parent resources to add the relation for.
-				relatedResources, err := a.st.GetParentResourcesOfType(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, resToUpdate, false)
-				if err != nil {
-					return fmt.Errorf("getting parent resources: %w", err)
+			for _, rr := range relatedResources {
+				if err := a.persistAddRelation(ctx, store.Relation{
+					Parent: model.Resource{Type: resToUpdate, Id: p.Resource.Id},
+					Child:  model.Resource{Type: rr.Type, Id: rr.Id},
+				},
+				); err != nil {
+					return fmt.Errorf("add relation to dependant resource: %w", err)
 				}
-				fmt.Printf("parents: %v\n", relatedResources)
+			}
 
-				for _, rr := range relatedResources {
-					if err := a.persistAddRelation(ctx, store.Relation{
-						Parent: model.Resource{Type: resToUpdate, Id: rr.Id},
-						Child:  model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
-					},
-					); err != nil {
-						return fmt.Errorf("add relation to dependant resource: %w", err)
-					}
+		} else {
+			// The resource to update is the child of the current relation. We need to figure out the parent resources to add the relation for.
+			relatedResources, err := a.st.GetParentResourcesOfType(ctx, model.Resource{Type: p.Resource.Type, Id: p.Resource.Id}, resToUpdate, false)
+			if err != nil {
+				return fmt.Errorf("getting parent resources: %w", err)
+			}
+
+			for _, rr := range relatedResources {
+				if err := a.persistAddRelation(ctx, store.Relation{
+					Parent: model.Resource{Type: resToUpdate, Id: rr.Id},
+					Child:  model.Resource{Type: p.Relation.Resource.Type, Id: p.Relation.Resource.Id},
+				},
+				); err != nil {
+					return fmt.Errorf("add relation to dependant resource: %w", err)
 				}
 			}
 		}
