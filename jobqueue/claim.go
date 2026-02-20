@@ -21,7 +21,7 @@ func (w *Worker) claimGroup(ctx context.Context) (string, error) {
 	var group string
 	err = tx.QueryRow(ctx, `
 		WITH q AS (
-		  SELECT job_group, min(ordering_seq) AS next_ts
+		  SELECT job_group, min(ordering_seq) AS next_order_seq
 		  FROM jobs
 		  WHERE status='queued' AND run_after <= now()
 		  GROUP BY job_group
@@ -31,7 +31,7 @@ func (w *Worker) claimGroup(ctx context.Context) (string, error) {
 		  FROM job_groups g
 		  JOIN q ON q.job_group = g.job_group
 		  WHERE g.locked_until IS NULL OR g.locked_until < now()
-		  ORDER BY q.next_ts
+		  ORDER BY q.next_order_seq
 		  LIMIT 1
 		  FOR UPDATE SKIP LOCKED
 		)
