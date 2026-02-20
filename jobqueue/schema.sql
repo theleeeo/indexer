@@ -44,5 +44,6 @@ CREATE INDEX IF NOT EXISTS jobs_running_expiry_idx
 
 CREATE INDEX IF NOT EXISTS available_job_groups_idx
   ON job_groups (locked_until)
-  WHERE locked_until IS NULL OR locked_until < now();
+  WHERE locked_until IS NULL;
+  -- WHERE locked_until IS NULL OR locked_until < now(); -- now() is not immutable so postgres does not accept this index predicate :(. Can we fix this?
 
