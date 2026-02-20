@@ -8,6 +8,8 @@ import (
 )
 
 func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
+	t.app.SetResourceConfig(DefaultResourceConfig)
+
 	t.Run("create resources", func() {
 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
@@ -145,6 +147,8 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 }
 
 func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
+	t.app.SetResourceConfig(DefaultResourceConfig)
+
 	t.Run("create resources in different indices", func() {
 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
@@ -219,6 +223,8 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 }
 
 func (t *TestSuite) Test_Create_WithRelation() {
+	t.app.SetResourceConfig(DefaultResourceConfig)
+
 	t.Run("create resource with relation", func() {
 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
@@ -243,6 +249,218 @@ func (t *TestSuite) Test_Create_WithRelation() {
 			t.Require().NoError(err)
 			t.Require().Equal("1", resp.Hits[0].Id)
 			relations := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+			t.Require().Len(relations, 1)
+			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+		})
+	})
+}
+
+// TODO: Related resource, both on create of primary and create of one with relation
+// func (t *TestSuite) Test_RelatedRelations_OnCreate() {
+// 	t.app.SetResourceConfig(RelatedResourceConfig)
+
+// 	t.Run("create resource with related relations", func() {
+// 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+// 			Resource: &index.Resource{
+// 				Type: "b",
+// 				Id:   "1",
+// 			},
+// 			Data: &structpb.Struct{},
+// 		})
+// 		t.Require().NoError(err)
+
+// 		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+// 			Resource: &index.Resource{
+// 				Type: "a",
+// 				Id:   "1",
+// 			},
+// 			Data: &structpb.Struct{},
+// 			Relations: []*index.Relation{
+// 				{
+// 					Resource: &index.Resource{
+// 						Type: "b",
+// 						Id:   "1",
+// 					},
+// 				},
+// 			},
+// 		})
+// 		t.Require().NoError(err)
+
+// 		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+// 			Resource: &index.Resource{
+// 				Type: "c",
+// 				Id:   "1",
+// 			},
+// 			Data: &structpb.Struct{},
+// 			Relations: []*index.Relation{
+// 				{
+// 					Resource: &index.Resource{
+// 						Type: "a",
+// 						Id:   "1",
+// 					},
+// 				},
+// 			},
+// 		})
+// 		t.Require().NoError(err)
+
+// 		t.worker.Drain(t.T().Context())
+// 	})
+
+// 	// TODO: Try nested t.Run
+
+// 	t.Run("verify related relations", func() {
+// 		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+// 		t.Require().NoError(err)
+// 		t.Require().Equal("1", resp.Hits[0].Id)
+
+// 		relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+// 		t.Require().Len(relations, 1)
+// 		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+
+// 		relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+// 		t.Require().Len(relations, 1)
+// 		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+// 	})
+// }
+
+func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
+	t.app.SetResourceConfig(RelatedResourceConfig)
+
+	t.Run("create resource with related relations", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "b",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+			Relations: []*index.Relation{
+				{
+					Resource: &index.Resource{
+						Type: "b",
+						Id:   "1",
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "c",
+				Id:   "1",
+			},
+			Data:      &structpb.Struct{},
+			Relations: []*index.Relation{},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
+			Resource: &index.Resource{
+				Type: "c",
+				Id:   "1",
+			},
+			Relation: &index.Relation{
+				Resource: &index.Resource{
+					Type: "a",
+					Id:   "1",
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		t.worker.Drain(t.T().Context())
+
+		t.Run("verify related relations", func() {
+			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+			t.Require().NoError(err)
+			t.Require().Equal("1", resp.Hits[0].Id)
+
+			relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+			t.Require().Len(relations, 1)
+			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+
+			relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+			t.Require().Len(relations, 1)
+			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+		})
+	})
+}
+
+func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
+	t.app.SetResourceConfig(RelatedResourceConfig)
+
+	t.Run("create resource with related relations", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "b",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Data:      &structpb.Struct{},
+			Relations: []*index.Relation{},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "c",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+			Relations: []*index.Relation{
+				{
+					Resource: &index.Resource{
+						Type: "a",
+						Id:   "1",
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		err = t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Relation: &index.Relation{
+				Resource: &index.Resource{
+					Type: "b",
+					Id:   "1",
+				},
+			},
+		})
+		t.Require().NoError(err)
+
+		t.worker.Drain(t.T().Context())
+
+		t.Run("verify related relations", func() {
+			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+			t.Require().NoError(err)
+			t.Require().Equal("1", resp.Hits[0].Id)
+
+			relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+			t.Require().Len(relations, 1)
+			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+
+			relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
 			t.Require().Len(relations, 1)
 			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
 		})

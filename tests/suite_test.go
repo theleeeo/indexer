@@ -41,9 +41,127 @@ type TestSuite struct {
 	worker       *jobqueue.Worker
 }
 
+var DefaultResourceConfig = resource.Configs{
+	{
+		Resource: "a",
+		Fields: []resource.FieldConfig{
+			{
+				Name: "field1",
+			},
+			{
+				Name: "field2",
+			},
+		},
+		Relations: []resource.RelationConfig{
+			{
+				Resource: "b",
+				Fields: []resource.FieldConfig{
+					{
+						Name: "field1",
+					},
+					{
+						Name: "field2",
+					},
+				},
+			},
+		},
+	},
+	{
+		Resource: "b",
+		Fields: []resource.FieldConfig{
+			{
+				Name: "field1",
+			},
+			{
+				Name: "field2",
+			},
+		},
+		Relations: []resource.RelationConfig{},
+	},
+}
+
+var RelatedResourceConfig = resource.Configs{
+	{
+		Resource: "a",
+		Fields: []resource.FieldConfig{
+			{
+				Name: "f1",
+			},
+		},
+		Relations: []resource.RelationConfig{
+			{
+				Resource: "b",
+				Fields: []resource.FieldConfig{
+					{
+						Name: "f1",
+					},
+				},
+			},
+		},
+	},
+	{
+		Resource: "b",
+		Fields: []resource.FieldConfig{
+			{
+				Name: "f1",
+			},
+		},
+		Relations: []resource.RelationConfig{
+			{
+				Resource: "a",
+				Fields: []resource.FieldConfig{
+					{
+						Name: "f1",
+					},
+				},
+			},
+		},
+	},
+	{
+		Resource: "c",
+		Fields: []resource.FieldConfig{
+			{
+				Name: "f1",
+			},
+		},
+		Relations: []resource.RelationConfig{
+			{
+				Resource: "a",
+				Fields: []resource.FieldConfig{
+					{
+						Name: "f1",
+					},
+				},
+			},
+			{
+				Resource: "b",
+				Fields: []resource.FieldConfig{
+					{
+						Name: "f1",
+					},
+				},
+				Dependance: "a",
+			},
+		},
+	},
+}
+
+func (t *TestSuite) verifyResourceConfigs() {
+	must(t.T(), DefaultResourceConfig.Validate())
+	must(t.T(), RelatedResourceConfig.Validate())
+}
+
+func must(t *testing.T, err error) {
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func (t *TestSuite) SetupSuite() {
 	log.SetOutput(os.Stderr)
 	t.T().Log("setting up the suite")
+
+	t.verifyResourceConfigs()
 
 	wg := sync.WaitGroup{}
 	containerCtx, cancel := context.WithTimeout(context.Background(), 1*time.Minute)
@@ -128,46 +246,7 @@ func (t *TestSuite) SetupSuite() {
 		t.T().Fatalf("failed to apply job queue schema: %v", err)
 	}
 
-	resources := []*resource.Config{
-		{
-			Resource: "a",
-			Fields: []resource.FieldConfig{
-				{
-					Name: "field1",
-				},
-				{
-					Name: "field2",
-				},
-			},
-			Relations: []resource.RelationConfig{
-				{
-					Resource: "b",
-					Fields: []resource.FieldConfig{
-						{
-							Name: "field1",
-						},
-						{
-							Name: "field2",
-						},
-					},
-				},
-			},
-		},
-		{
-			Resource: "b",
-			Fields: []resource.FieldConfig{
-				{
-					Name: "field1",
-				},
-				{
-					Name: "field2",
-				},
-			},
-			Relations: []resource.RelationConfig{},
-		},
-	}
-
-	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources, jobqueue.NewQueue(dbpool))
+	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), jobqueue.NewQueue(dbpool))
 
 	t.worker = jobqueue.NewWorker(t.pool, t.app.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),

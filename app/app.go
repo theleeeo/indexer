@@ -30,12 +30,15 @@ type App struct {
 	resources resource.Configs
 }
 
-func New(st *store.PostgresStore, esClient *es.Client, resources resource.Configs, queue *jobqueue.Queue) *App {
+func (a *App) SetResourceConfig(resources resource.Configs) {
+	a.resources = resources
+}
+
+func New(st *store.PostgresStore, esClient *es.Client, queue *jobqueue.Queue) *App {
 	return &App{
-		st:        st,
-		es:        esClient,
-		resources: resources,
-		queue:     queue,
+		st:    st,
+		es:    esClient,
+		queue: queue,
 	}
 }
 
