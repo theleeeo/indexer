@@ -26,6 +26,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 
 		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
@@ -44,6 +45,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 	})
 
 	t.Run("no query or filters", func() {
@@ -103,6 +105,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 
 		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{
 			Resource: "a",
@@ -121,6 +124,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 
 		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
 		t.Require().NoError(err)
@@ -136,6 +140,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 	})
 }
 
@@ -158,6 +163,8 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 			Data: &structpb.Struct{},
 		})
 		t.Require().NoError(err)
+
+		t.worker.Drain(t.T().Context())
 	})
 
 	t.Run("search in index a", func() {
@@ -196,6 +203,8 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 			},
 		})
 		t.Require().NoError(err)
+
+		t.worker.Drain(t.T().Context())
 	})
 
 	t.Run("verify deletions", func() {
@@ -227,6 +236,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 			},
 		})
 		t.Require().NoError(err)
+		t.worker.Drain(t.T().Context())
 
 		t.Run("verify relation", func() {
 			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"indexer/app"
 	"indexer/es"
+	"indexer/jobqueue"
 	"indexer/resource"
 	"indexer/store"
 	"log"
@@ -35,6 +36,9 @@ type TestSuite struct {
 	esClient *elasticsearch.Client
 
 	app *app.App
+
+	cancelWorker context.CancelFunc
+	worker       *jobqueue.Worker
 }
 
 func (t *TestSuite) SetupSuite() {
@@ -106,13 +110,22 @@ func (t *TestSuite) SetupSuite() {
 	}
 	t.pool = dbpool
 
-	schema, err := os.ReadFile(filepath.Join("..", "store", "pg_schema.sql"))
+	appSchema, err := os.ReadFile(filepath.Join("..", "store", "pg_schema.sql"))
 	if err != nil {
 		t.T().Fatal(err)
 	}
 
-	if _, err := t.pool.Exec(t.T().Context(), string(schema)); err != nil {
+	if _, err := t.pool.Exec(t.T().Context(), string(appSchema)); err != nil {
 		t.T().Fatalf("failed to apply schema: %v", err)
+	}
+
+	jobQueueSchema, err := os.ReadFile(filepath.Join("..", "jobqueue", "schema.sql"))
+	if err != nil {
+		t.T().Fatal(err)
+	}
+
+	if _, err := t.pool.Exec(t.T().Context(), string(jobQueueSchema)); err != nil {
+		t.T().Fatalf("failed to apply job queue schema: %v", err)
 	}
 
 	resources := []*resource.Config{
@@ -126,6 +139,19 @@ func (t *TestSuite) SetupSuite() {
 					Name: "field2",
 				},
 			},
+			Relations: []resource.RelationConfig{
+				{
+					Resource: "b",
+					Fields: []resource.FieldConfig{
+						{
+							Name: "field1",
+						},
+						{
+							Name: "field2",
+						},
+					},
+				},
+			},
 		},
 		{
 			Resource: "b",
@@ -137,10 +163,19 @@ func (t *TestSuite) SetupSuite() {
 					Name: "field2",
 				},
 			},
+			Relations: []resource.RelationConfig{},
 		},
 	}
 
-	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources, nil)
+	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), resources, jobqueue.NewQueue(dbpool))
+
+	t.worker = jobqueue.NewWorker(t.pool, t.app.HandlerFunc(), jobqueue.WorkerConfig{
+		Logger: log.Default(),
+	})
+
+	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	t.cancelWorker = cancelWorker
+	go t.worker.Run(workerCtx)
 }
 
 func (t *TestSuite) TearDownSuite() {
@@ -153,6 +188,10 @@ func (t *TestSuite) TearDownSuite() {
 	if err := testcontainers.TerminateContainer(t.pgContainer); err != nil {
 		log.Printf("failed to terminate postgres container: %s", err)
 	}
+
+	t.cancelWorker()
+
+	t.worker.Wait()
 }
 
 func (t *TestSuite) SetupTest() {
