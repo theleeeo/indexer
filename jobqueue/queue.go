@@ -68,3 +68,18 @@ func (q *Queue) Enqueue(
 	}
 	return id, nil
 }
+
+func (q *Queue) workExists(ctx context.Context) (bool, error) {
+	var hasWork bool
+	err := q.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM jobs
+			WHERE (status = 'queued' AND run_after <= now())
+			   OR status = 'running'
+		)
+	`).Scan(&hasWork)
+	if err != nil {
+		return false, err
+	}
+	return hasWork, nil
+}

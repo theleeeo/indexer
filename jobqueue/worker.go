@@ -322,3 +322,22 @@ func sleepWithJitter(ctx context.Context, base time.Duration, pct float64) {
 	case <-t.C:
 	}
 }
+
+// Drain blocks until there are no more running or claimable jobs. Useful for testing.
+func (w *Worker) Drain(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		hasWork, err := w.q.workExists(ctx)
+		if err != nil {
+			w.logf("Drain: hasWork error: %v", err)
+			sleepWithJitter(ctx, 500*time.Millisecond, 0.5)
+			continue
+		}
+		if !hasWork {
+			return
+		}
+		sleepWithJitter(ctx, 500*time.Millisecond, 0.5)
+	}
+}
