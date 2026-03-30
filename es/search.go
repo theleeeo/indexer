@@ -5,9 +5,10 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
-	"indexer/gen/search/v1"
 	"io"
 	"time"
+
+	"github.com/theleeeo/indexer/gen/search/v1"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )

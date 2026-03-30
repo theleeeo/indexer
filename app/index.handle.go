@@ -3,11 +3,12 @@ package app
 import (
 	"context"
 	"fmt"
-	"indexer/gen/index/v1"
-	"indexer/model"
-	"indexer/resource"
-	"indexer/store"
 	"log/slog"
+
+	"github.com/theleeeo/indexer/gen/index/v1"
+	"github.com/theleeeo/indexer/model"
+	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/store"
 )
 
 type idStruct struct {

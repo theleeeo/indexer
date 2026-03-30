@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"indexer/gen/index/v1"
-	"indexer/gen/search/v1"
+	"github.com/theleeeo/indexer/gen/index/v1"
+	"github.com/theleeeo/indexer/gen/search/v1"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )

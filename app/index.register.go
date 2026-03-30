@@ -3,10 +3,11 @@ package app
 import (
 	"context"
 	"fmt"
-	"indexer/gen/index/v1"
-	"indexer/model"
-	"indexer/resource"
-	"indexer/store"
+
+	"github.com/theleeeo/indexer/gen/index/v1"
+	"github.com/theleeeo/indexer/model"
+	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/store"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )

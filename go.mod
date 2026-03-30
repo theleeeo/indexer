@@ -1,4 +1,4 @@
-module indexer
+module github.com/theleeeo/indexer
 
 go 1.25
 

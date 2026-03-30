@@ -3,10 +3,11 @@ package app
 import (
 	"errors"
 	"fmt"
-	"indexer/es"
-	"indexer/jobqueue"
-	"indexer/resource"
-	"indexer/store"
+
+	"github.com/theleeeo/indexer/es"
+	"github.com/theleeeo/indexer/jobqueue"
+	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/store"
 )
 
 var (

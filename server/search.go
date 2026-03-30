@@ -3,8 +3,9 @@ package server
 import (
 	"context"
 	"errors"
-	"indexer/app"
-	"indexer/gen/search/v1"
+
+	"github.com/theleeeo/indexer/app"
+	"github.com/theleeeo/indexer/gen/search/v1"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

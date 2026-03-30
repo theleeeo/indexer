@@ -3,7 +3,8 @@ package app
 import (
 	"context"
 	"errors"
-	"indexer/gen/search/v1"
+
+	"github.com/theleeeo/indexer/gen/search/v1"
 )
 
 func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {

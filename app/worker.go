@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
-	"indexer/gen/index/v1"
-	"indexer/jobqueue"
+
+	"github.com/theleeeo/indexer/gen/index/v1"
+	"github.com/theleeeo/indexer/jobqueue"
 
 	"google.golang.org/protobuf/encoding/protojson"
 )

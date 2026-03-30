@@ -1,7 +1,7 @@
 package store
 
 import (
-	"indexer/model"
+	"github.com/theleeeo/indexer/model"
 )
 
 type Relation struct {
