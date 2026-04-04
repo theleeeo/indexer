@@ -27,10 +27,11 @@ func (c Configs) Validate() error {
 	return nil
 }
 
-// Verifies that all relations are correctly defined and precalculates fields regarding bidirectional relations
+// verifyFieldRelations verifies that all relations reference existing resources
+// and that their field lists match the target resource's field definitions.
 func (c Configs) verifyFieldRelations() error {
 	for _, rCfg := range c {
-		for i, currentRel := range rCfg.Relations {
+		for _, currentRel := range rCfg.Relations {
 			// Verify that the related resource exists
 			relRCfg := c.Get(currentRel.Resource)
 			if relRCfg == nil {
@@ -43,43 +44,6 @@ func (c Configs) verifyFieldRelations() error {
 					return relF.Name == f.Name
 				}) {
 					return fmt.Errorf("relation '%s'->'%s' specifies field '%s' which does not exist on '%s'", rCfg.Resource, currentRel.Resource, f.Name, currentRel.Resource)
-				}
-			}
-
-			if currentRel.Dependance != "" {
-				// Verify that the dependance resource exists
-				depRCfg := c.Get(currentRel.Dependance)
-				if depRCfg == nil {
-					return fmt.Errorf("relation '%s'->'%s' has dependance '%s' which does not exist", rCfg.Resource, currentRel.Resource, currentRel.Dependance)
-				}
-
-				// Verify that the dependance resource has the related resource as relation
-				depResIdx := slices.IndexFunc(depRCfg.Relations, func(depRel RelationConfig) bool {
-					return depRel.Resource == currentRel.Resource
-				})
-				if depResIdx == -1 {
-					return fmt.Errorf("relation '%s'->'%s' has dependance '%s' which does not have a relation to '%s'", rCfg.Resource, currentRel.Resource, currentRel.Dependance, currentRel.Resource)
-				}
-				depRCfg.Relations[depResIdx].UpdateResources = append(depRCfg.Relations[depResIdx].UpdateResources, rCfg.Resource)
-
-				// Verify that the dependance resource exists as a relation on the current resource
-				depRelidx := slices.IndexFunc(rCfg.Relations, func(depRel RelationConfig) bool {
-					return depRel.Resource == currentRel.Dependance
-				})
-				if depRelidx == -1 {
-					return fmt.Errorf("relation '%s'->'%s' has dependance '%s' which is not a relation on '%s'", rCfg.Resource, currentRel.Resource, currentRel.Dependance, rCfg.Resource)
-				}
-				// Set the UpdateResources field on the dependance relation
-				rCfg.Relations[depRelidx].UpdateResources = append(rCfg.Relations[depRelidx].UpdateResources, rCfg.Resource)
-
-			}
-
-			// If the related resource has a relation back to the original resource, mark both as bidirectional
-			for j, relR := range relRCfg.Relations {
-				if relR.Resource == rCfg.Resource {
-					rCfg.Relations[i].Bidirectional = true
-					relRCfg.Relations[j].Bidirectional = true
-					break
 				}
 			}
 		}

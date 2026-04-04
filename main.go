@@ -16,8 +16,10 @@ import (
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/gen/search/v1"
 	"github.com/theleeeo/indexer/jobqueue"
+	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/server"
+	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -76,20 +78,26 @@ func main() {
 
 	slog.SetLogLoggerLevel(slog.LevelDebug)
 
-	// st := store.NewMemoryStore()
 	st := store.NewPostgresStore(dbpool)
 
 	queue := jobqueue.NewQueue(dbpool)
 
-	app := app.New(st, esClientImpl, queue)
-	app.SetResourceConfig(resources)
+	// Source provider — replace this with a real source adapter implementation.
+	// For now we use a nil provider; real deployments must supply one.
+	var sourceProvider source.Provider // TODO: wire real source provider
 
-	worker := jobqueue.NewWorker(dbpool, app.HandlerFunc(), jobqueue.WorkerConfig{
+	application := app.New(st, esClientImpl, queue)
+	application.SetResourceConfig(resources)
+
+	builder := projection.NewBuilder(sourceProvider, resources, st)
+	application.SetBuilder(builder)
+
+	worker := jobqueue.NewWorker(dbpool, application.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),
 	})
 
-	idxSrv := server.NewIndexer(app)
-	searchSrv := server.NewSearcher(app)
+	idxSrv := server.NewIndexer(application)
+	searchSrv := server.NewSearcher(application)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

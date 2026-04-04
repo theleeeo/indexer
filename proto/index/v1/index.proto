@@ -2,65 +2,43 @@ syntax = "proto3";
 
 package index.v1;
 
-import "google/protobuf/struct.proto";
-
 option go_package = "indexer/gen/index/v1;index";
 
 service IndexService {
-  rpc Publish(PublishRequest) returns (PublishResponse);
-  rpc PublishBatch(PublishBatchRequest) returns (PublishBatchResponse);
+  // NotifyChange informs the indexer that a resource has changed.
+  // The indexer determines which search documents are affected and rebuilds
+  // them from authoritative source data.
+  rpc NotifyChange(NotifyChangeRequest) returns (NotifyChangeResponse);
+
+  // NotifyChangeBatch is the batched version of NotifyChange.
+  rpc NotifyChangeBatch(NotifyChangeBatchRequest)
+      returns (NotifyChangeBatchResponse);
 }
 
-message PublishRequest { ChangeEvent event = 1; }
+message NotifyChangeRequest { ChangeNotification notification = 1; }
 
-message PublishResponse {}
+message NotifyChangeResponse {}
 
-message PublishBatchRequest { repeated ChangeEvent events = 1; }
-
-message PublishBatchResponse {}
-
-message ChangeEvent {
-  oneof payload {
-    CreatePayload create_payload = 1;
-    UpdatePayload update_payload = 2;
-    DeletePayload delete_payload = 3;
-    AddRelationPayload add_relation_payload = 4;
-    RemoveRelationPayload remove_relation_payload = 5;
-    SetRelationsPayload set_relations_payload = 6;
-  }
+message NotifyChangeBatchRequest {
+  repeated ChangeNotification notifications = 1;
 }
 
-message CreatePayload {
-  Resource Resource = 1;
-  google.protobuf.Struct data = 2;
-  repeated Relation relations = 3;
+message NotifyChangeBatchResponse {}
+
+// ChangeNotification describes a single resource change event from a source
+// service.
+message ChangeNotification {
+  // The type of change.
+  ChangeKind kind = 1;
+
+  // The resource that changed.
+  string resource_type = 2;
+  string resource_id = 3;
 }
 
-message UpdatePayload {
-  Resource Resource = 1;
-  google.protobuf.Struct data = 2;
-}
-
-message DeletePayload { Resource Resource = 1; }
-
-message AddRelationPayload {
-  Resource Resource = 1;
-  Relation relation = 2;
-}
-
-message RemoveRelationPayload {
-  Resource Resource = 1;
-  Relation relation = 2;
-}
-
-message SetRelationsPayload {
-  Resource Resource = 1;
-  repeated Relation Relations = 2;
-}
-
-message Relation { Resource resource = 1; }
-
-message Resource {
-  string type = 1;
-  string id = 2;
+enum ChangeKind {
+  CHANGE_KIND_UNSPECIFIED = 0;
+  CHANGE_KIND_CREATED = 1;
+  CHANGE_KIND_UPDATED = 2;
+  CHANGE_KIND_DELETED = 3;
 }

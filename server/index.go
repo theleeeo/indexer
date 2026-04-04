@@ -3,15 +3,13 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
-	"time"
 
 	"github.com/theleeeo/indexer/app"
 	"github.com/theleeeo/indexer/gen/index/v1"
+	"github.com/theleeeo/indexer/source"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IndexerServer struct {
@@ -26,67 +24,63 @@ func NewIndexer(app *app.App) *IndexerServer {
 	}
 }
 
-func (s *IndexerServer) Publish(ctx context.Context, req *index.PublishRequest) (*index.PublishResponse, error) {
-	if req.Event == nil {
-		return nil, status.Error(codes.InvalidArgument, "event is required")
+func (s *IndexerServer) NotifyChange(ctx context.Context, req *index.NotifyChangeRequest) (*index.NotifyChangeResponse, error) {
+	if req.Notification == nil {
+		return nil, status.Error(codes.InvalidArgument, "notification is required")
 	}
 
-	if err := s.applyOne(ctx, req.Event); err != nil {
-		if errors.Is(err, app.ErrUnknownResource) {
-			return nil, status.Error(codes.FailedPrecondition, "unknown resource")
-		}
+	n := protoToNotification(req.Notification)
 
-		var invalidArgsErr *app.InvalidArgumentError
-		if errors.As(err, &invalidArgsErr) {
-			return nil, status.Error(codes.InvalidArgument, invalidArgsErr.Msg)
-		}
-		return nil, err
+	if err := s.app.RegisterChange(ctx, n); err != nil {
+		return nil, mapAppError(err)
 	}
 
-	return &index.PublishResponse{}, nil
+	return &index.NotifyChangeResponse{}, nil
 }
 
-func (s *IndexerServer) PublishBatch(ctx context.Context, req *index.PublishBatchRequest) (*index.PublishBatchResponse, error) {
-	if len(req.Events) == 0 {
-		return &index.PublishBatchResponse{}, nil
+func (s *IndexerServer) NotifyChangeBatch(ctx context.Context, req *index.NotifyChangeBatchRequest) (*index.NotifyChangeBatchResponse, error) {
+	if len(req.Notifications) == 0 {
+		return &index.NotifyChangeBatchResponse{}, nil
 	}
 
-	for _, ev := range req.Events {
-		if ev == nil {
+	for _, pn := range req.Notifications {
+		if pn == nil {
 			continue
 		}
-
-		// TODO: Apply in a transaction
-		if err := s.applyOne(ctx, ev); err != nil {
-			return nil, err
+		n := protoToNotification(pn)
+		if err := s.app.RegisterChange(ctx, n); err != nil {
+			return nil, mapAppError(err)
 		}
 	}
 
-	return &index.PublishBatchResponse{}, nil
+	return &index.NotifyChangeBatchResponse{}, nil
 }
 
-func (s *IndexerServer) applyOne(ctx context.Context, ev *index.ChangeEvent) error {
-	switch p := ev.Payload.(type) {
-	case *index.ChangeEvent_CreatePayload:
-		return s.app.RegisterCreate(ctx, p.CreatePayload)
-	case *index.ChangeEvent_UpdatePayload:
-		return s.app.RegisterUpdate(ctx, p.UpdatePayload)
-	case *index.ChangeEvent_DeletePayload:
-		return s.app.RegisterDelete(ctx, p.DeletePayload)
-	case *index.ChangeEvent_SetRelationsPayload:
-		return s.app.RegisterSetRelations(ctx, p.SetRelationsPayload)
-	case *index.ChangeEvent_AddRelationPayload:
-		return s.app.RegisterAddRelation(ctx, p.AddRelationPayload)
-	case *index.ChangeEvent_RemoveRelationPayload:
-		return s.app.RegisterRemoveRelation(ctx, p.RemoveRelationPayload)
-	default:
-		return fmt.Errorf("unknown payload")
+func protoToNotification(pn *index.ChangeNotification) source.Notification {
+	n := source.Notification{
+		ResourceType: pn.ResourceType,
+		ResourceID:   pn.ResourceId,
 	}
+
+	switch pn.Kind {
+	case index.ChangeKind_CHANGE_KIND_CREATED:
+		n.Kind = source.ChangeCreated
+	case index.ChangeKind_CHANGE_KIND_UPDATED:
+		n.Kind = source.ChangeUpdated
+	case index.ChangeKind_CHANGE_KIND_DELETED:
+		n.Kind = source.ChangeDeleted
+	}
+
+	return n
 }
 
-func zeroTimeIfNil(t *timestamppb.Timestamp) time.Time {
-	if t == nil {
-		return time.Time{}
+func mapAppError(err error) error {
+	if errors.Is(err, app.ErrUnknownResource) {
+		return status.Error(codes.InvalidArgument, "unknown resource")
 	}
-	return t.AsTime()
+	var invalidArgsErr *app.InvalidArgumentError
+	if errors.As(err, &invalidArgsErr) {
+		return status.Error(codes.InvalidArgument, invalidArgsErr.Msg)
+	}
+	return status.Error(codes.Internal, err.Error())
 }

@@ -5,45 +5,24 @@ import (
 	"encoding/json/v2"
 	"fmt"
 
-	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/jobqueue"
-
-	"google.golang.org/protobuf/encoding/protojson"
 )
 
 func (a *App) HandlerFunc() jobqueue.Handler {
 	return func(ctx context.Context, job jobqueue.Job) error {
 		switch job.Type {
-		case "create":
-			p := CreatePayload{}
+		case "rebuild":
+			p := RebuildPayload{}
 			if err := json.Unmarshal(job.Payload, &p); err != nil {
-				return fmt.Errorf("failed to unmarshal payload: %w", err)
+				return fmt.Errorf("failed to unmarshal rebuild payload: %w", err)
 			}
-			return a.handleCreate(ctx, p)
-		case "update":
-			p := &index.UpdatePayload{}
-			if err := protojson.Unmarshal(job.Payload, p); err != nil {
-				return fmt.Errorf("failed to unmarshal payload: %w", err)
-			}
-			return a.handleUpdate(ctx, p)
+			return a.handleRebuild(ctx, p)
 		case "delete":
-			p := &index.DeletePayload{}
-			if err := protojson.Unmarshal(job.Payload, p); err != nil {
-				return fmt.Errorf("failed to unmarshal payload: %w", err)
+			p := RebuildPayload{}
+			if err := json.Unmarshal(job.Payload, &p); err != nil {
+				return fmt.Errorf("failed to unmarshal delete payload: %w", err)
 			}
 			return a.handleDelete(ctx, p)
-		case "add_relation":
-			p := AddRelationPayload{}
-			if err := json.Unmarshal(job.Payload, &p); err != nil {
-				return fmt.Errorf("failed to unmarshal payload: %w", err)
-			}
-			return a.handleAddRelation(ctx, p)
-		case "remove_relation":
-			p := RemoveRelationPayload{}
-			if err := json.Unmarshal(job.Payload, &p); err != nil {
-				return fmt.Errorf("failed to unmarshal payload: %w", err)
-			}
-			return a.handleRemoveRelation(ctx, p)
 		default:
 			return fmt.Errorf("unknown job type: %s", job.Type)
 		}

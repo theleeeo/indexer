@@ -60,17 +60,4 @@ type QueryConfig struct {
 type RelationConfig struct {
 	Resource string        `yaml:"resource"`
 	Fields   []FieldConfig `yaml:"fields"`
-	// If set, this relation is dependent on this relation on this resource.
-	// IE. if A has a relation to C with dependance B, when a B is added to A, the C on that B should be added to A as well.
-	// This is used for relations that are not directly represented in the data, but can be inferred from other relations.
-	Dependance string `yaml:"dependance"`
-
-	// Calculated:
-
-	// If true, the related resource has a relation back to the original resource, so updates should be propagated in both directions
-	Bidirectional bool
-
-	// UpdateResources holds the list of related resources that should be updated when this relation is updated.
-	// This is calculated based on the Dependance field and is used to propagate updates to dependent resources.
-	UpdateResources []string
 }

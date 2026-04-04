@@ -19,16 +19,20 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IndexService_Publish_FullMethodName      = "/index.v1.IndexService/Publish"
-	IndexService_PublishBatch_FullMethodName = "/index.v1.IndexService/PublishBatch"
+	IndexService_NotifyChange_FullMethodName      = "/index.v1.IndexService/NotifyChange"
+	IndexService_NotifyChangeBatch_FullMethodName = "/index.v1.IndexService/NotifyChangeBatch"
 )
 
 // IndexServiceClient is the client API for IndexService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IndexServiceClient interface {
-	Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error)
-	PublishBatch(ctx context.Context, in *PublishBatchRequest, opts ...grpc.CallOption) (*PublishBatchResponse, error)
+	// NotifyChange informs the indexer that a resource has changed.
+	// The indexer determines which search documents are affected and rebuilds
+	// them from authoritative source data.
+	NotifyChange(ctx context.Context, in *NotifyChangeRequest, opts ...grpc.CallOption) (*NotifyChangeResponse, error)
+	// NotifyChangeBatch is the batched version of NotifyChange.
+	NotifyChangeBatch(ctx context.Context, in *NotifyChangeBatchRequest, opts ...grpc.CallOption) (*NotifyChangeBatchResponse, error)
 }
 
 type indexServiceClient struct {
@@ -39,20 +43,20 @@ func NewIndexServiceClient(cc grpc.ClientConnInterface) IndexServiceClient {
 	return &indexServiceClient{cc}
 }
 
-func (c *indexServiceClient) Publish(ctx context.Context, in *PublishRequest, opts ...grpc.CallOption) (*PublishResponse, error) {
+func (c *indexServiceClient) NotifyChange(ctx context.Context, in *NotifyChangeRequest, opts ...grpc.CallOption) (*NotifyChangeResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PublishResponse)
-	err := c.cc.Invoke(ctx, IndexService_Publish_FullMethodName, in, out, cOpts...)
+	out := new(NotifyChangeResponse)
+	err := c.cc.Invoke(ctx, IndexService_NotifyChange_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *indexServiceClient) PublishBatch(ctx context.Context, in *PublishBatchRequest, opts ...grpc.CallOption) (*PublishBatchResponse, error) {
+func (c *indexServiceClient) NotifyChangeBatch(ctx context.Context, in *NotifyChangeBatchRequest, opts ...grpc.CallOption) (*NotifyChangeBatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(PublishBatchResponse)
-	err := c.cc.Invoke(ctx, IndexService_PublishBatch_FullMethodName, in, out, cOpts...)
+	out := new(NotifyChangeBatchResponse)
+	err := c.cc.Invoke(ctx, IndexService_NotifyChangeBatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -63,8 +67,12 @@ func (c *indexServiceClient) PublishBatch(ctx context.Context, in *PublishBatchR
 // All implementations should embed UnimplementedIndexServiceServer
 // for forward compatibility.
 type IndexServiceServer interface {
-	Publish(context.Context, *PublishRequest) (*PublishResponse, error)
-	PublishBatch(context.Context, *PublishBatchRequest) (*PublishBatchResponse, error)
+	// NotifyChange informs the indexer that a resource has changed.
+	// The indexer determines which search documents are affected and rebuilds
+	// them from authoritative source data.
+	NotifyChange(context.Context, *NotifyChangeRequest) (*NotifyChangeResponse, error)
+	// NotifyChangeBatch is the batched version of NotifyChange.
+	NotifyChangeBatch(context.Context, *NotifyChangeBatchRequest) (*NotifyChangeBatchResponse, error)
 }
 
 // UnimplementedIndexServiceServer should be embedded to have
@@ -74,11 +82,11 @@ type IndexServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIndexServiceServer struct{}
 
-func (UnimplementedIndexServiceServer) Publish(context.Context, *PublishRequest) (*PublishResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Publish not implemented")
+func (UnimplementedIndexServiceServer) NotifyChange(context.Context, *NotifyChangeRequest) (*NotifyChangeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyChange not implemented")
 }
-func (UnimplementedIndexServiceServer) PublishBatch(context.Context, *PublishBatchRequest) (*PublishBatchResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method PublishBatch not implemented")
+func (UnimplementedIndexServiceServer) NotifyChangeBatch(context.Context, *NotifyChangeBatchRequest) (*NotifyChangeBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method NotifyChangeBatch not implemented")
 }
 func (UnimplementedIndexServiceServer) testEmbeddedByValue() {}
 
@@ -100,38 +108,38 @@ func RegisterIndexServiceServer(s grpc.ServiceRegistrar, srv IndexServiceServer)
 	s.RegisterService(&IndexService_ServiceDesc, srv)
 }
 
-func _IndexService_Publish_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishRequest)
+func _IndexService_NotifyChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyChangeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IndexServiceServer).Publish(ctx, in)
+		return srv.(IndexServiceServer).NotifyChange(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: IndexService_Publish_FullMethodName,
+		FullMethod: IndexService_NotifyChange_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).Publish(ctx, req.(*PublishRequest))
+		return srv.(IndexServiceServer).NotifyChange(ctx, req.(*NotifyChangeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _IndexService_PublishBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(PublishBatchRequest)
+func _IndexService_NotifyChangeBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyChangeBatchRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(IndexServiceServer).PublishBatch(ctx, in)
+		return srv.(IndexServiceServer).NotifyChangeBatch(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: IndexService_PublishBatch_FullMethodName,
+		FullMethod: IndexService_NotifyChangeBatch_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IndexServiceServer).PublishBatch(ctx, req.(*PublishBatchRequest))
+		return srv.(IndexServiceServer).NotifyChangeBatch(ctx, req.(*NotifyChangeBatchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -144,12 +152,12 @@ var IndexService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*IndexServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "Publish",
-			Handler:    _IndexService_Publish_Handler,
+			MethodName: "NotifyChange",
+			Handler:    _IndexService_NotifyChange_Handler,
 		},
 		{
-			MethodName: "PublishBatch",
-			Handler:    _IndexService_PublishBatch_Handler,
+			MethodName: "NotifyChangeBatch",
+			Handler:    _IndexService_NotifyChangeBatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

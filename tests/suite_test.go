@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/theleeeo/indexer/app"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/jobqueue"
+	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/store"
 
@@ -25,6 +27,65 @@ import (
 	esContainer "github.com/testcontainers/testcontainers-go/modules/elasticsearch"
 	pgContainer "github.com/testcontainers/testcontainers-go/modules/postgres"
 )
+
+// FakeProvider is a test source.Provider that serves data from in-memory maps.
+type FakeProvider struct {
+	mu        sync.Mutex
+	resources map[string]map[string]any   // "type|id" -> data
+	relations map[string][]map[string]any // "rootType|rootID|relType" -> []data
+}
+
+func NewFakeProvider() *FakeProvider {
+	return &FakeProvider{
+		resources: make(map[string]map[string]any),
+		relations: make(map[string][]map[string]any),
+	}
+}
+
+func (f *FakeProvider) Clear() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resources = make(map[string]map[string]any)
+	f.relations = make(map[string][]map[string]any)
+}
+
+func (f *FakeProvider) SetResource(resourceType, resourceID string, data map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.resources[resourceType+"|"+resourceID] = data
+}
+
+func (f *FakeProvider) DeleteResource(resourceType, resourceID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.resources, resourceType+"|"+resourceID)
+}
+
+func (f *FakeProvider) SetRelated(rootType, rootID, relationType string, related []map[string]any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.relations[rootType+"|"+rootID+"|"+relationType] = related
+}
+
+func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID string) (map[string]any, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	data, ok := f.resources[resourceType+"|"+resourceID]
+	if !ok {
+		return nil, nil
+	}
+	return data, nil
+}
+
+func (f *FakeProvider) FetchRelated(_ context.Context, rootType, rootID, relationType string) ([]map[string]any, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	data, ok := f.relations[rootType+"|"+rootID+"|"+relationType]
+	if !ok {
+		return nil, nil
+	}
+	return data, nil
+}
 
 type TestSuite struct {
 	suite.Suite
@@ -40,29 +101,24 @@ type TestSuite struct {
 
 	cancelWorker context.CancelFunc
 	worker       *jobqueue.Worker
+
+	fakeProvider *FakeProvider
+	st           *store.PostgresStore
 }
 
 var DefaultResourceConfig = resource.Configs{
 	{
 		Resource: "a",
 		Fields: []resource.FieldConfig{
-			{
-				Name: "field1",
-			},
-			{
-				Name: "field2",
-			},
+			{Name: "field1"},
+			{Name: "field2"},
 		},
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
 				Fields: []resource.FieldConfig{
-					{
-						Name: "field1",
-					},
-					{
-						Name: "field2",
-					},
+					{Name: "field1"},
+					{Name: "field2"},
 				},
 			},
 		},
@@ -70,12 +126,8 @@ var DefaultResourceConfig = resource.Configs{
 	{
 		Resource: "b",
 		Fields: []resource.FieldConfig{
-			{
-				Name: "field1",
-			},
-			{
-				Name: "field2",
-			},
+			{Name: "field1"},
+			{Name: "field2"},
 		},
 		Relations: []resource.RelationConfig{},
 	},
@@ -85,63 +137,40 @@ var RelatedResourceConfig = resource.Configs{
 	{
 		Resource: "a",
 		Fields: []resource.FieldConfig{
-			{
-				Name: "f1",
-			},
+			{Name: "f1"},
 		},
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
-				Fields: []resource.FieldConfig{
-					{
-						Name: "f1",
-					},
-				},
+				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
 	},
 	{
 		Resource: "b",
 		Fields: []resource.FieldConfig{
-			{
-				Name: "f1",
-			},
+			{Name: "f1"},
 		},
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Fields: []resource.FieldConfig{
-					{
-						Name: "f1",
-					},
-				},
+				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
 	},
 	{
 		Resource: "c",
 		Fields: []resource.FieldConfig{
-			{
-				Name: "f1",
-			},
+			{Name: "f1"},
 		},
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Fields: []resource.FieldConfig{
-					{
-						Name: "f1",
-					},
-				},
+				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 			{
 				Resource: "b",
-				Fields: []resource.FieldConfig{
-					{
-						Name: "f1",
-					},
-				},
-				Dependance: "a",
+				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
 	},
@@ -185,8 +214,6 @@ func (t *TestSuite) SetupSuite() {
 	wg.Go(func() {
 		postgresContainer, err := pgContainer.Run(containerCtx,
 			"postgres:17",
-			// pgContainer.WithInitScripts(filepath.Join("testdata", "init-user-db.sh")),
-			// pgContainer.WithConfigFile(filepath.Join("testdata", "my-postgres.conf")),
 			pgContainer.WithDatabase(pgDB),
 			pgContainer.WithUsername(pgUser),
 			pgContainer.WithPassword(pgPass),
@@ -207,7 +234,6 @@ func (t *TestSuite) SetupSuite() {
 
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: []string{esAddr},
-		// Trust the self-signed certs used by elasticsearch
 		Transport: &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
@@ -247,7 +273,14 @@ func (t *TestSuite) SetupSuite() {
 		t.T().Fatalf("failed to apply job queue schema: %v", err)
 	}
 
-	t.app = app.New(store.NewPostgresStore(dbpool), es.New(esClient, true), jobqueue.NewQueue(dbpool))
+	t.st = store.NewPostgresStore(dbpool)
+	t.fakeProvider = NewFakeProvider()
+
+	t.app = app.New(t.st, es.New(esClient, true), jobqueue.NewQueue(dbpool))
+	t.app.SetResourceConfig(DefaultResourceConfig)
+
+	builder := projection.NewBuilder(t.fakeProvider, DefaultResourceConfig, t.st)
+	t.app.SetBuilder(builder)
 
 	t.worker = jobqueue.NewWorker(t.pool, t.app.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),
@@ -281,9 +314,32 @@ func (t *TestSuite) BeforeTest(suiteName, testName string) {
 }
 
 func (t *TestSuite) AfterTest(suiteName, testName string) {
-	_, err := t.esClient.Indices.Delete([]string{"_all"})
+	// Clear fake provider data between tests.
+	t.fakeProvider.Clear()
+
+	// ES 8.x disallows _all / wildcard deletes by default.
+	// List concrete index names first, then delete each one.
+	catRes, err := t.esClient.Cat.Indices(
+		t.esClient.Cat.Indices.WithFormat("json"),
+	)
 	if err != nil {
-		t.T().Fatalf("failed to clear all indices: %v", err)
+		t.T().Fatalf("failed to list indices: %v", err)
+	}
+	defer catRes.Body.Close()
+
+	var indices []struct {
+		Index string `json:"index"`
+	}
+	if err := json.NewDecoder(catRes.Body).Decode(&indices); err != nil {
+		t.T().Fatalf("failed to decode cat indices: %v", err)
+	}
+
+	for _, idx := range indices {
+		res, err := t.esClient.Indices.Delete([]string{idx.Index})
+		if err != nil {
+			t.T().Fatalf("failed to delete index %s: %v", idx.Index, err)
+		}
+		res.Body.Close()
 	}
 
 	rows, err := t.pool.Query(t.T().Context(), `

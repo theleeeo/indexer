@@ -9,7 +9,6 @@ package index
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -22,70 +21,122 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type PublishRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Event         *ChangeEvent           `protobuf:"bytes,1,opt,name=event,proto3" json:"event,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
+type ChangeKind int32
 
-func (x *PublishRequest) Reset() {
-	*x = PublishRequest{}
-	mi := &file_index_v1_index_proto_msgTypes[0]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
+const (
+	ChangeKind_CHANGE_KIND_UNSPECIFIED ChangeKind = 0
+	ChangeKind_CHANGE_KIND_CREATED     ChangeKind = 1
+	ChangeKind_CHANGE_KIND_UPDATED     ChangeKind = 2
+	ChangeKind_CHANGE_KIND_DELETED     ChangeKind = 3
+)
 
-func (x *PublishRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*PublishRequest) ProtoMessage() {}
-
-func (x *PublishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[0]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
+// Enum value maps for ChangeKind.
+var (
+	ChangeKind_name = map[int32]string{
+		0: "CHANGE_KIND_UNSPECIFIED",
+		1: "CHANGE_KIND_CREATED",
+		2: "CHANGE_KIND_UPDATED",
+		3: "CHANGE_KIND_DELETED",
 	}
-	return mi.MessageOf(x)
+	ChangeKind_value = map[string]int32{
+		"CHANGE_KIND_UNSPECIFIED": 0,
+		"CHANGE_KIND_CREATED":     1,
+		"CHANGE_KIND_UPDATED":     2,
+		"CHANGE_KIND_DELETED":     3,
+	}
+)
+
+func (x ChangeKind) Enum() *ChangeKind {
+	p := new(ChangeKind)
+	*p = x
+	return p
 }
 
-// Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
-func (*PublishRequest) Descriptor() ([]byte, []int) {
+func (x ChangeKind) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ChangeKind) Descriptor() protoreflect.EnumDescriptor {
+	return file_index_v1_index_proto_enumTypes[0].Descriptor()
+}
+
+func (ChangeKind) Type() protoreflect.EnumType {
+	return &file_index_v1_index_proto_enumTypes[0]
+}
+
+func (x ChangeKind) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ChangeKind.Descriptor instead.
+func (ChangeKind) EnumDescriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *PublishRequest) GetEvent() *ChangeEvent {
+type NotifyChangeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notification  *ChangeNotification    `protobuf:"bytes,1,opt,name=notification,proto3" json:"notification,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NotifyChangeRequest) Reset() {
+	*x = NotifyChangeRequest{}
+	mi := &file_index_v1_index_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NotifyChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NotifyChangeRequest) ProtoMessage() {}
+
+func (x *NotifyChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[0]
 	if x != nil {
-		return x.Event
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NotifyChangeRequest.ProtoReflect.Descriptor instead.
+func (*NotifyChangeRequest) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *NotifyChangeRequest) GetNotification() *ChangeNotification {
+	if x != nil {
+		return x.Notification
 	}
 	return nil
 }
 
-type PublishResponse struct {
+type NotifyChangeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PublishResponse) Reset() {
-	*x = PublishResponse{}
+func (x *NotifyChangeResponse) Reset() {
+	*x = NotifyChangeResponse{}
 	mi := &file_index_v1_index_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishResponse) String() string {
+func (x *NotifyChangeResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishResponse) ProtoMessage() {}
+func (*NotifyChangeResponse) ProtoMessage() {}
 
-func (x *PublishResponse) ProtoReflect() protoreflect.Message {
+func (x *NotifyChangeResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_index_v1_index_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -97,32 +148,32 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
-func (*PublishResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use NotifyChangeResponse.ProtoReflect.Descriptor instead.
+func (*NotifyChangeResponse) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{1}
 }
 
-type PublishBatchRequest struct {
+type NotifyChangeBatchRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Events        []*ChangeEvent         `protobuf:"bytes,1,rep,name=events,proto3" json:"events,omitempty"`
+	Notifications []*ChangeNotification  `protobuf:"bytes,1,rep,name=notifications,proto3" json:"notifications,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PublishBatchRequest) Reset() {
-	*x = PublishBatchRequest{}
+func (x *NotifyChangeBatchRequest) Reset() {
+	*x = NotifyChangeBatchRequest{}
 	mi := &file_index_v1_index_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishBatchRequest) String() string {
+func (x *NotifyChangeBatchRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishBatchRequest) ProtoMessage() {}
+func (*NotifyChangeBatchRequest) ProtoMessage() {}
 
-func (x *PublishBatchRequest) ProtoReflect() protoreflect.Message {
+func (x *NotifyChangeBatchRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_index_v1_index_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -134,38 +185,38 @@ func (x *PublishBatchRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishBatchRequest.ProtoReflect.Descriptor instead.
-func (*PublishBatchRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use NotifyChangeBatchRequest.ProtoReflect.Descriptor instead.
+func (*NotifyChangeBatchRequest) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *PublishBatchRequest) GetEvents() []*ChangeEvent {
+func (x *NotifyChangeBatchRequest) GetNotifications() []*ChangeNotification {
 	if x != nil {
-		return x.Events
+		return x.Notifications
 	}
 	return nil
 }
 
-type PublishBatchResponse struct {
+type NotifyChangeBatchResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PublishBatchResponse) Reset() {
-	*x = PublishBatchResponse{}
+func (x *NotifyChangeBatchResponse) Reset() {
+	*x = NotifyChangeBatchResponse{}
 	mi := &file_index_v1_index_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PublishBatchResponse) String() string {
+func (x *NotifyChangeBatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PublishBatchResponse) ProtoMessage() {}
+func (*NotifyChangeBatchResponse) ProtoMessage() {}
 
-func (x *PublishBatchResponse) ProtoReflect() protoreflect.Message {
+func (x *NotifyChangeBatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_index_v1_index_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -177,40 +228,38 @@ func (x *PublishBatchResponse) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PublishBatchResponse.ProtoReflect.Descriptor instead.
-func (*PublishBatchResponse) Descriptor() ([]byte, []int) {
+// Deprecated: Use NotifyChangeBatchResponse.ProtoReflect.Descriptor instead.
+func (*NotifyChangeBatchResponse) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{3}
 }
 
-type ChangeEvent struct {
+// ChangeNotification describes a single resource change event from a source
+// service.
+type ChangeNotification struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
-	// Types that are valid to be assigned to Payload:
-	//
-	//	*ChangeEvent_CreatePayload
-	//	*ChangeEvent_UpdatePayload
-	//	*ChangeEvent_DeletePayload
-	//	*ChangeEvent_AddRelationPayload
-	//	*ChangeEvent_RemoveRelationPayload
-	//	*ChangeEvent_SetRelationsPayload
-	Payload       isChangeEvent_Payload `protobuf_oneof:"payload"`
+	// The type of change.
+	Kind ChangeKind `protobuf:"varint,1,opt,name=kind,proto3,enum=index.v1.ChangeKind" json:"kind,omitempty"`
+	// The resource that changed.
+	ResourceType  string `protobuf:"bytes,2,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId    string `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangeEvent) Reset() {
-	*x = ChangeEvent{}
+func (x *ChangeNotification) Reset() {
+	*x = ChangeNotification{}
 	mi := &file_index_v1_index_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangeEvent) String() string {
+func (x *ChangeNotification) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangeEvent) ProtoMessage() {}
+func (*ChangeNotification) ProtoMessage() {}
 
-func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
+func (x *ChangeNotification) ProtoReflect() protoreflect.Message {
 	mi := &file_index_v1_index_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -222,516 +271,28 @@ func (x *ChangeEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangeEvent.ProtoReflect.Descriptor instead.
-func (*ChangeEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use ChangeNotification.ProtoReflect.Descriptor instead.
+func (*ChangeNotification) Descriptor() ([]byte, []int) {
 	return file_index_v1_index_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *ChangeEvent) GetPayload() isChangeEvent_Payload {
+func (x *ChangeNotification) GetKind() ChangeKind {
 	if x != nil {
-		return x.Payload
+		return x.Kind
 	}
-	return nil
+	return ChangeKind_CHANGE_KIND_UNSPECIFIED
 }
 
-func (x *ChangeEvent) GetCreatePayload() *CreatePayload {
+func (x *ChangeNotification) GetResourceType() string {
 	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_CreatePayload); ok {
-			return x.CreatePayload
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetUpdatePayload() *UpdatePayload {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_UpdatePayload); ok {
-			return x.UpdatePayload
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetDeletePayload() *DeletePayload {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_DeletePayload); ok {
-			return x.DeletePayload
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetAddRelationPayload() *AddRelationPayload {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_AddRelationPayload); ok {
-			return x.AddRelationPayload
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetRemoveRelationPayload() *RemoveRelationPayload {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_RemoveRelationPayload); ok {
-			return x.RemoveRelationPayload
-		}
-	}
-	return nil
-}
-
-func (x *ChangeEvent) GetSetRelationsPayload() *SetRelationsPayload {
-	if x != nil {
-		if x, ok := x.Payload.(*ChangeEvent_SetRelationsPayload); ok {
-			return x.SetRelationsPayload
-		}
-	}
-	return nil
-}
-
-type isChangeEvent_Payload interface {
-	isChangeEvent_Payload()
-}
-
-type ChangeEvent_CreatePayload struct {
-	CreatePayload *CreatePayload `protobuf:"bytes,1,opt,name=create_payload,json=createPayload,proto3,oneof"`
-}
-
-type ChangeEvent_UpdatePayload struct {
-	UpdatePayload *UpdatePayload `protobuf:"bytes,2,opt,name=update_payload,json=updatePayload,proto3,oneof"`
-}
-
-type ChangeEvent_DeletePayload struct {
-	DeletePayload *DeletePayload `protobuf:"bytes,3,opt,name=delete_payload,json=deletePayload,proto3,oneof"`
-}
-
-type ChangeEvent_AddRelationPayload struct {
-	AddRelationPayload *AddRelationPayload `protobuf:"bytes,4,opt,name=add_relation_payload,json=addRelationPayload,proto3,oneof"`
-}
-
-type ChangeEvent_RemoveRelationPayload struct {
-	RemoveRelationPayload *RemoveRelationPayload `protobuf:"bytes,5,opt,name=remove_relation_payload,json=removeRelationPayload,proto3,oneof"`
-}
-
-type ChangeEvent_SetRelationsPayload struct {
-	SetRelationsPayload *SetRelationsPayload `protobuf:"bytes,6,opt,name=set_relations_payload,json=setRelationsPayload,proto3,oneof"`
-}
-
-func (*ChangeEvent_CreatePayload) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_UpdatePayload) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_DeletePayload) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_AddRelationPayload) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_RemoveRelationPayload) isChangeEvent_Payload() {}
-
-func (*ChangeEvent_SetRelationsPayload) isChangeEvent_Payload() {}
-
-type CreatePayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Data          *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	Relations     []*Relation            `protobuf:"bytes,3,rep,name=relations,proto3" json:"relations,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreatePayload) Reset() {
-	*x = CreatePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[5]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreatePayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreatePayload) ProtoMessage() {}
-
-func (x *CreatePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[5]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreatePayload.ProtoReflect.Descriptor instead.
-func (*CreatePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *CreatePayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *CreatePayload) GetData() *structpb.Struct {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-func (x *CreatePayload) GetRelations() []*Relation {
-	if x != nil {
-		return x.Relations
-	}
-	return nil
-}
-
-type UpdatePayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Data          *structpb.Struct       `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *UpdatePayload) Reset() {
-	*x = UpdatePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[6]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *UpdatePayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*UpdatePayload) ProtoMessage() {}
-
-func (x *UpdatePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[6]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use UpdatePayload.ProtoReflect.Descriptor instead.
-func (*UpdatePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{6}
-}
-
-func (x *UpdatePayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *UpdatePayload) GetData() *structpb.Struct {
-	if x != nil {
-		return x.Data
-	}
-	return nil
-}
-
-type DeletePayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *DeletePayload) Reset() {
-	*x = DeletePayload{}
-	mi := &file_index_v1_index_proto_msgTypes[7]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *DeletePayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*DeletePayload) ProtoMessage() {}
-
-func (x *DeletePayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[7]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use DeletePayload.ProtoReflect.Descriptor instead.
-func (*DeletePayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{7}
-}
-
-func (x *DeletePayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-type AddRelationPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Relation      *Relation              `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *AddRelationPayload) Reset() {
-	*x = AddRelationPayload{}
-	mi := &file_index_v1_index_proto_msgTypes[8]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *AddRelationPayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*AddRelationPayload) ProtoMessage() {}
-
-func (x *AddRelationPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[8]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use AddRelationPayload.ProtoReflect.Descriptor instead.
-func (*AddRelationPayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{8}
-}
-
-func (x *AddRelationPayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *AddRelationPayload) GetRelation() *Relation {
-	if x != nil {
-		return x.Relation
-	}
-	return nil
-}
-
-type RemoveRelationPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Relation      *Relation              `protobuf:"bytes,2,opt,name=relation,proto3" json:"relation,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *RemoveRelationPayload) Reset() {
-	*x = RemoveRelationPayload{}
-	mi := &file_index_v1_index_proto_msgTypes[9]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *RemoveRelationPayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*RemoveRelationPayload) ProtoMessage() {}
-
-func (x *RemoveRelationPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[9]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use RemoveRelationPayload.ProtoReflect.Descriptor instead.
-func (*RemoveRelationPayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{9}
-}
-
-func (x *RemoveRelationPayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *RemoveRelationPayload) GetRelation() *Relation {
-	if x != nil {
-		return x.Relation
-	}
-	return nil
-}
-
-type SetRelationsPayload struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=Resource,proto3" json:"Resource,omitempty"`
-	Relations     []*Relation            `protobuf:"bytes,2,rep,name=Relations,proto3" json:"Relations,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *SetRelationsPayload) Reset() {
-	*x = SetRelationsPayload{}
-	mi := &file_index_v1_index_proto_msgTypes[10]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *SetRelationsPayload) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*SetRelationsPayload) ProtoMessage() {}
-
-func (x *SetRelationsPayload) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[10]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use SetRelationsPayload.ProtoReflect.Descriptor instead.
-func (*SetRelationsPayload) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{10}
-}
-
-func (x *SetRelationsPayload) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-func (x *SetRelationsPayload) GetRelations() []*Relation {
-	if x != nil {
-		return x.Relations
-	}
-	return nil
-}
-
-type Relation struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      *Resource              `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Relation) Reset() {
-	*x = Relation{}
-	mi := &file_index_v1_index_proto_msgTypes[11]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Relation) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Relation) ProtoMessage() {}
-
-func (x *Relation) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[11]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Relation.ProtoReflect.Descriptor instead.
-func (*Relation) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{11}
-}
-
-func (x *Relation) GetResource() *Resource {
-	if x != nil {
-		return x.Resource
-	}
-	return nil
-}
-
-type Resource struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
-	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *Resource) Reset() {
-	*x = Resource{}
-	mi := &file_index_v1_index_proto_msgTypes[12]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *Resource) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*Resource) ProtoMessage() {}
-
-func (x *Resource) ProtoReflect() protoreflect.Message {
-	mi := &file_index_v1_index_proto_msgTypes[12]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use Resource.ProtoReflect.Descriptor instead.
-func (*Resource) Descriptor() ([]byte, []int) {
-	return file_index_v1_index_proto_rawDescGZIP(), []int{12}
-}
-
-func (x *Resource) GetType() string {
-	if x != nil {
-		return x.Type
+		return x.ResourceType
 	}
 	return ""
 }
 
-func (x *Resource) GetId() string {
+func (x *ChangeNotification) GetResourceId() string {
 	if x != nil {
-		return x.Id
+		return x.ResourceId
 	}
 	return ""
 }
@@ -740,47 +301,27 @@ var File_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_index_v1_index_proto_rawDesc = "" +
 	"\n" +
-	"\x14index/v1/index.proto\x12\bindex.v1\x1a\x1cgoogle/protobuf/struct.proto\"=\n" +
-	"\x0ePublishRequest\x12+\n" +
-	"\x05event\x18\x01 \x01(\v2\x15.index.v1.ChangeEventR\x05event\"\x11\n" +
-	"\x0fPublishResponse\"D\n" +
-	"\x13PublishBatchRequest\x12-\n" +
-	"\x06events\x18\x01 \x03(\v2\x15.index.v1.ChangeEventR\x06events\"\x16\n" +
-	"\x14PublishBatchResponse\"\xe0\x03\n" +
-	"\vChangeEvent\x12@\n" +
-	"\x0ecreate_payload\x18\x01 \x01(\v2\x17.index.v1.CreatePayloadH\x00R\rcreatePayload\x12@\n" +
-	"\x0eupdate_payload\x18\x02 \x01(\v2\x17.index.v1.UpdatePayloadH\x00R\rupdatePayload\x12@\n" +
-	"\x0edelete_payload\x18\x03 \x01(\v2\x17.index.v1.DeletePayloadH\x00R\rdeletePayload\x12P\n" +
-	"\x14add_relation_payload\x18\x04 \x01(\v2\x1c.index.v1.AddRelationPayloadH\x00R\x12addRelationPayload\x12Y\n" +
-	"\x17remove_relation_payload\x18\x05 \x01(\v2\x1f.index.v1.RemoveRelationPayloadH\x00R\x15removeRelationPayload\x12S\n" +
-	"\x15set_relations_payload\x18\x06 \x01(\v2\x1d.index.v1.SetRelationsPayloadH\x00R\x13setRelationsPayloadB\t\n" +
-	"\apayload\"\x9e\x01\n" +
-	"\rCreatePayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12+\n" +
-	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x04data\x120\n" +
-	"\trelations\x18\x03 \x03(\v2\x12.index.v1.RelationR\trelations\"l\n" +
-	"\rUpdatePayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12+\n" +
-	"\x04data\x18\x02 \x01(\v2\x17.google.protobuf.StructR\x04data\"?\n" +
-	"\rDeletePayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\"t\n" +
-	"\x12AddRelationPayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12.\n" +
-	"\brelation\x18\x02 \x01(\v2\x12.index.v1.RelationR\brelation\"w\n" +
-	"\x15RemoveRelationPayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x12.\n" +
-	"\brelation\x18\x02 \x01(\v2\x12.index.v1.RelationR\brelation\"w\n" +
-	"\x13SetRelationsPayload\x12.\n" +
-	"\bResource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bResource\x120\n" +
-	"\tRelations\x18\x02 \x03(\v2\x12.index.v1.RelationR\tRelations\":\n" +
-	"\bRelation\x12.\n" +
-	"\bresource\x18\x01 \x01(\v2\x12.index.v1.ResourceR\bresource\".\n" +
-	"\bResource\x12\x12\n" +
-	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
-	"\x02id\x18\x02 \x01(\tR\x02id2\x9d\x01\n" +
-	"\fIndexService\x12>\n" +
-	"\aPublish\x12\x18.index.v1.PublishRequest\x1a\x19.index.v1.PublishResponse\x12M\n" +
-	"\fPublishBatch\x12\x1d.index.v1.PublishBatchRequest\x1a\x1e.index.v1.PublishBatchResponseBw\n" +
+	"\x14index/v1/index.proto\x12\bindex.v1\"W\n" +
+	"\x13NotifyChangeRequest\x12@\n" +
+	"\fnotification\x18\x01 \x01(\v2\x1c.index.v1.ChangeNotificationR\fnotification\"\x16\n" +
+	"\x14NotifyChangeResponse\"^\n" +
+	"\x18NotifyChangeBatchRequest\x12B\n" +
+	"\rnotifications\x18\x01 \x03(\v2\x1c.index.v1.ChangeNotificationR\rnotifications\"\x1b\n" +
+	"\x19NotifyChangeBatchResponse\"\x84\x01\n" +
+	"\x12ChangeNotification\x12(\n" +
+	"\x04kind\x18\x01 \x01(\x0e2\x14.index.v1.ChangeKindR\x04kind\x12#\n" +
+	"\rresource_type\x18\x02 \x01(\tR\fresourceType\x12\x1f\n" +
+	"\vresource_id\x18\x03 \x01(\tR\n" +
+	"resourceId*t\n" +
+	"\n" +
+	"ChangeKind\x12\x1b\n" +
+	"\x17CHANGE_KIND_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13CHANGE_KIND_CREATED\x10\x01\x12\x17\n" +
+	"\x13CHANGE_KIND_UPDATED\x10\x02\x12\x17\n" +
+	"\x13CHANGE_KIND_DELETED\x10\x032\xbb\x01\n" +
+	"\fIndexService\x12M\n" +
+	"\fNotifyChange\x12\x1d.index.v1.NotifyChangeRequest\x1a\x1e.index.v1.NotifyChangeResponse\x12\\\n" +
+	"\x11NotifyChangeBatch\x12\".index.v1.NotifyChangeBatchRequest\x1a#.index.v1.NotifyChangeBatchResponseBw\n" +
 	"\fcom.index.v1B\n" +
 	"IndexProtoP\x01Z\x1aindexer/gen/index/v1;index\xa2\x02\x03IXX\xaa\x02\bIndex.V1\xca\x02\bIndex\\V1\xe2\x02\x14Index\\V1\\GPBMetadata\xea\x02\tIndex::V1b\x06proto3"
 
@@ -796,54 +337,29 @@ func file_index_v1_index_proto_rawDescGZIP() []byte {
 	return file_index_v1_index_proto_rawDescData
 }
 
-var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_index_v1_index_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_index_v1_index_proto_goTypes = []any{
-	(*PublishRequest)(nil),        // 0: index.v1.PublishRequest
-	(*PublishResponse)(nil),       // 1: index.v1.PublishResponse
-	(*PublishBatchRequest)(nil),   // 2: index.v1.PublishBatchRequest
-	(*PublishBatchResponse)(nil),  // 3: index.v1.PublishBatchResponse
-	(*ChangeEvent)(nil),           // 4: index.v1.ChangeEvent
-	(*CreatePayload)(nil),         // 5: index.v1.CreatePayload
-	(*UpdatePayload)(nil),         // 6: index.v1.UpdatePayload
-	(*DeletePayload)(nil),         // 7: index.v1.DeletePayload
-	(*AddRelationPayload)(nil),    // 8: index.v1.AddRelationPayload
-	(*RemoveRelationPayload)(nil), // 9: index.v1.RemoveRelationPayload
-	(*SetRelationsPayload)(nil),   // 10: index.v1.SetRelationsPayload
-	(*Relation)(nil),              // 11: index.v1.Relation
-	(*Resource)(nil),              // 12: index.v1.Resource
-	(*structpb.Struct)(nil),       // 13: google.protobuf.Struct
+	(ChangeKind)(0),                   // 0: index.v1.ChangeKind
+	(*NotifyChangeRequest)(nil),       // 1: index.v1.NotifyChangeRequest
+	(*NotifyChangeResponse)(nil),      // 2: index.v1.NotifyChangeResponse
+	(*NotifyChangeBatchRequest)(nil),  // 3: index.v1.NotifyChangeBatchRequest
+	(*NotifyChangeBatchResponse)(nil), // 4: index.v1.NotifyChangeBatchResponse
+	(*ChangeNotification)(nil),        // 5: index.v1.ChangeNotification
 }
 var file_index_v1_index_proto_depIdxs = []int32{
-	4,  // 0: index.v1.PublishRequest.event:type_name -> index.v1.ChangeEvent
-	4,  // 1: index.v1.PublishBatchRequest.events:type_name -> index.v1.ChangeEvent
-	5,  // 2: index.v1.ChangeEvent.create_payload:type_name -> index.v1.CreatePayload
-	6,  // 3: index.v1.ChangeEvent.update_payload:type_name -> index.v1.UpdatePayload
-	7,  // 4: index.v1.ChangeEvent.delete_payload:type_name -> index.v1.DeletePayload
-	8,  // 5: index.v1.ChangeEvent.add_relation_payload:type_name -> index.v1.AddRelationPayload
-	9,  // 6: index.v1.ChangeEvent.remove_relation_payload:type_name -> index.v1.RemoveRelationPayload
-	10, // 7: index.v1.ChangeEvent.set_relations_payload:type_name -> index.v1.SetRelationsPayload
-	12, // 8: index.v1.CreatePayload.Resource:type_name -> index.v1.Resource
-	13, // 9: index.v1.CreatePayload.data:type_name -> google.protobuf.Struct
-	11, // 10: index.v1.CreatePayload.relations:type_name -> index.v1.Relation
-	12, // 11: index.v1.UpdatePayload.Resource:type_name -> index.v1.Resource
-	13, // 12: index.v1.UpdatePayload.data:type_name -> google.protobuf.Struct
-	12, // 13: index.v1.DeletePayload.Resource:type_name -> index.v1.Resource
-	12, // 14: index.v1.AddRelationPayload.Resource:type_name -> index.v1.Resource
-	11, // 15: index.v1.AddRelationPayload.relation:type_name -> index.v1.Relation
-	12, // 16: index.v1.RemoveRelationPayload.Resource:type_name -> index.v1.Resource
-	11, // 17: index.v1.RemoveRelationPayload.relation:type_name -> index.v1.Relation
-	12, // 18: index.v1.SetRelationsPayload.Resource:type_name -> index.v1.Resource
-	11, // 19: index.v1.SetRelationsPayload.Relations:type_name -> index.v1.Relation
-	12, // 20: index.v1.Relation.resource:type_name -> index.v1.Resource
-	0,  // 21: index.v1.IndexService.Publish:input_type -> index.v1.PublishRequest
-	2,  // 22: index.v1.IndexService.PublishBatch:input_type -> index.v1.PublishBatchRequest
-	1,  // 23: index.v1.IndexService.Publish:output_type -> index.v1.PublishResponse
-	3,  // 24: index.v1.IndexService.PublishBatch:output_type -> index.v1.PublishBatchResponse
-	23, // [23:25] is the sub-list for method output_type
-	21, // [21:23] is the sub-list for method input_type
-	21, // [21:21] is the sub-list for extension type_name
-	21, // [21:21] is the sub-list for extension extendee
-	0,  // [0:21] is the sub-list for field type_name
+	5, // 0: index.v1.NotifyChangeRequest.notification:type_name -> index.v1.ChangeNotification
+	5, // 1: index.v1.NotifyChangeBatchRequest.notifications:type_name -> index.v1.ChangeNotification
+	0, // 2: index.v1.ChangeNotification.kind:type_name -> index.v1.ChangeKind
+	1, // 3: index.v1.IndexService.NotifyChange:input_type -> index.v1.NotifyChangeRequest
+	3, // 4: index.v1.IndexService.NotifyChangeBatch:input_type -> index.v1.NotifyChangeBatchRequest
+	2, // 5: index.v1.IndexService.NotifyChange:output_type -> index.v1.NotifyChangeResponse
+	4, // 6: index.v1.IndexService.NotifyChangeBatch:output_type -> index.v1.NotifyChangeBatchResponse
+	5, // [5:7] is the sub-list for method output_type
+	3, // [3:5] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_index_v1_index_proto_init() }
@@ -851,26 +367,19 @@ func file_index_v1_index_proto_init() {
 	if File_index_v1_index_proto != nil {
 		return
 	}
-	file_index_v1_index_proto_msgTypes[4].OneofWrappers = []any{
-		(*ChangeEvent_CreatePayload)(nil),
-		(*ChangeEvent_UpdatePayload)(nil),
-		(*ChangeEvent_DeletePayload)(nil),
-		(*ChangeEvent_AddRelationPayload)(nil),
-		(*ChangeEvent_RemoveRelationPayload)(nil),
-		(*ChangeEvent_SetRelationsPayload)(nil),
-	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_index_v1_index_proto_rawDesc), len(file_index_v1_index_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   13,
+			NumEnums:      1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_index_v1_index_proto_goTypes,
 		DependencyIndexes: file_index_v1_index_proto_depIdxs,
+		EnumInfos:         file_index_v1_index_proto_enumTypes,
 		MessageInfos:      file_index_v1_index_proto_msgTypes,
 	}.Build()
 	File_index_v1_index_proto = out.File

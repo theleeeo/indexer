@@ -6,6 +6,7 @@ import (
 
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/jobqueue"
+	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/store"
 )
@@ -29,18 +30,29 @@ type App struct {
 	queue *jobqueue.Queue
 
 	resources resource.Configs
+
+	builder *projection.Builder
 }
 
 func (a *App) SetResourceConfig(resources resource.Configs) {
 	a.resources = resources
+	if a.builder != nil {
+		a.builder.SetResourceConfig(resources)
+	}
 }
 
 func New(st *store.PostgresStore, esClient *es.Client, queue *jobqueue.Queue) *App {
-	return &App{
+	a := &App{
 		st:    st,
 		es:    esClient,
 		queue: queue,
 	}
+	return a
+}
+
+// SetBuilder sets the projection builder. Must be called after SetResourceConfig.
+func (a *App) SetBuilder(builder *projection.Builder) {
+	a.builder = builder
 }
 
 func (a *App) verifyResourceConfig(resource, resourceId string) (*resource.Config, error) {
