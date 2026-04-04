@@ -81,7 +81,8 @@ func main() {
 
 	queue := jobqueue.NewQueue(dbpool)
 
-	app := app.New(st, esClientImpl, resources, queue)
+	app := app.New(st, esClientImpl, queue)
+	app.SetResourceConfig(resources)
 
 	worker := jobqueue.NewWorker(dbpool, app.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),

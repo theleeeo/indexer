@@ -255,6 +255,52 @@ func (t *TestSuite) Test_Create_WithRelation() {
 	})
 }
 
+func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
+	t.app.SetResourceConfig(DefaultResourceConfig)
+
+	t.Run("create resource with relation", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+			Relations: []*index.Relation{
+				{
+					Resource: &index.Resource{
+						Type: "b",
+						Id:   "1",
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("create the related resource", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "b",
+				Id:   "1",
+			},
+			Data:      &structpb.Struct{},
+			Relations: []*index.Relation{},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.worker.Drain(t.T().Context())
+
+	t.Run("verify relation", func() {
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
+		t.Require().NoError(err)
+		t.Require().Equal("1", resp.Hits[0].Id)
+		relations := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+	})
+}
+
 // TODO: Related resource, both on create of primary and create of one with relation
 // func (t *TestSuite) Test_RelatedRelations_OnCreate() {
 // 	t.app.SetResourceConfig(RelatedResourceConfig)
@@ -326,7 +372,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
 	t.app.SetResourceConfig(RelatedResourceConfig)
 
-	t.Run("create resource with related relations", func() {
+	t.Run("create primary resource", func() {
 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "b",
@@ -335,8 +381,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
 			Data: &structpb.Struct{},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+	t.Run("create secondary resource with relation to primary", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "a",
 				Id:   "1",
@@ -352,8 +400,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
 			},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+	t.Run("create tertiary resource", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "c",
 				Id:   "1",
@@ -362,8 +412,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
 			Relations: []*index.Relation{},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
+	t.Run("add relation from tertiary to secondary resource", func() {
+		err := t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
 			Resource: &index.Resource{
 				Type: "c",
 				Id:   "1",
@@ -377,28 +429,29 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_ResourceWithRelation() {
 		})
 		t.Require().NoError(err)
 
-		t.worker.Drain(t.T().Context())
+	})
 
-		t.Run("verify related relations", func() {
-			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
-			t.Require().NoError(err)
-			t.Require().Equal("1", resp.Hits[0].Id)
+	t.worker.Drain(t.T().Context())
 
-			relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
-			t.Require().Len(relations, 1)
-			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+	t.Run("verify primary resource on tertiary resource", func() {
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+		t.Require().NoError(err)
+		t.Require().Equal("1", resp.Hits[0].Id)
 
-			relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
-			t.Require().Len(relations, 1)
-			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
-		})
+		relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+
+		relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
 	})
 }
 
 func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
 	t.app.SetResourceConfig(RelatedResourceConfig)
 
-	t.Run("create resource with related relations", func() {
+	t.Run("create primary resource", func() {
 		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "b",
@@ -407,8 +460,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
 			Data: &structpb.Struct{},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+	t.Run("create secondary resource", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "a",
 				Id:   "1",
@@ -417,8 +472,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
 			Relations: []*index.Relation{},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+	t.Run("create tertiary resource with relation to secondary", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
 			Resource: &index.Resource{
 				Type: "c",
 				Id:   "1",
@@ -434,8 +491,10 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
 			},
 		})
 		t.Require().NoError(err)
+	})
 
-		err = t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
+	t.Run("add relation from secondary to primary resource", func() {
+		err := t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
 			Resource: &index.Resource{
 				Type: "a",
 				Id:   "1",
@@ -448,21 +507,99 @@ func (t *TestSuite) Test_RelatedRelations_AddRelation_PrimaryResource() {
 			},
 		})
 		t.Require().NoError(err)
+	})
 
-		t.worker.Drain(t.T().Context())
+	t.worker.Drain(t.T().Context())
 
-		t.Run("verify related relations", func() {
-			resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
-			t.Require().NoError(err)
-			t.Require().Equal("1", resp.Hits[0].Id)
+	t.Run("verify related relations", func() {
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+		t.Require().NoError(err)
+		t.Require().Equal("1", resp.Hits[0].Id)
 
-			relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
-			t.Require().Len(relations, 1)
-			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+		relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
 
-			relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
-			t.Require().Len(relations, 1)
-			t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+		relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+	})
+}
+
+// Make sure that related resources are populated if the relation from
+func (t *TestSuite) Test_RelatedRelations_AddReverseRelation() {
+	t.app.SetResourceConfig(RelatedResourceConfig)
+
+	t.Run("create primary resource", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "b",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
 		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("create secondary resource", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+			Relations: []*index.Relation{
+				{
+					Resource: &index.Resource{
+						Type: "b",
+						Id:   "1",
+					},
+				},
+			},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("create tertiary resource with relation to secondary", func() {
+		err := t.app.RegisterCreate(t.T().Context(), &index.CreatePayload{
+			Resource: &index.Resource{
+				Type: "c",
+				Id:   "1",
+			},
+			Data: &structpb.Struct{},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.Run("add relation from secondary to tertiary resource", func() {
+		err := t.app.RegisterAddRelation(t.T().Context(), &index.AddRelationPayload{
+			Resource: &index.Resource{
+				Type: "a",
+				Id:   "1",
+			},
+			Relation: &index.Relation{
+				Resource: &index.Resource{
+					Type: "c",
+					Id:   "1",
+				},
+			},
+		})
+		t.Require().NoError(err)
+	})
+
+	t.worker.Drain(t.T().Context())
+
+	t.Run("verify related relations", func() {
+		resp, err := t.app.Search(t.T().Context(), &search.SearchRequest{Resource: "c"})
+		t.Require().NoError(err)
+		t.Require().Equal("1", resp.Hits[0].Id)
+
+		relations := resp.Hits[0].Source.Fields["a"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
+
+		relations = resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+		t.Require().Len(relations, 1)
+		t.Require().Equal("1", relations[0].GetStructValue().Fields["id"].GetStringValue())
 	})
 }
