@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/theleeeo/indexer/app"
+	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/source"
 
@@ -15,12 +15,12 @@ import (
 type IndexerServer struct {
 	index.UnimplementedIndexServiceServer
 
-	app *app.App
+	idx *core.Indexer
 }
 
-func NewIndexer(app *app.App) *IndexerServer {
+func NewIndexer(idx *core.Indexer) *IndexerServer {
 	return &IndexerServer{
-		app: app,
+		idx: idx,
 	}
 }
 
@@ -31,7 +31,7 @@ func (s *IndexerServer) NotifyChange(ctx context.Context, req *index.NotifyChang
 
 	n := protoToNotification(req.Notification)
 
-	if err := s.app.RegisterChange(ctx, n); err != nil {
+	if err := s.idx.RegisterChange(ctx, n); err != nil {
 		return nil, mapAppError(err)
 	}
 
@@ -48,7 +48,7 @@ func (s *IndexerServer) NotifyChangeBatch(ctx context.Context, req *index.Notify
 			continue
 		}
 		n := protoToNotification(pn)
-		if err := s.app.RegisterChange(ctx, n); err != nil {
+		if err := s.idx.RegisterChange(ctx, n); err != nil {
 			return nil, mapAppError(err)
 		}
 	}
@@ -75,10 +75,10 @@ func protoToNotification(pn *index.ChangeNotification) source.Notification {
 }
 
 func mapAppError(err error) error {
-	if errors.Is(err, app.ErrUnknownResource) {
+	if errors.Is(err, core.ErrUnknownResource) {
 		return status.Error(codes.InvalidArgument, "unknown resource")
 	}
-	var invalidArgsErr *app.InvalidArgumentError
+	var invalidArgsErr *core.InvalidArgumentError
 	if errors.As(err, &invalidArgsErr) {
 		return status.Error(codes.InvalidArgument, invalidArgsErr.Msg)
 	}

@@ -1,4 +1,4 @@
-package app
+package core
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 )
 
 // RegisterChange handles a single change notification from a source service.
-// It invalidates the source cache, determines which root search documents are
-// affected, and enqueues rebuild (or delete) jobs for each.
-func (a *App) RegisterChange(ctx context.Context, n source.Notification) error {
+// It determines which root search documents are affected and enqueues
+// rebuild (or delete) jobs for each.
+func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) error {
 	if n.ResourceType == "" {
 		return &InvalidArgumentError{Msg: "resource_type is required"}
 	}
@@ -20,7 +20,7 @@ func (a *App) RegisterChange(ctx context.Context, n source.Notification) error {
 	}
 
 	// Determine which root documents are affected.
-	roots, err := a.builder.AffectedRoots(ctx, n.ResourceType, n.ResourceID)
+	roots, err := idx.builder.AffectedRoots(ctx, n.ResourceType, n.ResourceID)
 	if err != nil {
 		return fmt.Errorf("determining affected roots: %w", err)
 	}
@@ -41,7 +41,7 @@ func (a *App) RegisterChange(ctx context.Context, n source.Notification) error {
 		}
 
 		jobGroup := fmt.Sprintf("%s|%s", root.Type, root.Id)
-		if _, err := a.queue.Enqueue(ctx, jobGroup, jobType, RebuildPayload{
+		if _, err := idx.queue.Enqueue(ctx, jobGroup, jobType, RebuildPayload{
 			ResourceType: root.Type,
 			ResourceID:   root.Id,
 		}, nil); err != nil {

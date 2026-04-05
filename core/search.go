@@ -1,4 +1,4 @@
-package app
+package core
 
 import (
 	"context"
@@ -7,12 +7,13 @@ import (
 	"github.com/theleeeo/indexer/gen/search/v1"
 )
 
-func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
+// Search executes a search query against the Elasticsearch index for the given resource.
+func (idx *Indexer) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
 	if req.Resource == "" {
 		return nil, errors.New("resource is required")
 	}
 
-	r := a.resources.Get(req.Resource)
+	r := idx.resources.Get(req.Resource)
 	if r == nil {
 		return nil, ErrUnknownResource
 	}
@@ -27,7 +28,7 @@ func (a *App) Search(ctx context.Context, req *search.SearchRequest) (*search.Se
 		req.Page = 0
 	}
 
-	res, err := a.es.Search(ctx, req, r.Resource+"_search", r.GetSearchableFields())
+	res, err := idx.es.Search(ctx, req, r.Resource+"_search", r.GetSearchableFields())
 	if err != nil {
 		return nil, err
 	}

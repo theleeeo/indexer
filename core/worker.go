@@ -1,4 +1,4 @@
-package app
+package core
 
 import (
 	"context"
@@ -8,7 +8,9 @@ import (
 	"github.com/theleeeo/indexer/jobqueue"
 )
 
-func (a *App) HandlerFunc() jobqueue.Handler {
+// HandlerFunc returns a jobqueue.Handler that processes rebuild and delete jobs.
+// Pass this to jobqueue.NewWorker to create a worker that processes jobs.
+func (idx *Indexer) HandlerFunc() jobqueue.Handler {
 	return func(ctx context.Context, job jobqueue.Job) error {
 		switch job.Type {
 		case "rebuild":
@@ -16,13 +18,13 @@ func (a *App) HandlerFunc() jobqueue.Handler {
 			if err := json.Unmarshal(job.Payload, &p); err != nil {
 				return fmt.Errorf("failed to unmarshal rebuild payload: %w", err)
 			}
-			return a.handleRebuild(ctx, p)
+			return idx.handleRebuild(ctx, p)
 		case "delete":
 			p := RebuildPayload{}
 			if err := json.Unmarshal(job.Payload, &p); err != nil {
 				return fmt.Errorf("failed to unmarshal delete payload: %w", err)
 			}
-			return a.handleDelete(ctx, p)
+			return idx.handleDelete(ctx, p)
 		default:
 			return fmt.Errorf("unknown job type: %s", job.Type)
 		}

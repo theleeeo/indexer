@@ -11,12 +11,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/theleeeo/indexer/app"
+	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/gen/search/v1"
 	"github.com/theleeeo/indexer/jobqueue"
-	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/server"
 	"github.com/theleeeo/indexer/source"
@@ -82,22 +81,24 @@ func main() {
 
 	queue := jobqueue.NewQueue(dbpool)
 
-	// Source provider — replace this with a real source adapter implementation.
+	// Source provider - replace this with a real source adapter implementation.
 	// For now we use a nil provider; real deployments must supply one.
 	var sourceProvider source.Provider // TODO: wire real source provider
 
-	application := app.New(st, esClientImpl, queue)
-	application.SetResourceConfig(resources)
+	idx := core.New(core.Config{
+		Provider:  sourceProvider,
+		Resources: resources,
+		ES:        esClientImpl,
+		Store:     st,
+		Queue:     queue,
+	})
 
-	builder := projection.NewBuilder(sourceProvider, resources, st)
-	application.SetBuilder(builder)
-
-	worker := jobqueue.NewWorker(dbpool, application.HandlerFunc(), jobqueue.WorkerConfig{
+	worker := jobqueue.NewWorker(dbpool, idx.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),
 	})
 
-	idxSrv := server.NewIndexer(application)
-	searchSrv := server.NewSearcher(application)
+	idxSrv := server.NewIndexer(idx)
+	searchSrv := server.NewSearcher(idx)
 
 	lis, err := net.Listen("tcp", grpcAddr)
 	if err != nil {

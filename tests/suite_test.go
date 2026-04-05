@@ -13,10 +13,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/theleeeo/indexer/app"
+	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/jobqueue"
-	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/store"
 
@@ -97,7 +96,7 @@ type TestSuite struct {
 
 	esClient *elasticsearch.Client
 
-	app *app.App
+	idx *core.Indexer
 
 	cancelWorker context.CancelFunc
 	worker       *jobqueue.Worker
@@ -276,13 +275,15 @@ func (t *TestSuite) SetupSuite() {
 	t.st = store.NewPostgresStore(dbpool)
 	t.fakeProvider = NewFakeProvider()
 
-	t.app = app.New(t.st, es.New(esClient, true), jobqueue.NewQueue(dbpool))
-	t.app.SetResourceConfig(DefaultResourceConfig)
+	t.idx = core.New(core.Config{
+		Provider:  t.fakeProvider,
+		Resources: DefaultResourceConfig,
+		ES:        es.New(esClient, true),
+		Store:     t.st,
+		Queue:     jobqueue.NewQueue(dbpool),
+	})
 
-	builder := projection.NewBuilder(t.fakeProvider, DefaultResourceConfig, t.st)
-	t.app.SetBuilder(builder)
-
-	t.worker = jobqueue.NewWorker(t.pool, t.app.HandlerFunc(), jobqueue.WorkerConfig{
+	t.worker = jobqueue.NewWorker(t.pool, t.idx.HandlerFunc(), jobqueue.WorkerConfig{
 		Logger: log.Default(),
 	})
 

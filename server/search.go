@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/theleeeo/indexer/app"
+	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/gen/search/v1"
 
 	"google.golang.org/grpc/codes"
@@ -14,20 +14,20 @@ import (
 type SearcherServer struct {
 	search.UnimplementedSearchServiceServer
 
-	app *app.App
+	idx *core.Indexer
 }
 
-func NewSearcher(app *app.App) *SearcherServer {
+func NewSearcher(idx *core.Indexer) *SearcherServer {
 	return &SearcherServer{
-		app: app,
+		idx: idx,
 	}
 }
 
 func (s *SearcherServer) Search(ctx context.Context, req *search.SearchRequest) (*search.SearchResponse, error) {
-	resp, err := s.app.Search(ctx, req)
+	resp, err := s.idx.Search(ctx, req)
 	if err != nil {
-		if errors.Is(err, app.ErrUnknownResource) {
-			return nil, status.Error(codes.FailedPrecondition, app.ErrUnknownResource.Error())
+		if errors.Is(err, core.ErrUnknownResource) {
+			return nil, status.Error(codes.FailedPrecondition, core.ErrUnknownResource.Error())
 		}
 		return nil, err
 	}
