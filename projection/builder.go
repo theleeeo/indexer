@@ -56,11 +56,37 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 		return nil, fmt.Errorf("clear relations for %s/%s: %w", rootType, rootID, err)
 	}
 
-	for _, rel := range rCfg.Relations {
-		related, err := b.provider.FetchRelated(ctx, rootType, rootID, rel.Resource)
+	ordered, err := resolveOrder(rootType, rCfg.Relations)
+	if err != nil {
+		return nil, fmt.Errorf("resolve relation order for %s: %w", rootType, err)
+	}
+
+	resolved := map[string][]map[string]any{
+		rootType: {data},
+	}
+
+	for _, rel := range ordered {
+		sourceData, ok := resolved[rel.Key.Source]
+		if !ok || len(sourceData) == 0 {
+			continue
+		}
+
+		keyVal, ok := sourceData[0][rel.Key.Field]
+		if !ok {
+			continue
+		}
+
+		keyStr, ok := keyVal.(string)
+		if !ok {
+			continue
+		}
+
+		related, err := b.provider.FetchRelated(ctx, rel.Resource, keyStr)
 		if err != nil {
 			return nil, fmt.Errorf("fetch related %s for %s/%s: %w", rel.Resource, rootType, rootID, err)
 		}
+
+		resolved[rel.Resource] = related
 
 		subResources := make([]map[string]any, 0, len(related))
 		var children []store.Relation
@@ -87,6 +113,53 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 	}
 
 	return doc, nil
+}
+
+// resolveOrder topologically sorts relations so that dependencies (relations
+// whose key source is another relation) are resolved before their dependants.
+func resolveOrder(rootType string, relations []resource.RelationConfig) ([]resource.RelationConfig, error) {
+	byResource := make(map[string]resource.RelationConfig, len(relations))
+	for _, r := range relations {
+		byResource[r.Resource] = r
+	}
+
+	var ordered []resource.RelationConfig
+	visited := make(map[string]bool)
+	inStack := make(map[string]bool)
+
+	var visit func(rel resource.RelationConfig) error
+	visit = func(rel resource.RelationConfig) error {
+		if inStack[rel.Resource] {
+			return fmt.Errorf("cycle detected involving %q", rel.Resource)
+		}
+		if visited[rel.Resource] {
+			return nil
+		}
+		inStack[rel.Resource] = true
+
+		if rel.Key.Source != rootType {
+			dep, ok := byResource[rel.Key.Source]
+			if !ok {
+				return fmt.Errorf("key source %q not found among relations", rel.Key.Source)
+			}
+			if err := visit(dep); err != nil {
+				return err
+			}
+		}
+
+		inStack[rel.Resource] = false
+		visited[rel.Resource] = true
+		ordered = append(ordered, rel)
+		return nil
+	}
+
+	for _, rel := range relations {
+		if err := visit(rel); err != nil {
+			return nil, err
+		}
+	}
+
+	return ordered, nil
 }
 
 func (b *Builder) AffectedRoots(ctx context.Context, resourceType, resourceID string) ([]model.Resource, error) {

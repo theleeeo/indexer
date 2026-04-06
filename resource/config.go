@@ -57,7 +57,18 @@ type QueryConfig struct {
 	Search *bool `yaml:"search"`
 }
 
+type KeyConfig struct {
+	// Source is the name of the resource to extract the lookup key from.
+	// Use the root resource's own name to extract from root data,
+	// or a sibling relation name to extract from its resolved data.
+	Source string `yaml:"source"`
+
+	// Field is the field name to extract from the source resource's data.
+	Field string `yaml:"field"`
+}
+
 type RelationConfig struct {
 	Resource string        `yaml:"resource"`
+	Key      KeyConfig     `yaml:"key"`
 	Fields   []FieldConfig `yaml:"fields"`
 }

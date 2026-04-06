@@ -31,7 +31,7 @@ import (
 type FakeProvider struct {
 	mu        sync.Mutex
 	resources map[string]map[string]any   // "type|id" -> data
-	relations map[string][]map[string]any // "rootType|rootID|relType" -> []data
+	relations map[string][]map[string]any // "type|key" -> []data
 }
 
 func NewFakeProvider() *FakeProvider {
@@ -60,10 +60,10 @@ func (f *FakeProvider) DeleteResource(resourceType, resourceID string) {
 	delete(f.resources, resourceType+"|"+resourceID)
 }
 
-func (f *FakeProvider) SetRelated(rootType, rootID, relationType string, related []map[string]any) {
+func (f *FakeProvider) SetRelated(resourceType, key string, related []map[string]any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.relations[rootType+"|"+rootID+"|"+relationType] = related
+	f.relations[resourceType+"|"+key] = related
 }
 
 func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID string) (map[string]any, error) {
@@ -76,10 +76,10 @@ func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID
 	return data, nil
 }
 
-func (f *FakeProvider) FetchRelated(_ context.Context, rootType, rootID, relationType string) ([]map[string]any, error) {
+func (f *FakeProvider) FetchRelated(_ context.Context, resourceType, key string) ([]map[string]any, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	data, ok := f.relations[rootType+"|"+rootID+"|"+relationType]
+	data, ok := f.relations[resourceType+"|"+key]
 	if !ok {
 		return nil, nil
 	}
@@ -115,6 +115,7 @@ var DefaultResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
+				Key:      resource.KeyConfig{Source: "a", Field: "id"},
 				Fields: []resource.FieldConfig{
 					{Name: "field1"},
 					{Name: "field2"},
@@ -141,6 +142,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
+				Key:      resource.KeyConfig{Source: "a", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -153,6 +155,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
+				Key:      resource.KeyConfig{Source: "b", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -165,10 +168,12 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
+				Key:      resource.KeyConfig{Source: "c", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 			{
 				Resource: "b",
+				Key:      resource.KeyConfig{Source: "c", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},

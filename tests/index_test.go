@@ -188,7 +188,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 
 	// Source has resource "a/1" with a related "b/1".
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1"})
-	t.fakeProvider.SetRelated("a", "1", "b", []map[string]any{
+	t.fakeProvider.SetRelated("b", "1", []map[string]any{
 		{"id": "1", "field1": "b_val"},
 	})
 
@@ -218,7 +218,7 @@ func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
 
 	// Initially a/1 exists with a relation to b/1 already known by the source.
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1"})
-	t.fakeProvider.SetRelated("a", "1", "b", []map[string]any{
+	t.fakeProvider.SetRelated("b", "1", []map[string]any{
 		{"id": "1", "field1": "b_val"},
 	})
 
@@ -260,16 +260,16 @@ func (t *TestSuite) Test_RelatedRelations_FullGraph() {
 
 	// a/1 exists as a root resource and has relation to b/1.
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "aval"})
-	t.fakeProvider.SetRelated("a", "1", "b", []map[string]any{
+	t.fakeProvider.SetRelated("b", "1", []map[string]any{
 		{"id": "1", "f1": "bval"},
 	})
 
 	// c/1 exists and has relations to both a/1 and b/1.
 	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "cval"})
-	t.fakeProvider.SetRelated("c", "1", "a", []map[string]any{
+	t.fakeProvider.SetRelated("a", "1", []map[string]any{
 		{"id": "1", "f1": "aval"},
 	})
-	t.fakeProvider.SetRelated("c", "1", "b", []map[string]any{
+	t.fakeProvider.SetRelated("b", "1", []map[string]any{
 		{"id": "1", "f1": "bval"},
 	})
 
@@ -308,10 +308,10 @@ func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "aval"})
 	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "bval"})
 	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "cval"})
-	t.fakeProvider.SetRelated("c", "1", "a", []map[string]any{
+	t.fakeProvider.SetRelated("a", "1", []map[string]any{
 		{"id": "1", "f1": "aval"},
 	})
-	t.fakeProvider.SetRelated("c", "1", "b", []map[string]any{
+	t.fakeProvider.SetRelated("b", "1", []map[string]any{
 		{"id": "1", "f1": "bval"},
 	})
 
@@ -324,7 +324,7 @@ func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
 
 	// Now update a/1 at the source.
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "aval_updated"})
-	t.fakeProvider.SetRelated("c", "1", "a", []map[string]any{
+	t.fakeProvider.SetRelated("a", "1", []map[string]any{
 		{"id": "1", "f1": "aval_updated"},
 	})
 

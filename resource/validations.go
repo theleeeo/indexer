@@ -27,8 +27,9 @@ func (c Configs) Validate() error {
 	return nil
 }
 
-// verifyFieldRelations verifies that all relations reference existing resources
-// and that their field lists match the target resource's field definitions.
+// verifyFieldRelations verifies that all relations reference existing resources,
+// that their field lists match the target resource's field definitions,
+// that key sources reference valid resources, and that there are no dependency cycles.
 func (c Configs) verifyFieldRelations() error {
 	for _, rCfg := range c {
 		for _, currentRel := range rCfg.Relations {
@@ -46,6 +47,70 @@ func (c Configs) verifyFieldRelations() error {
 					return fmt.Errorf("relation '%s'->'%s' specifies field '%s' which does not exist on '%s'", rCfg.Resource, currentRel.Resource, f.Name, currentRel.Resource)
 				}
 			}
+
+			// Verify key source: must be the owning resource or a sibling relation
+			if currentRel.Key.Source != rCfg.Resource {
+				found := false
+				for _, siblingRel := range rCfg.Relations {
+					if siblingRel.Resource == currentRel.Key.Source {
+						found = true
+						break
+					}
+				}
+				if !found {
+					return fmt.Errorf("relation '%s'->'%s' key source '%s' is not the root resource and not a sibling relation", rCfg.Resource, currentRel.Resource, currentRel.Key.Source)
+				}
+			}
+		}
+
+		// Verify no cycles in relation key dependencies
+		if err := verifyNoCycles(rCfg); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// verifyNoCycles checks that the relation key dependencies within a single
+// resource config form a DAG (no cycles).
+func verifyNoCycles(rCfg *Config) error {
+	// Build adjacency: relation resource name -> list of deps (key sources that are sibling relations)
+	deps := make(map[string]string) // relation -> dependency (its key source, if it's a sibling)
+	for _, rel := range rCfg.Relations {
+		if rel.Key.Source != rCfg.Resource {
+			deps[rel.Resource] = rel.Key.Source
+		}
+	}
+
+	// Walk each chain to detect cycles
+	visited := make(map[string]bool)
+	inStack := make(map[string]bool)
+
+	var visit func(node string) error
+	visit = func(node string) error {
+		if inStack[node] {
+			return fmt.Errorf("resource %q has a cycle in relation key dependencies involving %q", rCfg.Resource, node)
+		}
+		if visited[node] {
+			return nil
+		}
+		visited[node] = true
+		inStack[node] = true
+
+		if dep, ok := deps[node]; ok {
+			if err := visit(dep); err != nil {
+				return err
+			}
+		}
+
+		inStack[node] = false
+		return nil
+	}
+
+	for _, rel := range rCfg.Relations {
+		if err := visit(rel.Resource); err != nil {
+			return err
 		}
 	}
 
@@ -90,6 +155,10 @@ func (c RelationConfig) Validate() error {
 		return fmt.Errorf("resource required")
 	}
 
+	if err := c.Key.Validate(); err != nil {
+		return fmt.Errorf("key: %w", err)
+	}
+
 	// TODO: Default to "Use all fields" if none specified?
 	if len(c.Fields) == 0 {
 		return fmt.Errorf("at least one field required")
@@ -104,5 +173,15 @@ func (c RelationConfig) Validate() error {
 		}
 	}
 
+	return nil
+}
+
+func (k KeyConfig) Validate() error {
+	if k.Source == "" {
+		return fmt.Errorf("source required")
+	}
+	if k.Field == "" {
+		return fmt.Errorf("field required")
+	}
 	return nil
 }
