@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package provider.v1;
+
+import "google/protobuf/struct.proto";
+
+option go_package = "indexer/gen/provider/v1;provider";
+
+// ProviderService is the API that a source provider plugin must implement.
+// The indexer connects to it as a gRPC client to fetch resource data.
+service ProviderService {
+  // FetchResource returns the data for a single resource identified by type and
+  // ID.
+  rpc FetchResource(FetchResourceRequest) returns (FetchResourceResponse);
+
+  // FetchRelated returns a list of resources related to the given resource type
+  // and key.
+  rpc FetchRelated(FetchRelatedRequest) returns (FetchRelatedResponse);
+}
+
+message FetchResourceRequest {
+  string resource_type = 1;
+  string resource_id = 2;
+}
+
+message FetchResourceResponse { google.protobuf.Struct data = 1; }
+
+message FetchRelatedRequest {
+  string resource_type = 1;
+  string key = 2;
+}
+
+message FetchRelatedResponse { repeated google.protobuf.Struct data = 1; }

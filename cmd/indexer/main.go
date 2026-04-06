@@ -81,9 +81,16 @@ func main() {
 
 	queue := jobqueue.NewQueue(dbpool)
 
-	// Source provider - replace this with a real source adapter implementation.
-	// For now we use a nil provider; real deployments must supply one.
-	var sourceProvider source.Provider // TODO: wire real source provider
+	// Source provider - connect to the provider plugin over gRPC.
+	providerAddr := env("PROVIDER_ADDR", "")
+	if providerAddr == "" {
+		log.Fatalf("PROVIDER_ADDR is required (address of the gRPC provider plugin)")
+	}
+	sourceProvider, err := source.NewGRPCProvider(providerAddr)
+	if err != nil {
+		log.Fatalf("connect to provider plugin: %v", err)
+	}
+	defer sourceProvider.Close()
 
 	idx := core.New(core.Config{
 		Provider:  sourceProvider,
