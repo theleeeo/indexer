@@ -122,6 +122,8 @@ type FetchRelatedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
 	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
+	SourceField   string                 `protobuf:"bytes,3,opt,name=source_field,json=sourceField,proto3" json:"source_field,omitempty"`
+	RootResource  string                 `protobuf:"bytes,4,opt,name=root_resource,json=rootResource,proto3" json:"root_resource,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -166,6 +168,20 @@ func (x *FetchRelatedRequest) GetResourceType() string {
 func (x *FetchRelatedRequest) GetKey() string {
 	if x != nil {
 		return x.Key
+	}
+	return ""
+}
+
+func (x *FetchRelatedRequest) GetSourceField() string {
+	if x != nil {
+		return x.SourceField
+	}
+	return ""
+}
+
+func (x *FetchRelatedRequest) GetRootResource() string {
+	if x != nil {
+		return x.RootResource
 	}
 	return ""
 }
@@ -224,10 +240,12 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\"D\n" +
 	"\x15FetchResourceResponse\x12+\n" +
-	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"L\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\x94\x01\n" +
 	"\x13FetchRelatedRequest\x12#\n" +
 	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\"C\n" +
+	"\x03key\x18\x02 \x01(\tR\x03key\x12!\n" +
+	"\fsource_field\x18\x03 \x01(\tR\vsourceField\x12#\n" +
+	"\rroot_resource\x18\x04 \x01(\tR\frootResource\"C\n" +
 	"\x14FetchRelatedResponse\x12+\n" +
 	"\x04data\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x04data2\xbe\x01\n" +
 	"\x0fProviderService\x12V\n" +

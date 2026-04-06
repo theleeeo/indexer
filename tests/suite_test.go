@@ -17,6 +17,7 @@ import (
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 
 	"github.com/elastic/go-elasticsearch/v8"
@@ -76,14 +77,14 @@ func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID
 	return data, nil
 }
 
-func (f *FakeProvider) FetchRelated(_ context.Context, resourceType, key string) ([]map[string]any, error) {
+func (f *FakeProvider) FetchRelated(_ context.Context, params source.FetchRelatedParams) (source.FetchRelatedResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	data, ok := f.relations[resourceType+"|"+key]
+	data, ok := f.relations[params.ResourceType+"|"+params.Key]
 	if !ok {
-		return nil, nil
+		return source.FetchRelatedResult{}, nil
 	}
-	return data, nil
+	return source.FetchRelatedResult{Related: data}, nil
 }
 
 type TestSuite struct {

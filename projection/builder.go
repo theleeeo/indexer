@@ -81,16 +81,21 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 			continue
 		}
 
-		related, err := b.provider.FetchRelated(ctx, rel.Resource, keyStr)
+		relatedResp, err := b.provider.FetchRelated(ctx, source.FetchRelatedParams{
+			RootResource: rootType,
+			ResourceType: rel.Resource,
+			Key:          keyStr,
+			SourceField:  rel.Key.Field,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("fetch related %s for %s/%s: %w", rel.Resource, rootType, rootID, err)
 		}
 
-		resolved[rel.Resource] = related
+		resolved[rel.Resource] = relatedResp.Related
 
-		subResources := make([]map[string]any, 0, len(related))
+		subResources := make([]map[string]any, 0, len(relatedResp.Related))
 		var children []store.Relation
-		for _, r := range related {
+		for _, r := range relatedResp.Related {
 			filtered := filterFields(r, rel.Fields)
 			if id, ok := r["id"]; ok {
 				filtered["id"] = id

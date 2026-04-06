@@ -42,19 +42,21 @@ func (p *GRPCProvider) FetchResource(ctx context.Context, resourceType, resource
 	return resp.Data.AsMap(), nil
 }
 
-func (p *GRPCProvider) FetchRelated(ctx context.Context, resourceType, key string) ([]map[string]any, error) {
+func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedParams) (FetchRelatedResult, error) {
 	resp, err := p.client.FetchRelated(ctx, &pb.FetchRelatedRequest{
-		ResourceType: resourceType,
-		Key:          key,
+		ResourceType: params.ResourceType,
+		Key:          params.Key,
+		SourceField:  params.SourceField,
+		RootResource: params.RootResource,
 	})
 	if err != nil {
-		return nil, err
+		return FetchRelatedResult{}, err
 	}
 	result := make([]map[string]any, len(resp.Data))
 	for i, s := range resp.Data {
 		result[i] = s.AsMap()
 	}
-	return result, nil
+	return FetchRelatedResult{Related: result}, nil
 }
 
 // Close releases the underlying gRPC connection.
