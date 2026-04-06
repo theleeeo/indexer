@@ -27,9 +27,18 @@ message FetchResourceResponse { google.protobuf.Struct data = 1; }
 
 message FetchRelatedRequest {
   string resource_type = 1;
-  string key = 2;
-  string source_field = 3;
-  string root_resource = 4;
+  repeated KeyValue keys = 2;
+  RootResource root_resource = 3;
+}
+
+message KeyValue {
+  string field = 1;
+  string value = 2;
+}
+
+message RootResource {
+  string type = 1;
+  string id = 2;
 }
 
 message FetchRelatedResponse { repeated google.protobuf.Struct data = 1; }

@@ -63,8 +63,9 @@ type KeyConfig struct {
 	// or a sibling relation name to extract from its resolved data.
 	Source string `yaml:"source"`
 
-	// Field is the field name to extract from the source resource's data.
-	Field string `yaml:"field"`
+	// Fields are the field names to extract from the source resource's data.
+	// All extracted values are passed together to the provider.
+	Fields []string `yaml:"fields"`
 }
 
 type RelationConfig struct {

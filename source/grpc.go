@@ -43,11 +43,21 @@ func (p *GRPCProvider) FetchResource(ctx context.Context, resourceType, resource
 }
 
 func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedParams) (FetchRelatedResult, error) {
+	keys := make([]*pb.KeyValue, len(params.Keys))
+	for i, kv := range params.Keys {
+		keys[i] = &pb.KeyValue{
+			Field: kv.Field,
+			Value: kv.Value,
+		}
+	}
+
 	resp, err := p.client.FetchRelated(ctx, &pb.FetchRelatedRequest{
 		ResourceType: params.ResourceType,
-		Key:          params.Key,
-		SourceField:  params.SourceField,
-		RootResource: params.RootResource,
+		Keys:         keys,
+		RootResource: &pb.RootResource{
+			Type: params.RootResource.Type,
+			Id:   params.RootResource.Id,
+		},
 	})
 	if err != nil {
 		return FetchRelatedResult{}, err

@@ -180,8 +180,13 @@ func (k KeyConfig) Validate() error {
 	if k.Source == "" {
 		return fmt.Errorf("source required")
 	}
-	if k.Field == "" {
-		return fmt.Errorf("field required")
+	if len(k.Fields) == 0 {
+		return fmt.Errorf("at least one field required")
+	}
+	for i, f := range k.Fields {
+		if f == "" {
+			return fmt.Errorf("field %d: name required", i)
+		}
 	}
 	return nil
 }

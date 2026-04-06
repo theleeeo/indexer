@@ -71,21 +71,25 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 			continue
 		}
 
-		keyVal, ok := sourceData[0][rel.Key.Field]
-		if !ok {
-			continue
+		var keys []source.KeyValue
+		for _, field := range rel.Key.Fields {
+			if val, ok := sourceData[0][field]; ok {
+				if valStr, ok := val.(string); ok {
+					keys = append(keys, source.KeyValue{Field: field, Value: valStr})
+				}
+			}
 		}
-
-		keyStr, ok := keyVal.(string)
-		if !ok {
+		if len(keys) == 0 {
 			continue
 		}
 
 		relatedResp, err := b.provider.FetchRelated(ctx, source.FetchRelatedParams{
-			RootResource: rootType,
+			RootResource: source.RootResource{
+				Type: rootType,
+				Id:   rootID,
+			},
 			ResourceType: rel.Resource,
-			Key:          keyStr,
-			SourceField:  rel.Key.Field,
+			Keys:         keys,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("fetch related %s for %s/%s: %w", rel.Resource, rootType, rootID, err)

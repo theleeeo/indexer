@@ -7,13 +7,15 @@ a:
     - resource: b
       key:
         source: a
-        field: b_id
+        fields:
+          - b_id
       fields:
         - name: name
     - resource: c
       key:
         source: a
-        field: id
+        fields:
+          - id
       fields:
         - name: number
 
@@ -30,13 +32,15 @@ c:
     - resource: a
       key:
         source: c
-        field: a_id
+        fields:
+          - a_id
       fields:
         - name: searchField
     - resource: b
       key:
         source: c
-        field: b_id
+        fields:
+          - b_id
       fields:
         - name: name
           # Control whether this field is searchable or not.

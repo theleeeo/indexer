@@ -121,9 +121,8 @@ func (x *FetchResourceResponse) GetData() *structpb.Struct {
 type FetchRelatedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	Key           string                 `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
-	SourceField   string                 `protobuf:"bytes,3,opt,name=source_field,json=sourceField,proto3" json:"source_field,omitempty"`
-	RootResource  string                 `protobuf:"bytes,4,opt,name=root_resource,json=rootResource,proto3" json:"root_resource,omitempty"`
+	Keys          []*KeyValue            `protobuf:"bytes,2,rep,name=keys,proto3" json:"keys,omitempty"`
+	RootResource  *RootResource          `protobuf:"bytes,3,opt,name=root_resource,json=rootResource,proto3" json:"root_resource,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -165,23 +164,120 @@ func (x *FetchRelatedRequest) GetResourceType() string {
 	return ""
 }
 
-func (x *FetchRelatedRequest) GetKey() string {
+func (x *FetchRelatedRequest) GetKeys() []*KeyValue {
 	if x != nil {
-		return x.Key
+		return x.Keys
 	}
-	return ""
+	return nil
 }
 
-func (x *FetchRelatedRequest) GetSourceField() string {
-	if x != nil {
-		return x.SourceField
-	}
-	return ""
-}
-
-func (x *FetchRelatedRequest) GetRootResource() string {
+func (x *FetchRelatedRequest) GetRootResource() *RootResource {
 	if x != nil {
 		return x.RootResource
+	}
+	return nil
+}
+
+type KeyValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Field         string                 `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
+	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KeyValue) Reset() {
+	*x = KeyValue{}
+	mi := &file_provider_v1_provider_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KeyValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KeyValue) ProtoMessage() {}
+
+func (x *KeyValue) ProtoReflect() protoreflect.Message {
+	mi := &file_provider_v1_provider_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KeyValue.ProtoReflect.Descriptor instead.
+func (*KeyValue) Descriptor() ([]byte, []int) {
+	return file_provider_v1_provider_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *KeyValue) GetField() string {
+	if x != nil {
+		return x.Field
+	}
+	return ""
+}
+
+func (x *KeyValue) GetValue() string {
+	if x != nil {
+		return x.Value
+	}
+	return ""
+}
+
+type RootResource struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Type          string                 `protobuf:"bytes,1,opt,name=type,proto3" json:"type,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RootResource) Reset() {
+	*x = RootResource{}
+	mi := &file_provider_v1_provider_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RootResource) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RootResource) ProtoMessage() {}
+
+func (x *RootResource) ProtoReflect() protoreflect.Message {
+	mi := &file_provider_v1_provider_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RootResource.ProtoReflect.Descriptor instead.
+func (*RootResource) Descriptor() ([]byte, []int) {
+	return file_provider_v1_provider_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *RootResource) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *RootResource) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -195,7 +291,7 @@ type FetchRelatedResponse struct {
 
 func (x *FetchRelatedResponse) Reset() {
 	*x = FetchRelatedResponse{}
-	mi := &file_provider_v1_provider_proto_msgTypes[3]
+	mi := &file_provider_v1_provider_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -207,7 +303,7 @@ func (x *FetchRelatedResponse) String() string {
 func (*FetchRelatedResponse) ProtoMessage() {}
 
 func (x *FetchRelatedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_provider_v1_provider_proto_msgTypes[3]
+	mi := &file_provider_v1_provider_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -220,7 +316,7 @@ func (x *FetchRelatedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FetchRelatedResponse.ProtoReflect.Descriptor instead.
 func (*FetchRelatedResponse) Descriptor() ([]byte, []int) {
-	return file_provider_v1_provider_proto_rawDescGZIP(), []int{3}
+	return file_provider_v1_provider_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *FetchRelatedResponse) GetData() []*structpb.Struct {
@@ -240,12 +336,17 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\"D\n" +
 	"\x15FetchResourceResponse\x12+\n" +
-	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\x94\x01\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\xa5\x01\n" +
 	"\x13FetchRelatedRequest\x12#\n" +
-	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x10\n" +
-	"\x03key\x18\x02 \x01(\tR\x03key\x12!\n" +
-	"\fsource_field\x18\x03 \x01(\tR\vsourceField\x12#\n" +
-	"\rroot_resource\x18\x04 \x01(\tR\frootResource\"C\n" +
+	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12)\n" +
+	"\x04keys\x18\x02 \x03(\v2\x15.provider.v1.KeyValueR\x04keys\x12>\n" +
+	"\rroot_resource\x18\x03 \x01(\v2\x19.provider.v1.RootResourceR\frootResource\"6\n" +
+	"\bKeyValue\x12\x14\n" +
+	"\x05field\x18\x01 \x01(\tR\x05field\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value\"2\n" +
+	"\fRootResource\x12\x12\n" +
+	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"C\n" +
 	"\x14FetchRelatedResponse\x12+\n" +
 	"\x04data\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x04data2\xbe\x01\n" +
 	"\x0fProviderService\x12V\n" +
@@ -265,26 +366,30 @@ func file_provider_v1_provider_proto_rawDescGZIP() []byte {
 	return file_provider_v1_provider_proto_rawDescData
 }
 
-var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_provider_v1_provider_proto_goTypes = []any{
 	(*FetchResourceRequest)(nil),  // 0: provider.v1.FetchResourceRequest
 	(*FetchResourceResponse)(nil), // 1: provider.v1.FetchResourceResponse
 	(*FetchRelatedRequest)(nil),   // 2: provider.v1.FetchRelatedRequest
-	(*FetchRelatedResponse)(nil),  // 3: provider.v1.FetchRelatedResponse
-	(*structpb.Struct)(nil),       // 4: google.protobuf.Struct
+	(*KeyValue)(nil),              // 3: provider.v1.KeyValue
+	(*RootResource)(nil),          // 4: provider.v1.RootResource
+	(*FetchRelatedResponse)(nil),  // 5: provider.v1.FetchRelatedResponse
+	(*structpb.Struct)(nil),       // 6: google.protobuf.Struct
 }
 var file_provider_v1_provider_proto_depIdxs = []int32{
-	4, // 0: provider.v1.FetchResourceResponse.data:type_name -> google.protobuf.Struct
-	4, // 1: provider.v1.FetchRelatedResponse.data:type_name -> google.protobuf.Struct
-	0, // 2: provider.v1.ProviderService.FetchResource:input_type -> provider.v1.FetchResourceRequest
-	2, // 3: provider.v1.ProviderService.FetchRelated:input_type -> provider.v1.FetchRelatedRequest
-	1, // 4: provider.v1.ProviderService.FetchResource:output_type -> provider.v1.FetchResourceResponse
-	3, // 5: provider.v1.ProviderService.FetchRelated:output_type -> provider.v1.FetchRelatedResponse
-	4, // [4:6] is the sub-list for method output_type
-	2, // [2:4] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	6, // 0: provider.v1.FetchResourceResponse.data:type_name -> google.protobuf.Struct
+	3, // 1: provider.v1.FetchRelatedRequest.keys:type_name -> provider.v1.KeyValue
+	4, // 2: provider.v1.FetchRelatedRequest.root_resource:type_name -> provider.v1.RootResource
+	6, // 3: provider.v1.FetchRelatedResponse.data:type_name -> google.protobuf.Struct
+	0, // 4: provider.v1.ProviderService.FetchResource:input_type -> provider.v1.FetchResourceRequest
+	2, // 5: provider.v1.ProviderService.FetchRelated:input_type -> provider.v1.FetchRelatedRequest
+	1, // 6: provider.v1.ProviderService.FetchResource:output_type -> provider.v1.FetchResourceResponse
+	5, // 7: provider.v1.ProviderService.FetchRelated:output_type -> provider.v1.FetchRelatedResponse
+	6, // [6:8] is the sub-list for method output_type
+	4, // [4:6] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_provider_v1_provider_proto_init() }
@@ -298,7 +403,7 @@ func file_provider_v1_provider_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_provider_v1_provider_proto_rawDesc), len(file_provider_v1_provider_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

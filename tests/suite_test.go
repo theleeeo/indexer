@@ -61,10 +61,14 @@ func (f *FakeProvider) DeleteResource(resourceType, resourceID string) {
 	delete(f.resources, resourceType+"|"+resourceID)
 }
 
-func (f *FakeProvider) SetRelated(resourceType, key string, related []map[string]any) {
+func (f *FakeProvider) SetRelated(resourceType string, keyValues []string, related []map[string]any) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.relations[resourceType+"|"+key] = related
+	key := resourceType
+	for _, v := range keyValues {
+		key += "|" + v
+	}
+	f.relations[key] = related
 }
 
 func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID string) (map[string]any, error) {
@@ -80,7 +84,12 @@ func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID
 func (f *FakeProvider) FetchRelated(_ context.Context, params source.FetchRelatedParams) (source.FetchRelatedResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	data, ok := f.relations[params.ResourceType+"|"+params.Key]
+	// Build lookup key by joining all field values in order.
+	key := params.ResourceType
+	for _, kv := range params.Keys {
+		key += "|" + kv.Value
+	}
+	data, ok := f.relations[key]
 	if !ok {
 		return source.FetchRelatedResult{}, nil
 	}
@@ -116,7 +125,7 @@ var DefaultResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Field: "id"},
+				Key:      resource.KeyConfig{Source: "a", Fields: []string{"id"}},
 				Fields: []resource.FieldConfig{
 					{Name: "field1"},
 					{Name: "field2"},
@@ -143,7 +152,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Field: "id"},
+				Key:      resource.KeyConfig{Source: "a", Fields: []string{"id"}},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -156,7 +165,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Key:      resource.KeyConfig{Source: "b", Field: "id"},
+				Key:      resource.KeyConfig{Source: "b", Fields: []string{"id"}},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -169,12 +178,12 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Key:      resource.KeyConfig{Source: "c", Field: "id"},
+				Key:      resource.KeyConfig{Source: "c", Fields: []string{"id"}},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "c", Field: "id"},
+				Key:      resource.KeyConfig{Source: "c", Fields: []string{"id"}},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
