@@ -3,12 +3,14 @@ a:
   fields:
     - name: searchField
     - name: secondaryField
+      type: text
   relations:
     - resource: b
       key:
         source: a
         fields:
           - b_id
+      cardinality: one
       fields:
         - name: name
     - resource: c
@@ -16,8 +18,10 @@ a:
         source: a
         fields:
           - id
+      cardinality: many
       fields:
         - name: number
+          type: integer
 
 b:
   indexName: b_search

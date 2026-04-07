@@ -49,7 +49,15 @@ func (c Config) GetRelation(resource string) *RelationConfig {
 
 type FieldConfig struct {
 	Name  string      `yaml:"name"`
+	Type  string      `yaml:"type"` // ES field type; defaults to "keyword"
 	Query QueryConfig `yaml:"query"`
+}
+
+func (f FieldConfig) ESType() string {
+	if f.Type == "" {
+		return "keyword"
+	}
+	return f.Type
 }
 
 type QueryConfig struct {
@@ -69,7 +77,12 @@ type KeyConfig struct {
 }
 
 type RelationConfig struct {
-	Resource string        `yaml:"resource"`
-	Key      KeyConfig     `yaml:"key"`
-	Fields   []FieldConfig `yaml:"fields"`
+	Resource    string        `yaml:"resource"`
+	Key         KeyConfig     `yaml:"key"`
+	Cardinality string        `yaml:"cardinality"` // "one" or "many"; defaults to "many"
+	Fields      []FieldConfig `yaml:"fields"`
+}
+
+func (r RelationConfig) IsMany() bool {
+	return r.Cardinality != "one"
 }

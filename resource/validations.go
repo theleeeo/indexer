@@ -159,6 +159,10 @@ func (c RelationConfig) Validate() error {
 		return fmt.Errorf("key: %w", err)
 	}
 
+	if c.Cardinality != "" && c.Cardinality != "one" && c.Cardinality != "many" {
+		return fmt.Errorf("cardinality must be \"one\" or \"many\"")
+	}
+
 	// TODO: Default to "Use all fields" if none specified?
 	if len(c.Fields) == 0 {
 		return fmt.Errorf("at least one field required")
