@@ -71,11 +71,11 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 			continue
 		}
 
-		var keys []source.KeyValue
+		var keys []source.ResourceKey
 		for _, field := range rel.Key.Fields {
 			if val, ok := sourceData[0][field]; ok {
 				if valStr, ok := val.(string); ok {
-					keys = append(keys, source.KeyValue{Field: field, Value: valStr})
+					keys = append(keys, source.ResourceKey{Field: field, Value: valStr})
 				}
 			}
 		}

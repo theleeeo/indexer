@@ -12,8 +12,8 @@ type Provider interface {
 	FetchRelated(ctx context.Context, params FetchRelatedParams) (FetchRelatedResult, error)
 }
 
-// KeyValue holds a single extracted field name and its value.
-type KeyValue struct {
+// ResourceKey holds a single extracted field name and its value.
+type ResourceKey struct {
 	Field string
 	Value string
 }
@@ -24,7 +24,7 @@ type FetchRelatedParams struct {
 	// The resource type to fetch.
 	ResourceType string
 	// Keys are the extracted field-value pairs used to identify the related resources.
-	Keys []KeyValue
+	Keys []ResourceKey
 }
 
 type RootResource struct {

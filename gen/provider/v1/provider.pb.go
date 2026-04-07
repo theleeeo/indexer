@@ -121,7 +121,7 @@ func (x *FetchResourceResponse) GetData() *structpb.Struct {
 type FetchRelatedRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	Keys          []*KeyValue            `protobuf:"bytes,2,rep,name=keys,proto3" json:"keys,omitempty"`
+	Keys          []*ResourceKey         `protobuf:"bytes,2,rep,name=keys,proto3" json:"keys,omitempty"`
 	RootResource  *RootResource          `protobuf:"bytes,3,opt,name=root_resource,json=rootResource,proto3" json:"root_resource,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -164,7 +164,7 @@ func (x *FetchRelatedRequest) GetResourceType() string {
 	return ""
 }
 
-func (x *FetchRelatedRequest) GetKeys() []*KeyValue {
+func (x *FetchRelatedRequest) GetKeys() []*ResourceKey {
 	if x != nil {
 		return x.Keys
 	}
@@ -178,7 +178,7 @@ func (x *FetchRelatedRequest) GetRootResource() *RootResource {
 	return nil
 }
 
-type KeyValue struct {
+type ResourceKey struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Field         string                 `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
 	Value         string                 `protobuf:"bytes,2,opt,name=value,proto3" json:"value,omitempty"`
@@ -186,20 +186,20 @@ type KeyValue struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *KeyValue) Reset() {
-	*x = KeyValue{}
+func (x *ResourceKey) Reset() {
+	*x = ResourceKey{}
 	mi := &file_provider_v1_provider_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *KeyValue) String() string {
+func (x *ResourceKey) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*KeyValue) ProtoMessage() {}
+func (*ResourceKey) ProtoMessage() {}
 
-func (x *KeyValue) ProtoReflect() protoreflect.Message {
+func (x *ResourceKey) ProtoReflect() protoreflect.Message {
 	mi := &file_provider_v1_provider_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -211,19 +211,19 @@ func (x *KeyValue) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use KeyValue.ProtoReflect.Descriptor instead.
-func (*KeyValue) Descriptor() ([]byte, []int) {
+// Deprecated: Use ResourceKey.ProtoReflect.Descriptor instead.
+func (*ResourceKey) Descriptor() ([]byte, []int) {
 	return file_provider_v1_provider_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *KeyValue) GetField() string {
+func (x *ResourceKey) GetField() string {
 	if x != nil {
 		return x.Field
 	}
 	return ""
 }
 
-func (x *KeyValue) GetValue() string {
+func (x *ResourceKey) GetValue() string {
 	if x != nil {
 		return x.Value
 	}
@@ -336,12 +336,12 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
 	"resourceId\"D\n" +
 	"\x15FetchResourceResponse\x12+\n" +
-	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\xa5\x01\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\xa8\x01\n" +
 	"\x13FetchRelatedRequest\x12#\n" +
-	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12)\n" +
-	"\x04keys\x18\x02 \x03(\v2\x15.provider.v1.KeyValueR\x04keys\x12>\n" +
-	"\rroot_resource\x18\x03 \x01(\v2\x19.provider.v1.RootResourceR\frootResource\"6\n" +
-	"\bKeyValue\x12\x14\n" +
+	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12,\n" +
+	"\x04keys\x18\x02 \x03(\v2\x18.provider.v1.ResourceKeyR\x04keys\x12>\n" +
+	"\rroot_resource\x18\x03 \x01(\v2\x19.provider.v1.RootResourceR\frootResource\"9\n" +
+	"\vResourceKey\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"2\n" +
 	"\fRootResource\x12\x12\n" +
@@ -371,14 +371,14 @@ var file_provider_v1_provider_proto_goTypes = []any{
 	(*FetchResourceRequest)(nil),  // 0: provider.v1.FetchResourceRequest
 	(*FetchResourceResponse)(nil), // 1: provider.v1.FetchResourceResponse
 	(*FetchRelatedRequest)(nil),   // 2: provider.v1.FetchRelatedRequest
-	(*KeyValue)(nil),              // 3: provider.v1.KeyValue
+	(*ResourceKey)(nil),           // 3: provider.v1.ResourceKey
 	(*RootResource)(nil),          // 4: provider.v1.RootResource
 	(*FetchRelatedResponse)(nil),  // 5: provider.v1.FetchRelatedResponse
 	(*structpb.Struct)(nil),       // 6: google.protobuf.Struct
 }
 var file_provider_v1_provider_proto_depIdxs = []int32{
 	6, // 0: provider.v1.FetchResourceResponse.data:type_name -> google.protobuf.Struct
-	3, // 1: provider.v1.FetchRelatedRequest.keys:type_name -> provider.v1.KeyValue
+	3, // 1: provider.v1.FetchRelatedRequest.keys:type_name -> provider.v1.ResourceKey
 	4, // 2: provider.v1.FetchRelatedRequest.root_resource:type_name -> provider.v1.RootResource
 	6, // 3: provider.v1.FetchRelatedResponse.data:type_name -> google.protobuf.Struct
 	0, // 4: provider.v1.ProviderService.FetchResource:input_type -> provider.v1.FetchResourceRequest

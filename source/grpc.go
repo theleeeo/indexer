@@ -43,9 +43,9 @@ func (p *GRPCProvider) FetchResource(ctx context.Context, resourceType, resource
 }
 
 func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedParams) (FetchRelatedResult, error) {
-	keys := make([]*pb.KeyValue, len(params.Keys))
+	keys := make([]*pb.ResourceKey, len(params.Keys))
 	for i, kv := range params.Keys {
-		keys[i] = &pb.KeyValue{
+		keys[i] = &pb.ResourceKey{
 			Field: kv.Field,
 			Value: kv.Value,
 		}
