@@ -50,7 +50,7 @@ type SubFetcher[Parent any] interface {
 }
 
 func NewSubPlan[Parent any, Req any, Result any](
-	root *RootPlan[Parent, Req],
+	root Executor[Parent, Req],
 	fetcher SubFetcher[Parent],
 	builder func(Parent, any) Result,
 ) *SubPlan[Parent, Result, Req] {
