@@ -17,60 +17,62 @@ type BuildRequest struct {
 	ResourceID   string
 }
 
-// buildDoc is the intermediate document flowing through the aggregation plan.
+// BuildDoc is the intermediate document flowing through the aggregation plan.
 // It carries the final doc, the resolved data for chained relations, and root info.
-type buildDoc struct {
+type BuildDoc struct {
 	Doc      map[string]any
 	Resolved map[string][]map[string]any
 	Root     model.Resource
 }
 
+// Plan is an aggregation executor that produces BuildDoc results.
+type Plan = aggregation.Executor[BuildRequest, BuildDoc]
+
 type Builder struct {
-	provider  source.Provider
 	resources resource.Configs
 	st        *store.PostgresStore
 
-	plans map[string]aggregation.Executor[buildDoc, BuildRequest]
+	plans map[string]Plan
 }
 
-func NewBuilder(provider source.Provider, resources resource.Configs, st *store.PostgresStore) *Builder {
-	b := &Builder{
-		provider:  provider,
+func NewBuilder(plans map[string]Plan, resources resource.Configs, st *store.PostgresStore) *Builder {
+	return &Builder{
+		plans:     plans,
 		resources: resources,
 		st:        st,
 	}
-	b.plans = b.buildPlans()
-	return b
 }
 
-func (b *Builder) SetResourceConfig(resources resource.Configs) {
+func (b *Builder) SetPlans(plans map[string]Plan, resources resource.Configs) {
+	b.plans = plans
 	b.resources = resources
-	b.plans = b.buildPlans()
 }
 
-// buildPlans constructs an aggregation plan for each resource type in the config.
-func (b *Builder) buildPlans() map[string]aggregation.Executor[buildDoc, BuildRequest] {
-	plans := make(map[string]aggregation.Executor[buildDoc, BuildRequest], len(b.resources))
-	for _, rCfg := range b.resources {
-		plans[rCfg.Resource] = b.buildPlanForResource(rCfg)
+// BuildPlansFromConfig constructs an aggregation plan for each resource type
+// in the config. This is the default plan builder used by the standalone binary.
+// Library users can build their own plans and pass them to NewBuilder directly.
+func BuildPlansFromConfig(provider source.Provider, resources resource.Configs, st *store.PostgresStore) map[string]Plan {
+	plans := make(map[string]Plan, len(resources))
+	for _, rCfg := range resources {
+		plans[rCfg.Resource] = buildPlanForResource(provider, st, rCfg)
 	}
 	return plans
 }
 
 // buildPlanForResource creates a RootPlan for the resource and chains SubPlans
 // for each relation in topological order.
-func (b *Builder) buildPlanForResource(rCfg *resource.Config) aggregation.Executor[buildDoc, BuildRequest] {
-	// Root plan: fetches the root resource and initialises the buildDoc.
-	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[BuildRequest]) (aggregation.FetchResult[buildDoc], error) {
-		data, err := b.provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
+func buildPlanForResource(provider source.Provider, st *store.PostgresStore, rCfg *resource.Config) Plan {
+	// Root plan: fetches the root resource and initialises the BuildDoc.
+	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[BuildRequest]) (aggregation.FetchResult[BuildDoc], error) {
+		data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
 		if err != nil {
-			return aggregation.FetchResult[buildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
+			return aggregation.FetchResult[BuildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
 		}
 
 		root := model.Resource{Type: params.Request.ResourceType, Id: params.Request.ResourceID}
 
 		if data == nil {
-			return aggregation.FetchResult[buildDoc]{Items: []buildDoc{{
+			return aggregation.FetchResult[BuildDoc]{Items: []BuildDoc{{
 				Doc:      nil,
 				Resolved: nil,
 				Root:     root,
@@ -78,14 +80,14 @@ func (b *Builder) buildPlanForResource(rCfg *resource.Config) aggregation.Execut
 		}
 
 		// Clear existing relation edges so we can re-add the current set.
-		if err := b.st.RemoveResource(context.Background(), root); err != nil {
-			return aggregation.FetchResult[buildDoc]{}, fmt.Errorf("clear relations for %s/%s: %w", root.Type, root.Id, err)
+		if err := st.RemoveResource(context.Background(), root); err != nil {
+			return aggregation.FetchResult[BuildDoc]{}, fmt.Errorf("clear relations for %s/%s: %w", root.Type, root.Id, err)
 		}
 
 		fields := filterFields(data, rCfg.Fields)
 
-		return aggregation.FetchResult[buildDoc]{
-			Items: []buildDoc{{
+		return aggregation.FetchResult[BuildDoc]{
+			Items: []BuildDoc{{
 				Doc: map[string]any{
 					"fields": fields,
 				},
@@ -107,23 +109,22 @@ func (b *Builder) buildPlanForResource(rCfg *resource.Config) aggregation.Execut
 	}
 
 	// Chain a SubPlan for each relation.
-	var current aggregation.Executor[buildDoc, BuildRequest] = rootPlan
+	var current Plan = rootPlan
 	for _, rel := range ordered {
-		current = b.buildRelationSubPlan(current, rCfg.Resource, rel)
+		current = buildRelationSubPlan(provider, st, current, rel)
 	}
 
 	return current
 }
 
-// relationFetcher implements aggregation.SubFetcher[buildDoc].
+// relationFetcher implements aggregation.SubFetcher[BuildDoc].
 type relationFetcher struct {
-	provider     source.Provider
-	st           *store.PostgresStore
-	rel          resource.RelationConfig
-	rootResource string
+	provider source.Provider
+	st       *store.PostgresStore
+	rel      resource.RelationConfig
 }
 
-func (f *relationFetcher) Fetch(parent buildDoc) (any, error) {
+func (f *relationFetcher) Fetch(parent BuildDoc) (any, error) {
 	if parent.Doc == nil {
 		return (*fetchedRelation)(nil), nil
 	}
@@ -182,19 +183,19 @@ type fetchedRelation struct {
 }
 
 // buildRelationSubPlan creates a SubPlan for a single relation.
-func (b *Builder) buildRelationSubPlan(
-	parent aggregation.Executor[buildDoc, BuildRequest],
-	rootResource string,
+func buildRelationSubPlan(
+	provider source.Provider,
+	st *store.PostgresStore,
+	parent Plan,
 	rel resource.RelationConfig,
-) *aggregation.SubPlan[buildDoc, buildDoc, BuildRequest] {
+) *aggregation.SubPlan[BuildRequest, BuildDoc, BuildDoc] {
 	fetcher := &relationFetcher{
-		provider:     b.provider,
-		st:           b.st,
-		rel:          rel,
-		rootResource: rootResource,
+		provider: provider,
+		st:       st,
+		rel:      rel,
 	}
 
-	builder := func(parentDoc buildDoc, fetchResult any) buildDoc {
+	builder := func(parentDoc BuildDoc, fetchResult any) BuildDoc {
 		if parentDoc.Doc == nil {
 			return parentDoc
 		}

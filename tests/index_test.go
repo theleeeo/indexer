@@ -6,7 +6,7 @@ import (
 )
 
 func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
-	t.idx.SetResourceConfig(DefaultResourceConfig)
+	t.setResourceConfig(DefaultResourceConfig)
 
 	// Populate source with two "a" resources.
 	t.fakeProvider.SetResource("a", "1", map[string]any{
@@ -116,7 +116,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 }
 
 func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
-	t.idx.SetResourceConfig(DefaultResourceConfig)
+	t.setResourceConfig(DefaultResourceConfig)
 
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1"})
 	t.fakeProvider.SetResource("b", "2", map[string]any{"id": "2"})
@@ -184,7 +184,7 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 }
 
 func (t *TestSuite) Test_Create_WithRelation() {
-	t.idx.SetResourceConfig(DefaultResourceConfig)
+	t.setResourceConfig(DefaultResourceConfig)
 
 	// Source has resource "a/1" with a related "b/1".
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1"})
@@ -214,7 +214,7 @@ func (t *TestSuite) Test_Create_WithRelation() {
 // Test that when a related child resource is created after the parent,
 // and we rebuild the parent, the parent document has the relation populated.
 func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
-	t.idx.SetResourceConfig(DefaultResourceConfig)
+	t.setResourceConfig(DefaultResourceConfig)
 
 	// Initially a/1 exists with a relation to b/1 already known by the source.
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1"})
@@ -253,7 +253,7 @@ func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
 // Test that when a root "c" has relations to "a" and "b", and the source
 // returns the full graph, it gets indexed correctly.
 func (t *TestSuite) Test_RelatedRelations_FullGraph() {
-	t.idx.SetResourceConfig(RelatedResourceConfig)
+	t.setResourceConfig(RelatedResourceConfig)
 
 	// b/1 exists as a root resource.
 	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "bval"})
@@ -302,7 +302,7 @@ func (t *TestSuite) Test_RelatedRelations_FullGraph() {
 
 // Test that updating a child resource triggers a rebuild of parent root documents.
 func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
-	t.idx.SetResourceConfig(RelatedResourceConfig)
+	t.setResourceConfig(RelatedResourceConfig)
 
 	// Set up the graph: c/1 → a/1, c/1 → b/1.
 	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "aval"})

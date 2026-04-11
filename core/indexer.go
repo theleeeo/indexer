@@ -8,7 +8,6 @@ import (
 	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
-	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 )
 
@@ -26,8 +25,10 @@ func (e *InvalidArgumentError) Error() string {
 
 // Config holds the dependencies required to create an Indexer.
 type Config struct {
-	// Provider fetches authoritative data from the source service.
-	Provider source.Provider
+	// Builder is the projection builder that fetches and assembles documents.
+	// Use projection.BuildPlansFromConfig to create plans from a resource config,
+	// or provide custom plans for library usage.
+	Builder *projection.Builder
 
 	// Resources defines the resource types, fields, and relations.
 	Resources resource.Configs
@@ -57,26 +58,22 @@ type Indexer struct {
 }
 
 // New creates a new Indexer with the given configuration.
-// The projection builder is created automatically from the provided
-// Provider, Resources, and Store.
 func New(cfg Config) *Indexer {
-	builder := projection.NewBuilder(cfg.Provider, cfg.Resources, cfg.Store)
-
 	return &Indexer{
 		st:        cfg.Store,
 		es:        cfg.ES,
 		queue:     cfg.Queue,
 		resources: cfg.Resources,
-		builder:   builder,
+		builder:   cfg.Builder,
 	}
 }
 
-// SetResourceConfig dynamically updates the resource configuration.
+// SetBuilder replaces the projection builder and resource configuration.
 // This is primarily used by the standalone application with YAML DSL;
-// library users typically set the config once at construction via Config.
-func (idx *Indexer) SetResourceConfig(resources resource.Configs) {
+// library users typically set these once at construction via Config.
+func (idx *Indexer) SetBuilder(builder *projection.Builder, resources resource.Configs) {
 	idx.resources = resources
-	idx.builder.SetResourceConfig(resources)
+	idx.builder = builder
 }
 
 func (idx *Indexer) verifyResourceConfig(resource, resourceId string) (*resource.Config, error) {
