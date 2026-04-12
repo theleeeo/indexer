@@ -230,13 +230,10 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 		return nil, fmt.Errorf("unknown resource type %q", rootType)
 	}
 
-	ch, err := plan.Execute(ctx, BuildRequest{
+	ch := plan.Execute(ctx, BuildRequest{
 		ResourceType: rootType,
 		ResourceID:   rootID,
 	})
-	if err != nil {
-		return nil, err
-	}
 
 	for result := range ch {
 		if result.Err != nil {

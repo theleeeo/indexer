@@ -25,8 +25,7 @@ func Test_RootPlan(t *testing.T) {
 
 	rootPlan := NewRootPlan(fetcher)
 
-	ch, err := rootPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := rootPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -59,8 +58,7 @@ func Test_SubPlan_Execute(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -79,8 +77,7 @@ func Test_RootPlan_Execute_WithError(t *testing.T) {
 
 	rootPlan := NewRootPlan(fetcher)
 
-	ch, err := rootPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := rootPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -112,8 +109,7 @@ func Test_SubPlan_WithError(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -142,8 +138,7 @@ func Test_SubPlan_WithParentError(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -180,8 +175,7 @@ func Test_SubPlan_MultipleSubItems(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[SubResult]
 	for res := range ch {
@@ -235,8 +229,7 @@ func Test_MultipleSubPlans(t *testing.T) {
 	subPlan1 := NewSubPlan(rootPlan, subFetcher1, builder1)
 	subPlan2 := NewSubPlan(subPlan1, subFetcher2, builder2)
 
-	ch, err := subPlan2.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan2.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[SubResult2]
 	for res := range ch {
@@ -270,8 +263,7 @@ func Test_SubPlan_EmptyParentResults(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -302,8 +294,7 @@ func Test_SubPlan_WithMapResult(t *testing.T) {
 	rootPlan := NewRootPlan(rootFetcher)
 	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
 
-	ch, err := subPlan.Execute(context.Background(), "request")
-	require.NoError(t, err)
+	ch := subPlan.Execute(context.Background(), "request")
 
 	var results []ExecutionResult[map[string]string]
 	for res := range ch {

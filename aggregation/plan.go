@@ -22,7 +22,7 @@ type RootPlan[Req any, P any] struct {
 	fetcher func(FetchParameters[Req]) (FetchResult[P], error)
 }
 
-func (p *RootPlan[Req, P]) Execute(ctx context.Context, params Req) (<-chan ExecutionResult[P], error) {
+func (p *RootPlan[Req, P]) Execute(ctx context.Context, params Req) <-chan ExecutionResult[P] {
 	var npt any
 	ch := make(chan ExecutionResult[P])
 	go func() {
@@ -42,14 +42,14 @@ func (p *RootPlan[Req, P]) Execute(ctx context.Context, params Req) (<-chan Exec
 			npt = result.NextPageToken
 		}
 	}()
-	return ch, nil
+	return ch
 }
 
 type SubFetcher[Parent any] interface {
 	Fetch(Parent) (any, error)
 }
 
-func NewSubPlan[Parent any, Req any, Result any](
+func NewSubPlan[Req any, Parent any, Result any](
 	root Executor[Req, Parent],
 	fetcher SubFetcher[Parent],
 	builder func(Parent, any) Result,
@@ -63,15 +63,12 @@ type SubPlan[Req any, Parent any, Result any] struct {
 	Builder func(Parent, any) Result
 }
 
-func (p *SubPlan[Req, P, R]) Execute(ctx context.Context, rootParams Req) (<-chan ExecutionResult[R], error) {
+func (p *SubPlan[Req, P, R]) Execute(ctx context.Context, rootParams Req) <-chan ExecutionResult[R] {
 	ch := make(chan ExecutionResult[R])
 	go func() {
 		defer close(ch)
-		parentCh, err := p.Parent.Execute(ctx, rootParams)
-		if err != nil {
-			ch <- ExecutionResult[R]{Err: err}
-			return
-		}
+
+		parentCh := p.Parent.Execute(ctx, rootParams)
 
 		for parentItems := range parentCh {
 			if parentItems.Err != nil {
@@ -93,7 +90,7 @@ func (p *SubPlan[Req, P, R]) Execute(ctx context.Context, rootParams Req) (<-cha
 			ch <- ExecutionResult[R]{Items: rowResult}
 		}
 	}()
-	return ch, nil
+	return ch
 }
 
 type ExecutionResult[P any] struct {
@@ -102,5 +99,5 @@ type ExecutionResult[P any] struct {
 }
 
 type Executor[Req, P any] interface {
-	Execute(ctx context.Context, params Req) (<-chan ExecutionResult[P], error)
+	Execute(ctx context.Context, params Req) <-chan ExecutionResult[P]
 }
