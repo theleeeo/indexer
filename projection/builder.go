@@ -26,7 +26,7 @@ type BuildDoc struct {
 }
 
 // Plan is an aggregation executor that produces BuildDoc results.
-type Plan = aggregation.Executor[BuildRequest, BuildDoc]
+type Plan = aggregation.Executer[BuildRequest, BuildDoc]
 
 type Builder struct {
 	resources resource.Configs

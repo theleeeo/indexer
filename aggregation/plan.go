@@ -50,7 +50,7 @@ type SubFetcher[Parent any] interface {
 }
 
 func NewSubPlan[Req any, Parent any, Result any](
-	root Executor[Req, Parent],
+	root Executer[Req, Parent],
 	fetcher SubFetcher[Parent],
 	builder func(Parent, any) Result,
 ) *SubPlan[Req, Parent, Result] {
@@ -58,7 +58,7 @@ func NewSubPlan[Req any, Parent any, Result any](
 }
 
 type SubPlan[Req any, Parent any, Result any] struct {
-	Parent  Executor[Req, Parent]
+	Parent  Executer[Req, Parent]
 	Fetcher SubFetcher[Parent]
 	Builder func(Parent, any) Result
 }
@@ -98,6 +98,6 @@ type ExecutionResult[P any] struct {
 	Err   error
 }
 
-type Executor[Req, P any] interface {
+type Executer[Req, P any] interface {
 	Execute(ctx context.Context, params Req) <-chan ExecutionResult[P]
 }
