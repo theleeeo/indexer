@@ -163,3 +163,33 @@ func (s *PostgresStore) removeResource(ctx context.Context, sender executor, res
 	)
 	return err
 }
+
+func (s *PostgresStore) AddChildResources(ctx context.Context, parent model.Resource, childs []model.Resource) error {
+	var relations []Relation
+	for _, child := range childs {
+		relations = append(relations, Relation{
+			Parent: parent,
+			Child:  child,
+		})
+	}
+	return s.AddRelations(ctx, relations)
+}
+
+// UpsertResource inserts or ignores the resource in the resources table.
+func (s *PostgresStore) UpsertResource(ctx context.Context, resource model.Resource) error {
+	_, err := s.pool.Exec(ctx,
+		`INSERT INTO resources (type, id) VALUES ($1, $2) ON CONFLICT (type, id) DO NOTHING`,
+		resource.Type, resource.Id,
+	)
+	return err
+}
+
+// DeleteResource removes a resource from the resources table.
+func (s *PostgresStore) DeleteResource(ctx context.Context, resource model.Resource) error {
+	_, err := s.pool.Exec(ctx,
+		`DELETE FROM resources WHERE type=$1 AND id=$2`,
+		resource.Type, resource.Id,
+	)
+
+	return err
+}

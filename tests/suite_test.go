@@ -291,7 +291,7 @@ func (t *TestSuite) SetupSuite() {
 	t.st = store.NewPostgresStore(dbpool)
 	t.fakeProvider = NewFakeProvider()
 
-	plans := projection.BuildPlansFromConfig(t.fakeProvider, DefaultResourceConfig, t.st)
+	plans := projection.BuildPlansFromConfig(t.fakeProvider, DefaultResourceConfig)
 	builder := projection.NewBuilder(plans, DefaultResourceConfig, t.st)
 
 	t.idx = core.New(core.Config{
@@ -334,7 +334,7 @@ func (t *TestSuite) SetupTest() {
 // config and updates the indexer's builder. This is the test equivalent of
 // dynamically changing the resource configuration at runtime.
 func (t *TestSuite) setResourceConfig(resources resource.Configs) {
-	plans := projection.BuildPlansFromConfig(t.fakeProvider, resources, t.st)
+	plans := projection.BuildPlansFromConfig(t.fakeProvider, resources)
 	builder := projection.NewBuilder(plans, resources, t.st)
 	t.idx.SetBuilder(builder, resources)
 }

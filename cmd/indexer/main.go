@@ -93,7 +93,7 @@ func main() {
 	}
 	defer sourceProvider.Close()
 
-	plans := projection.BuildPlansFromConfig(sourceProvider, resources, st)
+	plans := projection.BuildPlansFromConfig(sourceProvider, resources)
 	builder := projection.NewBuilder(plans, resources, st)
 
 	idx := core.New(core.Config{

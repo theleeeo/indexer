@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/theleeeo/indexer/model"
 	"github.com/theleeeo/indexer/source"
 )
 
@@ -17,6 +18,18 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 	}
 	if n.ResourceID == "" {
 		return &InvalidArgumentError{Msg: "resource_id is required"}
+	}
+
+	// Track the resource itself in the resources table.
+	res := model.Resource{Type: n.ResourceType, Id: n.ResourceID}
+	if n.Kind == source.ChangeDeleted {
+		if err := idx.st.DeleteResource(ctx, res); err != nil {
+			return fmt.Errorf("delete resource %s/%s: %w", n.ResourceType, n.ResourceID, err)
+		}
+	} else {
+		if err := idx.st.UpsertResource(ctx, res); err != nil {
+			return fmt.Errorf("upsert resource %s/%s: %w", n.ResourceType, n.ResourceID, err)
+		}
 	}
 
 	// Determine which root documents are affected.

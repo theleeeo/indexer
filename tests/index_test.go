@@ -5,6 +5,18 @@ import (
 	"github.com/theleeeo/indexer/source"
 )
 
+// resourceTracked reports whether (resourceType, resourceID) is present in the
+// resources table.
+func (t *TestSuite) resourceTracked(resourceType, resourceID string) bool {
+	var count int
+	err := t.pool.QueryRow(t.T().Context(),
+		`SELECT COUNT(*) FROM resources WHERE type=$1 AND id=$2`,
+		resourceType, resourceID,
+	).Scan(&count)
+	t.Require().NoError(err)
+	return count > 0
+}
+
 func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	t.setResourceConfig(DefaultResourceConfig)
 
@@ -25,6 +37,8 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			Kind:         source.ChangeCreated,
 		})
 		t.Require().NoError(err)
+		t.Require().True(t.resourceTracked("a", "1"))
+
 		t.worker.Drain(t.T().Context())
 
 		err = t.idx.RegisterChange(t.T().Context(), source.Notification{
@@ -33,6 +47,8 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			Kind:         source.ChangeCreated,
 		})
 		t.Require().NoError(err)
+		t.Require().True(t.resourceTracked("a", "2"))
+
 		t.worker.Drain(t.T().Context())
 	})
 
@@ -76,6 +92,8 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			Kind:         source.ChangeUpdated,
 		})
 		t.Require().NoError(err)
+		t.Require().True(t.resourceTracked("a", "1"))
+
 		t.worker.Drain(t.T().Context())
 
 		resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{
@@ -96,6 +114,7 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			Kind:         source.ChangeDeleted,
 		})
 		t.Require().NoError(err)
+		t.Require().False(t.resourceTracked("a", "1"))
 		t.worker.Drain(t.T().Context())
 
 		resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})

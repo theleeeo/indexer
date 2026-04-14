@@ -1,3 +1,9 @@
+CREATE TABLE IF NOT EXISTS resources (
+	type VARCHAR NOT NULL,
+	id VARCHAR NOT NULL,
+	UNIQUE (type, id)
+);
+
 CREATE TABLE IF NOT EXISTS relations (
 	resource VARCHAR NOT NULL,
 	resource_id VARCHAR NOT NULL,

@@ -20,9 +20,12 @@ type BuildRequest struct {
 // BuildDoc is the intermediate document flowing through the aggregation plan.
 // It carries the final doc, the resolved data for chained relations, and root info.
 type BuildDoc struct {
+	Root model.Resource
+
 	Doc      map[string]any
 	Resolved map[string][]map[string]any
-	Root     model.Resource
+
+	Relations []model.Resource
 }
 
 // Plan is an aggregation executor that produces BuildDoc results.
@@ -51,17 +54,17 @@ func (b *Builder) SetPlans(plans map[string]Plan, resources resource.Configs) {
 // BuildPlansFromConfig constructs an aggregation plan for each resource type
 // in the config. This is the default plan builder used by the standalone binary.
 // Library users can build their own plans and pass them to NewBuilder directly.
-func BuildPlansFromConfig(provider source.Provider, resources resource.Configs, st *store.PostgresStore) map[string]Plan {
+func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]Plan {
 	plans := make(map[string]Plan, len(resources))
 	for _, rCfg := range resources {
-		plans[rCfg.Resource] = buildPlanForResource(provider, st, rCfg)
+		plans[rCfg.Resource] = buildPlanForResource(provider, rCfg)
 	}
 	return plans
 }
 
 // buildPlanForResource creates a RootPlan for the resource and chains SubPlans
 // for each relation in topological order.
-func buildPlanForResource(provider source.Provider, st *store.PostgresStore, rCfg *resource.Config) Plan {
+func buildPlanForResource(provider source.Provider, rCfg *resource.Config) Plan {
 	// Root plan: fetches the root resource and initialises the BuildDoc.
 	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[BuildRequest]) (aggregation.FetchResult[BuildDoc], error) {
 		data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
@@ -77,11 +80,6 @@ func buildPlanForResource(provider source.Provider, st *store.PostgresStore, rCf
 				Resolved: nil,
 				Root:     root,
 			}}}, nil
-		}
-
-		// Clear existing relation edges so we can re-add the current set.
-		if err := st.RemoveResource(context.Background(), root); err != nil {
-			return aggregation.FetchResult[BuildDoc]{}, fmt.Errorf("clear relations for %s/%s: %w", root.Type, root.Id, err)
 		}
 
 		fields := filterFields(data, rCfg.Fields)
@@ -111,7 +109,7 @@ func buildPlanForResource(provider source.Provider, st *store.PostgresStore, rCf
 	// Chain a SubPlan for each relation.
 	var current Plan = rootPlan
 	for _, rel := range ordered {
-		current = buildRelationSubPlan(provider, st, current, rel)
+		current = buildRelationSubPlan(provider, current, rel)
 	}
 
 	return current
@@ -120,7 +118,6 @@ func buildPlanForResource(provider source.Provider, st *store.PostgresStore, rCf
 // relationFetcher implements aggregation.SubFetcher[BuildDoc].
 type relationFetcher struct {
 	provider source.Provider
-	st       *store.PostgresStore
 	rel      resource.RelationConfig
 }
 
@@ -158,40 +155,26 @@ func (f *relationFetcher) Fetch(parent BuildDoc) (any, error) {
 		return nil, fmt.Errorf("fetch related %s for %s/%s: %w", f.rel.Resource, parent.Root.Type, parent.Root.Id, err)
 	}
 
-	// Persist discovered relations so AffectedRoots can look them up.
-	var children []store.Relation
-	for _, r := range relatedResp.Related {
-		if id, ok := r["id"]; ok {
-			if idStr, ok := id.(string); ok {
-				children = append(children, store.Relation{
-					Parent: parent.Root,
-					Child:  model.Resource{Type: f.rel.Resource, Id: idStr},
-				})
-			}
-		}
-	}
-	if err := f.st.AddRelations(context.Background(), children); err != nil {
-		return nil, fmt.Errorf("persist relations %s for %s/%s: %w", f.rel.Resource, parent.Root.Type, parent.Root.Id, err)
-	}
-
-	return &fetchedRelation{Related: relatedResp.Related}, nil
+	return &fetchedRelation{
+		ResourceType: f.rel.Resource,
+		Related:      relatedResp.Related,
+	}, nil
 }
 
 // fetchedRelation holds the raw data returned by a relation fetch.
 type fetchedRelation struct {
-	Related []map[string]any
+	ResourceType string
+	Related      []map[string]any
 }
 
 // buildRelationSubPlan creates a SubPlan for a single relation.
 func buildRelationSubPlan(
 	provider source.Provider,
-	st *store.PostgresStore,
 	parent Plan,
 	rel resource.RelationConfig,
 ) *aggregation.SubPlan[BuildRequest, BuildDoc, BuildDoc] {
 	fetcher := &relationFetcher{
 		provider: provider,
-		st:       st,
 		rel:      rel,
 	}
 
@@ -203,6 +186,14 @@ func buildRelationSubPlan(
 		fr, ok := fetchResult.(*fetchedRelation)
 		if !ok || fr == nil {
 			return parentDoc
+		}
+
+		for _, r := range fr.Related {
+			if id, ok := r["id"]; ok {
+				if idStr, ok := id.(string); ok {
+					parentDoc.Relations = append(parentDoc.Relations, model.Resource{Type: fr.ResourceType, Id: idStr})
+				}
+			}
 		}
 
 		// Update the resolved map so downstream relations can reference this data.
@@ -230,6 +221,10 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 		return nil, fmt.Errorf("unknown resource type %q", rootType)
 	}
 
+	if err := b.st.RemoveResource(ctx, model.Resource{Type: rootType, Id: rootID}); err != nil {
+		return nil, fmt.Errorf("clear relations for %s/%s: %w", rootType, rootID, err)
+	}
+
 	ch := plan.Execute(ctx, BuildRequest{
 		ResourceType: rootType,
 		ResourceID:   rootID,
@@ -240,7 +235,16 @@ func (b *Builder) Build(ctx context.Context, rootType, rootID string) (map[strin
 			return nil, result.Err
 		}
 		if len(result.Items) > 0 {
-			return result.Items[0].Doc, nil
+			doc := result.Items[0].Doc
+			// TODO: Race condition where childs can be changed between fetch and persist.
+			if err := b.st.AddChildResources(ctx,
+				model.Resource{Type: rootType, Id: rootID},
+				result.Items[0].Relations,
+			); err != nil {
+				return nil, fmt.Errorf("persist relations for %s/%s: %w", rootType, rootID, err)
+			}
+
+			return doc, nil
 		}
 	}
 
@@ -297,6 +301,7 @@ func resolveOrder(rootType string, relations []resource.RelationConfig) ([]resou
 func (b *Builder) AffectedRoots(ctx context.Context, resourceType, resourceID string) ([]model.Resource, error) {
 	var roots []model.Resource
 
+	// TODO: Should not be able to fail?
 	if rCfg := b.resources.Get(resourceType); rCfg != nil {
 		roots = append(roots, model.Resource{Type: resourceType, Id: resourceID})
 	}
