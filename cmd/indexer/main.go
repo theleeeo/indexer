@@ -17,7 +17,6 @@ import (
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/gen/search/v1"
 	"github.com/theleeeo/indexer/jobqueue"
-	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/server"
 	"github.com/theleeeo/indexer/source"
@@ -95,10 +94,9 @@ func main() {
 	defer sourceProvider.Close()
 
 	plans := dsl.BuildPlansFromConfig(sourceProvider, resources)
-	builder := projection.NewBuilder(plans, resources, st)
 
 	idx := core.New(core.Config{
-		Builder:   builder,
+		Plans:     plans,
 		Resources: resources,
 		ES:        esClientImpl,
 		Store:     st,

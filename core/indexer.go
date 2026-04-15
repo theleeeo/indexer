@@ -8,6 +8,7 @@ import (
 	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 )
 
@@ -25,13 +26,10 @@ func (e *InvalidArgumentError) Error() string {
 
 // Config holds the dependencies required to create an Indexer.
 type Config struct {
-	// Builder is the projection builder that fetches and assembles documents.
-	// Use projection.BuildPlansFromConfig to create plans from a resource config,
-	// or provide custom plans for library usage.
-	Builder *projection.Builder
-
 	// Resources defines the resource types, fields, and relations.
 	Resources resource.Configs
+
+	Plans map[string]projection.Plan
 
 	// ES is the Elasticsearch client for indexing and searching.
 	ES *es.Client
@@ -50,11 +48,11 @@ type Indexer struct {
 	st *store.PostgresStore
 	es *es.Client
 
+	plans map[string]projection.Plan
+
 	queue *jobqueue.Queue
 
 	resources resource.Configs
-
-	builder *projection.Builder
 }
 
 // New creates a new Indexer with the given configuration.
@@ -64,31 +62,32 @@ func New(cfg Config) *Indexer {
 		es:        cfg.ES,
 		queue:     cfg.Queue,
 		resources: cfg.Resources,
-		builder:   cfg.Builder,
+		plans:     cfg.Plans,
 	}
 }
 
-// SetBuilder replaces the projection builder and resource configuration.
+// SetPlans replaces the aggregation plans and resource configuration.
 // This is primarily used by the standalone application with YAML DSL;
 // library users typically set these once at construction via Config.
-func (idx *Indexer) SetBuilder(builder *projection.Builder, resources resource.Configs) {
+func (idx *Indexer) SetPlans(plans map[string]projection.Plan, resources resource.Configs) {
+	idx.plans = plans
 	idx.resources = resources
-	idx.builder = builder
+
 }
 
-func (idx *Indexer) verifyResourceConfig(resource, resourceId string) (*resource.Config, error) {
-	if resource == "" {
-		return nil, fmt.Errorf("resource required")
+func (idx *Indexer) verifyResourceConfig(n source.Notification) error {
+	if n.ResourceType == "" {
+		return fmt.Errorf("resource_type required")
 	}
 
-	if resourceId == "" {
-		return nil, fmt.Errorf("resource_id required")
+	if n.ResourceID == "" {
+		return fmt.Errorf("resource_id required")
 	}
 
-	r := idx.resources.Get(resource)
+	r := idx.resources.Get(n.ResourceType)
 	if r == nil {
-		return nil, ErrUnknownResource
+		return ErrUnknownResource
 	}
 
-	return r, nil
+	return nil
 }

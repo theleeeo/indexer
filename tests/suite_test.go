@@ -17,7 +17,6 @@ import (
 	"github.com/theleeeo/indexer/dsl"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/jobqueue"
-	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
@@ -293,10 +292,9 @@ func (t *TestSuite) SetupSuite() {
 	t.fakeProvider = NewFakeProvider()
 
 	plans := dsl.BuildPlansFromConfig(t.fakeProvider, DefaultResourceConfig)
-	builder := projection.NewBuilder(plans, DefaultResourceConfig, t.st)
 
 	t.idx = core.New(core.Config{
-		Builder:   builder,
+		Plans:     plans,
 		Resources: DefaultResourceConfig,
 		ES:        es.New(esClient, true),
 		Store:     t.st,
@@ -336,8 +334,7 @@ func (t *TestSuite) SetupTest() {
 // dynamically changing the resource configuration at runtime.
 func (t *TestSuite) setResourceConfig(resources resource.Configs) {
 	plans := dsl.BuildPlansFromConfig(t.fakeProvider, resources)
-	builder := projection.NewBuilder(plans, resources, t.st)
-	t.idx.SetBuilder(builder, resources)
+	t.idx.SetPlans(plans, resources)
 }
 
 func (t *TestSuite) BeforeTest(suiteName, testName string) {

@@ -13,11 +13,8 @@ import (
 // It determines which root search documents are affected and enqueues
 // rebuild (or delete) jobs for each.
 func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) error {
-	if n.ResourceType == "" {
-		return &InvalidArgumentError{Msg: "resource_type is required"}
-	}
-	if n.ResourceID == "" {
-		return &InvalidArgumentError{Msg: "resource_id is required"}
+	if err := idx.verifyResourceConfig(n); err != nil {
+		return err
 	}
 
 	// Track the resource itself in the resources table.
@@ -32,10 +29,35 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 		}
 	}
 
-	// Determine which root documents are affected.
-	roots, err := idx.builder.AffectedRoots(ctx, n.ResourceType, n.ResourceID)
-	if err != nil {
-		return fmt.Errorf("determining affected roots: %w", err)
+	roots := []model.Resource{
+		// The resource itself is always affected
+		{Type: n.ResourceType, Id: n.ResourceID},
+	}
+
+	// Determine which parents are affected.
+	for _, rCfg := range idx.resources {
+		if rCfg.Resource == n.ResourceType {
+			continue
+		}
+
+		hasRelation := false
+		for _, rel := range rCfg.Relations {
+			if rel.Resource == n.ResourceType {
+				hasRelation = true
+				break
+			}
+		}
+
+		if !hasRelation {
+			continue
+		}
+
+		parents, err := idx.st.GetParentResourcesOfType(ctx, model.Resource{Type: n.ResourceType, Id: n.ResourceID}, rCfg.Resource)
+		if err != nil {
+			return fmt.Errorf("getting parents: %w", err)
+		}
+
+		roots = append(roots, parents...)
 	}
 
 	slog.Info("registering change",
@@ -58,7 +80,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 			ResourceType: root.Type,
 			ResourceID:   root.Id,
 		}, nil); err != nil {
-			return fmt.Errorf("enqueue %s job for %s/%s: %w", jobType, root.Type, root.Id, err)
+			return fmt.Errorf("enqueueing job for root %s|%s: %w", root.Type, root.Id, err)
 		}
 	}
 
