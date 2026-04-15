@@ -1,0 +1,181 @@
+package dsl
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/theleeeo/indexer/aggregation"
+	"github.com/theleeeo/indexer/model"
+	"github.com/theleeeo/indexer/projection"
+	"github.com/theleeeo/indexer/resource"
+	"github.com/theleeeo/indexer/source"
+)
+
+// BuildPlansFromConfig constructs an aggregation plan for each resource type
+// in the config. This is the default plan builder used by the standalone binary.
+// Library users can build their own plans and pass them to NewBuilder directly.
+func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]projection.Plan {
+	plans := make(map[string]projection.Plan, len(resources))
+	for _, rCfg := range resources {
+		plans[rCfg.Resource] = buildPlanForResource(provider, rCfg)
+	}
+	return plans
+}
+
+// buildPlanForResource creates a RootPlan for the resource and chains SubPlans
+// for each relation in topological order.
+func buildPlanForResource(provider source.Provider, rCfg *resource.Config) projection.Plan {
+	// Root plan: fetches the root resource and initialises the BuildDoc.
+	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[projection.BuildRequest]) (aggregation.FetchResult[projection.BuildDoc], error) {
+		data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
+		if err != nil {
+			return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
+		}
+
+		root := model.Resource{Type: params.Request.ResourceType, Id: params.Request.ResourceID}
+
+		if data == nil {
+			return aggregation.FetchResult[projection.BuildDoc]{Items: []projection.BuildDoc{{
+				Doc:      nil,
+				Resolved: nil,
+				Root:     root,
+			}}}, nil
+		}
+
+		fields := filterFields(data, rCfg.Fields)
+
+		return aggregation.FetchResult[projection.BuildDoc]{
+			Items: []projection.BuildDoc{{
+				Doc: map[string]any{
+					"fields": fields,
+				},
+				Resolved: map[string][]map[string]any{
+					rCfg.Resource: {data},
+				},
+				Root: root,
+			}},
+		}, nil
+	})
+
+	// Resolve the topological order of relations.
+	ordered, err := resolveOrder(rCfg.Resource, rCfg.Relations)
+	if err != nil {
+		// If the config is invalid the plan will never execute successfully,
+		// but we defer the error to execution time rather than panicking at
+		// startup so that validation can catch it first.
+		return rootPlan
+	}
+
+	// Chain a SubPlan for each relation.
+	var current projection.Plan = rootPlan
+	for _, rel := range ordered {
+		current = buildRelationSubPlan(provider, current, rel)
+	}
+
+	return current
+}
+
+// buildRelationSubPlan creates a SubPlan for a single relation.
+func buildRelationSubPlan(
+	provider source.Provider,
+	parent projection.Plan,
+	rel resource.RelationConfig,
+) *aggregation.SubPlan[projection.BuildRequest, projection.BuildDoc, projection.BuildDoc] {
+	fetcher := &relationFetcher{
+		provider: provider,
+		rel:      rel,
+	}
+
+	builder := func(parentDoc projection.BuildDoc, fetchResult any) projection.BuildDoc {
+		if parentDoc.Doc == nil {
+			return parentDoc
+		}
+
+		fr, ok := fetchResult.(*fetchedRelation)
+		if !ok || fr == nil {
+			return parentDoc
+		}
+
+		for _, r := range fr.Related {
+			if id, ok := r["id"]; ok {
+				if idStr, ok := id.(string); ok {
+					parentDoc.Relations = append(parentDoc.Relations, model.Resource{Type: fr.ResourceType, Id: idStr})
+				}
+			}
+		}
+
+		// Update the resolved map so downstream relations can reference this data.
+		parentDoc.Resolved[rel.Resource] = fr.Related
+
+		subResources := make([]map[string]any, 0, len(fr.Related))
+		for _, r := range fr.Related {
+			filtered := filterFields(r, rel.Fields)
+			if id, ok := r["id"]; ok {
+				filtered["id"] = id
+			}
+			subResources = append(subResources, filtered)
+		}
+
+		parentDoc.Doc[rel.Resource] = subResources
+		return parentDoc
+	}
+
+	return aggregation.NewSubPlan(parent, fetcher, builder)
+}
+
+func filterFields(data map[string]any, fields []resource.FieldConfig) map[string]any {
+	result := make(map[string]any, len(fields))
+	for _, f := range fields {
+		if v, ok := data[f.Name]; ok {
+			result[f.Name] = v
+		}
+	}
+	return result
+}
+
+// resolveOrder topologically sorts relations so that dependencies (relations
+// whose key source is another relation) are resolved before their dependants.
+func resolveOrder(rootType string, relations []resource.RelationConfig) ([]resource.RelationConfig, error) {
+	byResource := make(map[string]resource.RelationConfig, len(relations))
+	for _, r := range relations {
+		byResource[r.Resource] = r
+	}
+
+	var ordered []resource.RelationConfig
+	visited := make(map[string]bool)
+	inStack := make(map[string]bool)
+
+	var visit func(rel resource.RelationConfig) error
+	visit = func(rel resource.RelationConfig) error {
+		if inStack[rel.Resource] {
+			return fmt.Errorf("cycle detected involving %q", rel.Resource)
+		}
+		if visited[rel.Resource] {
+			return nil
+		}
+		inStack[rel.Resource] = true
+
+		if rel.Key.Source != rootType {
+			dep, ok := byResource[rel.Key.Source]
+			if !ok {
+				return fmt.Errorf("key source %q not found among relations", rel.Key.Source)
+			}
+			if err := visit(dep); err != nil {
+				return err
+			}
+		}
+
+		inStack[rel.Resource] = false
+		visited[rel.Resource] = true
+		ordered = append(ordered, rel)
+		return nil
+	}
+
+	for _, rel := range relations {
+		if err := visit(rel); err != nil {
+			return nil, err
+		}
+	}
+
+	return ordered, nil
+}

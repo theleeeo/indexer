@@ -12,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/theleeeo/indexer/core"
+	"github.com/theleeeo/indexer/dsl"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/gen/search/v1"
@@ -93,7 +94,7 @@ func main() {
 	}
 	defer sourceProvider.Close()
 
-	plans := projection.BuildPlansFromConfig(sourceProvider, resources)
+	plans := dsl.BuildPlansFromConfig(sourceProvider, resources)
 	builder := projection.NewBuilder(plans, resources, st)
 
 	idx := core.New(core.Config{
