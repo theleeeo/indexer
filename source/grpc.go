@@ -18,6 +18,10 @@ type GRPCProvider struct {
 // NewGRPCProvider dials the given address and returns a Provider backed by the
 // remote ProviderService plugin.
 func NewGRPCProvider(addr string) (*GRPCProvider, error) {
+	if addr == "" {
+		return nil, fmt.Errorf("provider address is required")
+	}
+
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, fmt.Errorf("dial provider plugin %s: %w", addr, err)

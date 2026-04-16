@@ -1,0 +1,29 @@
+# App runtime configuration for cmd/indexer.
+# Start with: APP_CONFIG_PATH=example.indexer.yml GOEXPERIMENT=jsonv2 go run ./cmd/indexer
+#
+# Each key maps to an env var by uppercasing and replacing '.' with '_':
+#   grpc.addr        -> GRPC_ADDR
+#   es.addrs         -> ES_ADDRS  (comma-separated when set via env)
+#   es.username      -> ES_USERNAME
+#   es.password      -> ES_PASSWORD
+#   pg.addr          -> PG_ADDR
+#   provider.addr    -> PROVIDER_ADDR
+#   resource_config_path -> RESOURCE_CONFIG_PATH
+
+grpc:
+  addr: ":9000"
+
+es:
+  addrs:
+    - "http://localhost:9200"
+  username: ""
+  password: ""
+
+pg:
+  addr: "postgres://user:pass@localhost:5432/indexer"
+
+# Required unless provided with PROVIDER_ADDR env var.
+provider:
+  addr: "localhost:50051"
+
+resource_config_path: "resources.yml"

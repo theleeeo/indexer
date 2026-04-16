@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 
 	"github.com/theleeeo/indexer/core"
@@ -29,22 +28,19 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func env(key, def string) string {
-	if v := os.Getenv(key); v != "" {
-		return v
-	}
-	return def
-}
-
 func main() {
-	grpcAddr := env("GRPC_ADDR", ":9000")
+	appConfigPath := os.Getenv("APP_CONFIG_PATH")
+	if appConfigPath == "" {
+		appConfigPath = "indexer.yml"
+	}
 
-	esAddrs := strings.Split(env("ES_ADDRS", "http://localhost:9200"), ",")
-	esUser := env("ES_USERNAME", "")
-	esPass := env("ES_PASSWORD", "")
+	cfg, err := loadAppConfig(appConfigPath)
+	if err != nil {
+		log.Fatalf("load app config: %v", err)
+	}
 
-	resourceConfigPath := env("RESOURCE_CONFIG_PATH", "resources.yml")
-	resources, err := loadResourceConfig(resourceConfigPath)
+	resources, err := loadResourceConfig(cfg.ResourceConfigPath)
+
 	if err != nil {
 		log.Fatalf("load resource config: %v", err)
 	}
@@ -59,9 +55,9 @@ func main() {
 	}
 
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses: esAddrs,
-		Username:  esUser,
-		Password:  esPass,
+		Addresses: cfg.ES.Addrs,
+		Username:  cfg.ES.Username,
+		Password:  cfg.ES.Password,
 	})
 	if err != nil {
 		log.Fatalf("setting up es client: %v", err)
@@ -69,8 +65,7 @@ func main() {
 
 	esClientImpl := es.New(esClient, false)
 
-	pgAddr := env("PG_ADDR", "postgres://user:pass@localhost:5432/indexer")
-	dbpool, err := pgxpool.New(context.Background(), pgAddr)
+	dbpool, err := pgxpool.New(context.Background(), cfg.PG.Addr)
 	if err != nil {
 		log.Fatalf("pgxpool: %v", err)
 	}
@@ -82,12 +77,7 @@ func main() {
 
 	queue := jobqueue.NewQueue(dbpool)
 
-	// Source provider - connect to the provider plugin over gRPC.
-	providerAddr := env("PROVIDER_ADDR", "")
-	if providerAddr == "" {
-		log.Fatalf("PROVIDER_ADDR is required (address of the gRPC provider plugin)")
-	}
-	sourceProvider, err := source.NewGRPCProvider(providerAddr)
+	sourceProvider, err := source.NewGRPCProvider(cfg.Provider.Addr)
 	if err != nil {
 		log.Fatalf("connect to provider plugin: %v", err)
 	}
@@ -110,7 +100,7 @@ func main() {
 	idxSrv := server.NewIndexer(idx)
 	searchSrv := server.NewSearcher(idx)
 
-	lis, err := net.Listen("tcp", grpcAddr)
+	lis, err := net.Listen("tcp", cfg.GRPC.Addr)
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
@@ -135,7 +125,7 @@ func main() {
 	})
 
 	wg.Go(func() {
-		log.Printf("gRPC server listening on %s", grpcAddr)
+		log.Printf("gRPC server listening on %s", cfg.GRPC.Addr)
 		if err := g.Serve(lis); err != nil {
 			log.Printf("gRPC server error: %v", err)
 		}

@@ -52,6 +52,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 			continue
 		}
 
+		// TODO: Get all parents in one go, no matter the type.
 		parents, err := idx.st.GetParentResourcesOfType(ctx, model.Resource{Type: n.ResourceType, Id: n.ResourceID}, rCfg.Resource)
 		if err != nil {
 			return fmt.Errorf("getting parents: %w", err)
