@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/gen/search/v1"
 	"github.com/theleeeo/indexer/source"
 )
@@ -362,4 +363,189 @@ func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
 		t.Require().Len(aRels, 1)
 		t.Require().Equal("aval_updated", aRels[0].GetStructValue().Fields["f1"].GetStringValue())
 	})
+}
+
+// Test_Rebuild_SpecificIDs triggers a full rebuild for specific resource IDs
+// and verifies the documents are rebuilt in ES.
+func (t *TestSuite) Test_Rebuild_SpecificIDs() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	// Create two resources via the normal change notification path.
+	t.fakeProvider.SetResource("a", "1", map[string]any{
+		"id": "1", "field1": "original1",
+	})
+	t.fakeProvider.SetResource("a", "2", map[string]any{
+		"id": "2", "field1": "original2",
+	})
+
+	for _, id := range []string{"1", "2"} {
+		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+			ResourceType: "a", ResourceID: id, Kind: source.ChangeCreated,
+		})
+		t.Require().NoError(err)
+	}
+	t.worker.Drain(t.T().Context())
+
+	// Update the source data (without notifying the indexer).
+	t.fakeProvider.SetResource("a", "1", map[string]any{
+		"id": "1", "field1": "updated1",
+	})
+
+	// Rebuild only resource "1".
+	err := t.idx.Rebuild(t.T().Context(), []core.ResourceSelector{
+		{ResourceType: "a", ResourceIDs: []string{"1"}},
+	})
+	t.Require().NoError(err)
+	t.worker.Drain(t.T().Context())
+
+	// Resource "1" should have updated data; "2" should be unchanged.
+	resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{
+		Resource: "a", Query: "updated1",
+	})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+	t.Require().Equal("1", resp.Hits[0].Id)
+
+	resp, err = t.idx.Search(t.T().Context(), &search.SearchRequest{
+		Resource: "a", Query: "original2",
+	})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+	t.Require().Equal("2", resp.Hits[0].Id)
+}
+
+// Test_Rebuild_All triggers a full rebuild of all resources of a type
+// using the "rebuild all" path (empty resource IDs).
+func (t *TestSuite) Test_Rebuild_All() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	// Create resources the normal way.
+	t.fakeProvider.SetResource("a", "1", map[string]any{
+		"id": "1", "field1": "v1",
+	})
+	t.fakeProvider.SetResource("a", "2", map[string]any{
+		"id": "2", "field1": "v2",
+	})
+
+	for _, id := range []string{"1", "2"} {
+		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+			ResourceType: "a", ResourceID: id, Kind: source.ChangeCreated,
+		})
+		t.Require().NoError(err)
+	}
+	t.worker.Drain(t.T().Context())
+
+	// Update both at the source without notifying.
+	t.fakeProvider.SetResource("a", "1", map[string]any{
+		"id": "1", "field1": "rebuilt1",
+	})
+	t.fakeProvider.SetResource("a", "2", map[string]any{
+		"id": "2", "field1": "rebuilt2",
+	})
+
+	// Rebuild all — empty ResourceIDs triggers the plan's ListResources path.
+	err := t.idx.Rebuild(t.T().Context(), []core.ResourceSelector{
+		{ResourceType: "a"},
+	})
+	t.Require().NoError(err)
+	t.worker.Drain(t.T().Context())
+
+	// Both resources should reflect the updated source data.
+	resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 2)
+
+	// Verify by searching for the new values.
+	resp, err = t.idx.Search(t.T().Context(), &search.SearchRequest{
+		Resource: "a", Query: "rebuilt1",
+	})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+	t.Require().Equal("1", resp.Hits[0].Id)
+
+	resp, err = t.idx.Search(t.T().Context(), &search.SearchRequest{
+		Resource: "a", Query: "rebuilt2",
+	})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+	t.Require().Equal("2", resp.Hits[0].Id)
+}
+
+// Test_Rebuild_UnknownResource verifies that rebuilding an unknown resource type
+// returns an error.
+func (t *TestSuite) Test_Rebuild_UnknownResource() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	err := t.idx.Rebuild(t.T().Context(), []core.ResourceSelector{
+		{ResourceType: "nonexistent"},
+	})
+	t.Require().Error(err)
+	t.Require().ErrorIs(err, core.ErrUnknownResource)
+}
+
+// Test_Rebuild_WithRelations verifies that a full rebuild correctly populates
+// related resources and persists the relation graph.
+func (t *TestSuite) Test_Rebuild_WithRelations() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	// Set up source: a/1 has a relation to b/1.
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "field1": "aval"})
+	t.fakeProvider.SetRelated("b", []string{"1"}, []map[string]any{
+		{"id": "b1", "field1": "bval"},
+	})
+	t.fakeProvider.SetResource("b", "b1", map[string]any{"id": "b1", "field1": "bval"})
+
+	// Rebuild a/1 via the rebuild API (specific ID).
+	err := t.idx.Rebuild(t.T().Context(), []core.ResourceSelector{
+		{ResourceType: "a", ResourceIDs: []string{"1"}},
+	})
+	t.Require().NoError(err)
+	t.worker.Drain(t.T().Context())
+
+	// Verify the relation is populated in the search result.
+	resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+
+	bRels := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+	t.Require().Len(bRels, 1)
+	t.Require().Equal("b1", bRels[0].GetStructValue().Fields["id"].GetStringValue())
+	t.Require().Equal("bval", bRels[0].GetStructValue().Fields["field1"].GetStringValue())
+}
+
+// Test_Rebuild_All_WithRelations verifies that a "rebuild all" via the plan's
+// ListResources path correctly populates related data.
+func (t *TestSuite) Test_Rebuild_All_WithRelations() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	// Set up source.
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "field1": "aval"})
+	t.fakeProvider.SetRelated("b", []string{"1"}, []map[string]any{
+		{"id": "b1", "field1": "bval"},
+	})
+	t.fakeProvider.SetResource("b", "b1", map[string]any{"id": "b1", "field1": "bval"})
+
+	// Rebuild all a resources.
+	err := t.idx.Rebuild(t.T().Context(), []core.ResourceSelector{
+		{ResourceType: "a"},
+	})
+	t.Require().NoError(err)
+	t.worker.Drain(t.T().Context())
+
+	// Verify.
+	resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{Resource: "a"})
+	t.Require().NoError(err)
+	t.Require().Len(resp.Hits, 1)
+
+	bRels := resp.Hits[0].Source.Fields["b"].GetListValue().GetValues()
+	t.Require().Len(bRels, 1)
+	t.Require().Equal("b1", bRels[0].GetStructValue().Fields["id"].GetStringValue())
+}
+
+// Test_Rebuild_EmptySelectors verifies that passing no selectors returns an error.
+func (t *TestSuite) Test_Rebuild_EmptySelectors() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	err := t.idx.Rebuild(t.T().Context(), nil)
+	t.Require().Error(err)
 }
