@@ -6,66 +6,92 @@ import "google/protobuf/struct.proto";
 
 option go_package = "indexer/gen/searcher/v1;search";
 
-service SearchService{
+service SearchService {
   rpc Search(SearchRequest) returns (SearchResponse);
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
 }
 
 message SearchRequest {
-  string          resource       = 1;
+  string resource = 1;
 
-  string          query          = 2;
-  repeated Filter filters        = 3;
+  string query = 2;
+  repeated Filter filters = 3;
 
   // Pagination (simple from/size)
-  int32           page           = 4; 
-  int32           page_size      = 5; 
+  // TODO: Support page tokens?
+  // TODO: Support pit:s?
+  int32 page = 4;
+  int32 page_size = 5;
 
   // TODO: Multiple fields? Why?
-  repeated Sort   sort           = 6;
+  repeated Sort sort = 6;
 
-  bool            include_source = 7;
+  bool include_source = 7;
 }
 
 message SearchHit {
-  string                 id     = 1;
-  double                 score  = 2;
+  string id = 1;
+  double score = 2;
 
   // The indexed document (source)
   google.protobuf.Struct source = 3;
 }
 
 message SearchResponse {
-  int64              total = 1;
-  repeated SearchHit hits  = 2;
+  int64 total = 1;
+  repeated SearchHit hits = 2;
 }
-
 
 enum FilterOp {
   FILTER_OP_UNSPECIFIED = 0;
-  FILTER_OP_EQ          = 1; // term query
-  FILTER_OP_IN          = 2; // terms query
+  FILTER_OP_EQ = 1; // term query
+  FILTER_OP_IN = 2; // terms query
 }
 
 message Filter {
   // Example: "b.name.keyword" or "a_status" or "c.state"
-  string          field       = 1;
+  string field = 1;
 
-  FilterOp        op          = 2;
+  FilterOp op = 2;
 
   // For EQ
-  string          value       = 3;
+  string value = 3;
 
   // For IN
-  repeated string values      = 4;
+  repeated string values = 4;
 
   // If you need nested filtering (e.g. c is mapped as "nested"):
   // nested_path="c", field="c.state", op=EQ, value="active"
-  // TODO: Remove. Nested fields are not used
-  string          nested_path = 5;
+  // TODO: Can it be more ergonomic to specify nested filters? Maybe a separate
+  // message for nested filters? Or calculate on the fly based on the resource
+  // configured
+  string nested_path = 5;
 }
 
 message Sort {
   // Example: "updated_at"
   string field = 1;
-  bool   desc  = 2;
+  bool desc = 2;
+}
+
+message GetCapabilitiesRequest {}
+
+message GetCapabilitiesResponse { repeated ResourceCapability resources = 1; }
+
+message ResourceCapability {
+  string resource = 1;
+  repeated FieldCapability fields = 2;
+}
+
+message FieldCapability {
+  // The full path used in filters/sort, e.g. "fields.access_id" or "b.name"
+  string field = 1;
+  // The Elasticsearch field type, e.g. "keyword", "text", "integer"
+  string type = 2;
+  // Which filter operations are supported on this field
+  repeated FilterOp filter_ops = 3;
+  // Whether this field is included in full-text search queries
+  bool searchable = 4;
+  // Whether this field can be used for sorting
+  bool sortable = 5;
 }

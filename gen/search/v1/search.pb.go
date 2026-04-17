@@ -413,6 +413,219 @@ func (x *Sort) GetDesc() bool {
 	return false
 }
 
+type GetCapabilitiesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCapabilitiesRequest) Reset() {
+	*x = GetCapabilitiesRequest{}
+	mi := &file_search_v1_search_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCapabilitiesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCapabilitiesRequest) ProtoMessage() {}
+
+func (x *GetCapabilitiesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_search_v1_search_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCapabilitiesRequest.ProtoReflect.Descriptor instead.
+func (*GetCapabilitiesRequest) Descriptor() ([]byte, []int) {
+	return file_search_v1_search_proto_rawDescGZIP(), []int{5}
+}
+
+type GetCapabilitiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resources     []*ResourceCapability  `protobuf:"bytes,1,rep,name=resources,proto3" json:"resources,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCapabilitiesResponse) Reset() {
+	*x = GetCapabilitiesResponse{}
+	mi := &file_search_v1_search_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCapabilitiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCapabilitiesResponse) ProtoMessage() {}
+
+func (x *GetCapabilitiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_search_v1_search_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCapabilitiesResponse.ProtoReflect.Descriptor instead.
+func (*GetCapabilitiesResponse) Descriptor() ([]byte, []int) {
+	return file_search_v1_search_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetCapabilitiesResponse) GetResources() []*ResourceCapability {
+	if x != nil {
+		return x.Resources
+	}
+	return nil
+}
+
+type ResourceCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	Fields        []*FieldCapability     `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceCapability) Reset() {
+	*x = ResourceCapability{}
+	mi := &file_search_v1_search_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceCapability) ProtoMessage() {}
+
+func (x *ResourceCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_search_v1_search_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceCapability.ProtoReflect.Descriptor instead.
+func (*ResourceCapability) Descriptor() ([]byte, []int) {
+	return file_search_v1_search_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ResourceCapability) GetResource() string {
+	if x != nil {
+		return x.Resource
+	}
+	return ""
+}
+
+func (x *ResourceCapability) GetFields() []*FieldCapability {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
+type FieldCapability struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The full path used in filters/sort, e.g. "fields.access_id" or "b.name"
+	Field string `protobuf:"bytes,1,opt,name=field,proto3" json:"field,omitempty"`
+	// The Elasticsearch field type, e.g. "keyword", "text", "integer"
+	Type string `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	// Which filter operations are supported on this field
+	FilterOps []FilterOp `protobuf:"varint,3,rep,packed,name=filter_ops,json=filterOps,proto3,enum=search.v1.FilterOp" json:"filter_ops,omitempty"`
+	// Whether this field is included in full-text search queries
+	Searchable bool `protobuf:"varint,4,opt,name=searchable,proto3" json:"searchable,omitempty"`
+	// Whether this field can be used for sorting
+	Sortable      bool `protobuf:"varint,5,opt,name=sortable,proto3" json:"sortable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FieldCapability) Reset() {
+	*x = FieldCapability{}
+	mi := &file_search_v1_search_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FieldCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FieldCapability) ProtoMessage() {}
+
+func (x *FieldCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_search_v1_search_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FieldCapability.ProtoReflect.Descriptor instead.
+func (*FieldCapability) Descriptor() ([]byte, []int) {
+	return file_search_v1_search_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *FieldCapability) GetField() string {
+	if x != nil {
+		return x.Field
+	}
+	return ""
+}
+
+func (x *FieldCapability) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *FieldCapability) GetFilterOps() []FilterOp {
+	if x != nil {
+		return x.FilterOps
+	}
+	return nil
+}
+
+func (x *FieldCapability) GetSearchable() bool {
+	if x != nil {
+		return x.Searchable
+	}
+	return false
+}
+
+func (x *FieldCapability) GetSortable() bool {
+	if x != nil {
+		return x.Sortable
+	}
+	return false
+}
+
 var File_search_v1_search_proto protoreflect.FileDescriptor
 
 const file_search_v1_search_proto_rawDesc = "" +
@@ -442,13 +655,29 @@ const file_search_v1_search_proto_rawDesc = "" +
 	"nestedPath\"0\n" +
 	"\x04Sort\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x12\n" +
-	"\x04desc\x18\x02 \x01(\bR\x04desc*I\n" +
+	"\x04desc\x18\x02 \x01(\bR\x04desc\"\x18\n" +
+	"\x16GetCapabilitiesRequest\"V\n" +
+	"\x17GetCapabilitiesResponse\x12;\n" +
+	"\tresources\x18\x01 \x03(\v2\x1d.search.v1.ResourceCapabilityR\tresources\"d\n" +
+	"\x12ResourceCapability\x12\x1a\n" +
+	"\bresource\x18\x01 \x01(\tR\bresource\x122\n" +
+	"\x06fields\x18\x02 \x03(\v2\x1a.search.v1.FieldCapabilityR\x06fields\"\xab\x01\n" +
+	"\x0fFieldCapability\x12\x14\n" +
+	"\x05field\x18\x01 \x01(\tR\x05field\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x122\n" +
+	"\n" +
+	"filter_ops\x18\x03 \x03(\x0e2\x13.search.v1.FilterOpR\tfilterOps\x12\x1e\n" +
+	"\n" +
+	"searchable\x18\x04 \x01(\bR\n" +
+	"searchable\x12\x1a\n" +
+	"\bsortable\x18\x05 \x01(\bR\bsortable*I\n" +
 	"\bFilterOp\x12\x19\n" +
 	"\x15FILTER_OP_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fFILTER_OP_EQ\x10\x01\x12\x10\n" +
-	"\fFILTER_OP_IN\x10\x022N\n" +
+	"\fFILTER_OP_IN\x10\x022\xa8\x01\n" +
 	"\rSearchService\x12=\n" +
-	"\x06Search\x12\x18.search.v1.SearchRequest\x1a\x19.search.v1.SearchResponseB\x81\x01\n" +
+	"\x06Search\x12\x18.search.v1.SearchRequest\x1a\x19.search.v1.SearchResponse\x12X\n" +
+	"\x0fGetCapabilities\x12!.search.v1.GetCapabilitiesRequest\x1a\".search.v1.GetCapabilitiesResponseB\x81\x01\n" +
 	"\rcom.search.v1B\vSearchProtoP\x01Z\x1eindexer/gen/searcher/v1;search\xa2\x02\x03SXX\xaa\x02\tSearch.V1\xca\x02\tSearch\\V1\xe2\x02\x15Search\\V1\\GPBMetadata\xea\x02\n" +
 	"Search::V1b\x06proto3"
 
@@ -465,29 +694,38 @@ func file_search_v1_search_proto_rawDescGZIP() []byte {
 }
 
 var file_search_v1_search_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_search_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_search_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_search_v1_search_proto_goTypes = []any{
-	(FilterOp)(0),           // 0: search.v1.FilterOp
-	(*SearchRequest)(nil),   // 1: search.v1.SearchRequest
-	(*SearchHit)(nil),       // 2: search.v1.SearchHit
-	(*SearchResponse)(nil),  // 3: search.v1.SearchResponse
-	(*Filter)(nil),          // 4: search.v1.Filter
-	(*Sort)(nil),            // 5: search.v1.Sort
-	(*structpb.Struct)(nil), // 6: google.protobuf.Struct
+	(FilterOp)(0),                   // 0: search.v1.FilterOp
+	(*SearchRequest)(nil),           // 1: search.v1.SearchRequest
+	(*SearchHit)(nil),               // 2: search.v1.SearchHit
+	(*SearchResponse)(nil),          // 3: search.v1.SearchResponse
+	(*Filter)(nil),                  // 4: search.v1.Filter
+	(*Sort)(nil),                    // 5: search.v1.Sort
+	(*GetCapabilitiesRequest)(nil),  // 6: search.v1.GetCapabilitiesRequest
+	(*GetCapabilitiesResponse)(nil), // 7: search.v1.GetCapabilitiesResponse
+	(*ResourceCapability)(nil),      // 8: search.v1.ResourceCapability
+	(*FieldCapability)(nil),         // 9: search.v1.FieldCapability
+	(*structpb.Struct)(nil),         // 10: google.protobuf.Struct
 }
 var file_search_v1_search_proto_depIdxs = []int32{
-	4, // 0: search.v1.SearchRequest.filters:type_name -> search.v1.Filter
-	5, // 1: search.v1.SearchRequest.sort:type_name -> search.v1.Sort
-	6, // 2: search.v1.SearchHit.source:type_name -> google.protobuf.Struct
-	2, // 3: search.v1.SearchResponse.hits:type_name -> search.v1.SearchHit
-	0, // 4: search.v1.Filter.op:type_name -> search.v1.FilterOp
-	1, // 5: search.v1.SearchService.Search:input_type -> search.v1.SearchRequest
-	3, // 6: search.v1.SearchService.Search:output_type -> search.v1.SearchResponse
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4,  // 0: search.v1.SearchRequest.filters:type_name -> search.v1.Filter
+	5,  // 1: search.v1.SearchRequest.sort:type_name -> search.v1.Sort
+	10, // 2: search.v1.SearchHit.source:type_name -> google.protobuf.Struct
+	2,  // 3: search.v1.SearchResponse.hits:type_name -> search.v1.SearchHit
+	0,  // 4: search.v1.Filter.op:type_name -> search.v1.FilterOp
+	8,  // 5: search.v1.GetCapabilitiesResponse.resources:type_name -> search.v1.ResourceCapability
+	9,  // 6: search.v1.ResourceCapability.fields:type_name -> search.v1.FieldCapability
+	0,  // 7: search.v1.FieldCapability.filter_ops:type_name -> search.v1.FilterOp
+	1,  // 8: search.v1.SearchService.Search:input_type -> search.v1.SearchRequest
+	6,  // 9: search.v1.SearchService.GetCapabilities:input_type -> search.v1.GetCapabilitiesRequest
+	3,  // 10: search.v1.SearchService.Search:output_type -> search.v1.SearchResponse
+	7,  // 11: search.v1.SearchService.GetCapabilities:output_type -> search.v1.GetCapabilitiesResponse
+	10, // [10:12] is the sub-list for method output_type
+	8,  // [8:10] is the sub-list for method input_type
+	8,  // [8:8] is the sub-list for extension type_name
+	8,  // [8:8] is the sub-list for extension extendee
+	0,  // [0:8] is the sub-list for field type_name
 }
 
 func init() { file_search_v1_search_proto_init() }
@@ -501,7 +739,7 @@ func file_search_v1_search_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_search_v1_search_proto_rawDesc), len(file_search_v1_search_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

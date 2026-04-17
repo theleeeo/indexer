@@ -1,6 +1,6 @@
 module github.com/theleeeo/indexer
 
-go 1.25
+go 1.26
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0

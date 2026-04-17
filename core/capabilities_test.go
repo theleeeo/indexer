@@ -1,0 +1,151 @@
+package core
+
+import (
+	"testing"
+
+	"github.com/theleeeo/indexer/gen/search/v1"
+	"github.com/theleeeo/indexer/resource"
+)
+
+func TestGetCapabilities_Empty(t *testing.T) {
+	idx := New(Config{})
+	resp := idx.GetCapabilities()
+
+	if len(resp.Resources) != 0 {
+		t.Fatalf("expected 0 resources, got %d", len(resp.Resources))
+	}
+}
+
+func TestGetCapabilities_SingleResource(t *testing.T) {
+	idx := New(Config{
+		Resources: resource.Configs{
+			{
+				Resource: "product",
+				Fields: []resource.FieldConfig{
+					{Name: "title", Type: "text"},
+					{Name: "status"},
+				},
+			},
+		},
+	})
+
+	resp := idx.GetCapabilities()
+	if len(resp.Resources) != 1 {
+		t.Fatalf("expected 1 resource, got %d", len(resp.Resources))
+	}
+
+	rc := resp.Resources[0]
+	if rc.Resource != "product" {
+		t.Fatalf("expected resource 'product', got %q", rc.Resource)
+	}
+	if len(rc.Fields) != 2 {
+		t.Fatalf("expected 2 fields, got %d", len(rc.Fields))
+	}
+
+	// title — text field
+	title := rc.Fields[0]
+	assertField(t, title, "fields.title", "text", true, false, nil)
+
+	// status — keyword field (default)
+	status := rc.Fields[1]
+	assertField(t, status, "fields.status", "keyword", true, true,
+		[]search.FilterOp{search.FilterOp_FILTER_OP_EQ, search.FilterOp_FILTER_OP_IN})
+}
+
+func TestGetCapabilities_WithRelations(t *testing.T) {
+	idx := New(Config{
+		Resources: resource.Configs{
+			{
+				Resource: "order",
+				Fields: []resource.FieldConfig{
+					{Name: "order_number"},
+				},
+				Relations: []resource.RelationConfig{
+					{
+						Resource: "customer",
+						Fields: []resource.FieldConfig{
+							{Name: "name", Type: "text"},
+							{Name: "tier"},
+						},
+					},
+				},
+			},
+		},
+	})
+
+	resp := idx.GetCapabilities()
+	rc := resp.Resources[0]
+	if len(rc.Fields) != 3 {
+		t.Fatalf("expected 3 fields, got %d", len(rc.Fields))
+	}
+
+	assertField(t, rc.Fields[0], "fields.order_number", "keyword", true, true,
+		[]search.FilterOp{search.FilterOp_FILTER_OP_EQ, search.FilterOp_FILTER_OP_IN})
+	assertField(t, rc.Fields[1], "customer.name", "text", true, false, nil)
+	assertField(t, rc.Fields[2], "customer.tier", "keyword", true, true,
+		[]search.FilterOp{search.FilterOp_FILTER_OP_EQ, search.FilterOp_FILTER_OP_IN})
+}
+
+func TestGetCapabilities_SearchDisabled(t *testing.T) {
+	idx := New(Config{
+		Resources: resource.Configs{
+			{
+				Resource: "item",
+				Fields: []resource.FieldConfig{
+					{Name: "code", Query: resource.QueryConfig{Search: new(false)}},
+				},
+			},
+		},
+	})
+
+	resp := idx.GetCapabilities()
+	f := resp.Resources[0].Fields[0]
+	assertField(t, f, "fields.code", "keyword", false, true,
+		[]search.FilterOp{search.FilterOp_FILTER_OP_EQ, search.FilterOp_FILTER_OP_IN})
+}
+
+func TestGetCapabilities_MultipleResources(t *testing.T) {
+	idx := New(Config{
+		Resources: resource.Configs{
+			{Resource: "a", Fields: []resource.FieldConfig{{Name: "x"}}},
+			{Resource: "b", Fields: []resource.FieldConfig{{Name: "y", Type: "integer"}}},
+		},
+	})
+
+	resp := idx.GetCapabilities()
+	if len(resp.Resources) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(resp.Resources))
+	}
+	if resp.Resources[0].Resource != "a" || resp.Resources[1].Resource != "b" {
+		t.Fatalf("unexpected resource names: %q, %q", resp.Resources[0].Resource, resp.Resources[1].Resource)
+	}
+
+	bField := resp.Resources[1].Fields[0]
+	assertField(t, bField, "fields.y", "integer", true, true,
+		[]search.FilterOp{search.FilterOp_FILTER_OP_EQ, search.FilterOp_FILTER_OP_IN})
+}
+
+func assertField(t *testing.T, f *search.FieldCapability, wantField, wantType string, wantSearchable, wantSortable bool, wantOps []search.FilterOp) {
+	t.Helper()
+	if f.Field != wantField {
+		t.Errorf("field: got %q, want %q", f.Field, wantField)
+	}
+	if f.Type != wantType {
+		t.Errorf("type for %q: got %q, want %q", wantField, f.Type, wantType)
+	}
+	if f.Searchable != wantSearchable {
+		t.Errorf("searchable for %q: got %v, want %v", wantField, f.Searchable, wantSearchable)
+	}
+	if f.Sortable != wantSortable {
+		t.Errorf("sortable for %q: got %v, want %v", wantField, f.Sortable, wantSortable)
+	}
+	if len(f.FilterOps) != len(wantOps) {
+		t.Errorf("filter_ops count for %q: got %d, want %d", wantField, len(f.FilterOps), len(wantOps))
+		return
+	}
+	for i, op := range wantOps {
+		if f.FilterOps[i] != op {
+			t.Errorf("filter_ops[%d] for %q: got %v, want %v", i, wantField, f.FilterOps[i], op)
+		}
+	}
+}

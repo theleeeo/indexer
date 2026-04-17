@@ -33,3 +33,7 @@ func (s *SearcherServer) Search(ctx context.Context, req *search.SearchRequest) 
 	}
 	return resp, err
 }
+
+func (s *SearcherServer) GetCapabilities(ctx context.Context, req *search.GetCapabilitiesRequest) (*search.GetCapabilitiesResponse, error) {
+	return s.idx.GetCapabilities(), nil
+}
