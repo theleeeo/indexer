@@ -16,6 +16,10 @@ service ProviderService {
   // FetchRelated returns a list of resources related to the given resource type
   // and key.
   rpc FetchRelated(FetchRelatedRequest) returns (FetchRelatedResponse);
+
+  // ListResources returns a paginated list of all resources of a given type.
+  // Used for full index rebuilds.
+  rpc ListResources(ListResourcesRequest) returns (ListResourcesResponse);
 }
 
 message FetchResourceRequest {
@@ -42,3 +46,19 @@ message RootResource {
 }
 
 message FetchRelatedResponse { repeated google.protobuf.Struct data = 1; }
+
+message ListResourcesRequest {
+  string resource_type = 1;
+  string page_token = 2;
+  int32 page_size = 3;
+}
+
+message ListResourcesResponse {
+  repeated ResourceItem resources = 1;
+  string next_page_token = 2;
+}
+
+message ResourceItem {
+  string resource_id = 1;
+  google.protobuf.Struct data = 2;
+}

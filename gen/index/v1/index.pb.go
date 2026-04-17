@@ -297,6 +297,149 @@ func (x *ChangeNotification) GetResourceId() string {
 	return ""
 }
 
+// ResourceSelector identifies a set of resources to rebuild.
+// Empty resource_ids means "rebuild all" (discovered via ListResources on the
+// provider). Empty versions means "all configured versions".
+type ResourceSelector struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	Versions      []int32                `protobuf:"varint,2,rep,packed,name=versions,proto3" json:"versions,omitempty"`
+	ResourceIds   []string               `protobuf:"bytes,3,rep,name=resource_ids,json=resourceIds,proto3" json:"resource_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResourceSelector) Reset() {
+	*x = ResourceSelector{}
+	mi := &file_index_v1_index_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResourceSelector) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResourceSelector) ProtoMessage() {}
+
+func (x *ResourceSelector) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResourceSelector.ProtoReflect.Descriptor instead.
+func (*ResourceSelector) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ResourceSelector) GetResourceType() string {
+	if x != nil {
+		return x.ResourceType
+	}
+	return ""
+}
+
+func (x *ResourceSelector) GetVersions() []int32 {
+	if x != nil {
+		return x.Versions
+	}
+	return nil
+}
+
+func (x *ResourceSelector) GetResourceIds() []string {
+	if x != nil {
+		return x.ResourceIds
+	}
+	return nil
+}
+
+type RebuildRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Selectors     []*ResourceSelector    `protobuf:"bytes,1,rep,name=selectors,proto3" json:"selectors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RebuildRequest) Reset() {
+	*x = RebuildRequest{}
+	mi := &file_index_v1_index_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RebuildRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RebuildRequest) ProtoMessage() {}
+
+func (x *RebuildRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RebuildRequest.ProtoReflect.Descriptor instead.
+func (*RebuildRequest) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *RebuildRequest) GetSelectors() []*ResourceSelector {
+	if x != nil {
+		return x.Selectors
+	}
+	return nil
+}
+
+type RebuildResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RebuildResponse) Reset() {
+	*x = RebuildResponse{}
+	mi := &file_index_v1_index_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RebuildResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RebuildResponse) ProtoMessage() {}
+
+func (x *RebuildResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_index_v1_index_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RebuildResponse.ProtoReflect.Descriptor instead.
+func (*RebuildResponse) Descriptor() ([]byte, []int) {
+	return file_index_v1_index_proto_rawDescGZIP(), []int{7}
+}
+
 var File_index_v1_index_proto protoreflect.FileDescriptor
 
 const file_index_v1_index_proto_rawDesc = "" +
@@ -312,16 +455,24 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\x04kind\x18\x01 \x01(\x0e2\x14.index.v1.ChangeKindR\x04kind\x12#\n" +
 	"\rresource_type\x18\x02 \x01(\tR\fresourceType\x12\x1f\n" +
 	"\vresource_id\x18\x03 \x01(\tR\n" +
-	"resourceId*t\n" +
+	"resourceId\"v\n" +
+	"\x10ResourceSelector\x12#\n" +
+	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x1a\n" +
+	"\bversions\x18\x02 \x03(\x05R\bversions\x12!\n" +
+	"\fresource_ids\x18\x03 \x03(\tR\vresourceIds\"J\n" +
+	"\x0eRebuildRequest\x128\n" +
+	"\tselectors\x18\x01 \x03(\v2\x1a.index.v1.ResourceSelectorR\tselectors\"\x11\n" +
+	"\x0fRebuildResponse*t\n" +
 	"\n" +
 	"ChangeKind\x12\x1b\n" +
 	"\x17CHANGE_KIND_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13CHANGE_KIND_CREATED\x10\x01\x12\x17\n" +
 	"\x13CHANGE_KIND_UPDATED\x10\x02\x12\x17\n" +
-	"\x13CHANGE_KIND_DELETED\x10\x032\xbb\x01\n" +
+	"\x13CHANGE_KIND_DELETED\x10\x032\xfb\x01\n" +
 	"\fIndexService\x12M\n" +
 	"\fNotifyChange\x12\x1d.index.v1.NotifyChangeRequest\x1a\x1e.index.v1.NotifyChangeResponse\x12\\\n" +
-	"\x11NotifyChangeBatch\x12\".index.v1.NotifyChangeBatchRequest\x1a#.index.v1.NotifyChangeBatchResponseBw\n" +
+	"\x11NotifyChangeBatch\x12\".index.v1.NotifyChangeBatchRequest\x1a#.index.v1.NotifyChangeBatchResponse\x12>\n" +
+	"\aRebuild\x12\x18.index.v1.RebuildRequest\x1a\x19.index.v1.RebuildResponseBw\n" +
 	"\fcom.index.v1B\n" +
 	"IndexProtoP\x01Z\x1aindexer/gen/index/v1;index\xa2\x02\x03IXX\xaa\x02\bIndex.V1\xca\x02\bIndex\\V1\xe2\x02\x14Index\\V1\\GPBMetadata\xea\x02\tIndex::V1b\x06proto3"
 
@@ -338,7 +489,7 @@ func file_index_v1_index_proto_rawDescGZIP() []byte {
 }
 
 var file_index_v1_index_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_index_v1_index_proto_goTypes = []any{
 	(ChangeKind)(0),                   // 0: index.v1.ChangeKind
 	(*NotifyChangeRequest)(nil),       // 1: index.v1.NotifyChangeRequest
@@ -346,20 +497,26 @@ var file_index_v1_index_proto_goTypes = []any{
 	(*NotifyChangeBatchRequest)(nil),  // 3: index.v1.NotifyChangeBatchRequest
 	(*NotifyChangeBatchResponse)(nil), // 4: index.v1.NotifyChangeBatchResponse
 	(*ChangeNotification)(nil),        // 5: index.v1.ChangeNotification
+	(*ResourceSelector)(nil),          // 6: index.v1.ResourceSelector
+	(*RebuildRequest)(nil),            // 7: index.v1.RebuildRequest
+	(*RebuildResponse)(nil),           // 8: index.v1.RebuildResponse
 }
 var file_index_v1_index_proto_depIdxs = []int32{
 	5, // 0: index.v1.NotifyChangeRequest.notification:type_name -> index.v1.ChangeNotification
 	5, // 1: index.v1.NotifyChangeBatchRequest.notifications:type_name -> index.v1.ChangeNotification
 	0, // 2: index.v1.ChangeNotification.kind:type_name -> index.v1.ChangeKind
-	1, // 3: index.v1.IndexService.NotifyChange:input_type -> index.v1.NotifyChangeRequest
-	3, // 4: index.v1.IndexService.NotifyChangeBatch:input_type -> index.v1.NotifyChangeBatchRequest
-	2, // 5: index.v1.IndexService.NotifyChange:output_type -> index.v1.NotifyChangeResponse
-	4, // 6: index.v1.IndexService.NotifyChangeBatch:output_type -> index.v1.NotifyChangeBatchResponse
-	5, // [5:7] is the sub-list for method output_type
-	3, // [3:5] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	6, // 3: index.v1.RebuildRequest.selectors:type_name -> index.v1.ResourceSelector
+	1, // 4: index.v1.IndexService.NotifyChange:input_type -> index.v1.NotifyChangeRequest
+	3, // 5: index.v1.IndexService.NotifyChangeBatch:input_type -> index.v1.NotifyChangeBatchRequest
+	7, // 6: index.v1.IndexService.Rebuild:input_type -> index.v1.RebuildRequest
+	2, // 7: index.v1.IndexService.NotifyChange:output_type -> index.v1.NotifyChangeResponse
+	4, // 8: index.v1.IndexService.NotifyChangeBatch:output_type -> index.v1.NotifyChangeBatchResponse
+	8, // 9: index.v1.IndexService.Rebuild:output_type -> index.v1.RebuildResponse
+	7, // [7:10] is the sub-list for method output_type
+	4, // [4:7] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_index_v1_index_proto_init() }
@@ -373,7 +530,7 @@ func file_index_v1_index_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_index_v1_index_proto_rawDesc), len(file_index_v1_index_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   8,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

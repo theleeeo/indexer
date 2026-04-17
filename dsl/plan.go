@@ -30,35 +30,14 @@ func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) 
 // for each relation in topological order.
 func buildPlanForVersion(provider source.Provider, resourceName string, vc *resource.VersionConfig) projection.Plan {
 	// Root plan: fetches the root resource and initialises the BuildDoc.
+	// When ResourceID is empty, the plan lists all resources of the type with
+	// pagination via provider.ListResources. When set, it fetches a single
+	// resource as before.
 	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[projection.BuildRequest]) (aggregation.FetchResult[projection.BuildDoc], error) {
-		data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
-		if err != nil {
-			return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
+		if params.Request.ResourceID == "" {
+			return fetchAllResources(provider, resourceName, vc.Fields, params)
 		}
-
-		root := model.Resource{Type: params.Request.ResourceType, Id: params.Request.ResourceID}
-
-		if data == nil {
-			return aggregation.FetchResult[projection.BuildDoc]{Items: []projection.BuildDoc{{
-				Doc:      nil,
-				Resolved: nil,
-				Root:     root,
-			}}}, nil
-		}
-
-		fields := filterFields(data, vc.Fields)
-
-		return aggregation.FetchResult[projection.BuildDoc]{
-			Items: []projection.BuildDoc{{
-				Doc: map[string]any{
-					"fields": fields,
-				},
-				Resolved: map[string][]map[string]any{
-					resourceName: {data},
-				},
-				Root: root,
-			}},
-		}, nil
+		return fetchSingleResource(provider, resourceName, vc.Fields, params)
 	})
 
 	// Resolve the topological order of relations.
@@ -182,4 +161,92 @@ func resolveOrder(rootType string, relations []resource.RelationConfig) ([]resou
 	}
 
 	return ordered, nil
+}
+
+// fetchSingleResource fetches one resource by ID and wraps it in a BuildDoc.
+func fetchSingleResource(
+	provider source.Provider,
+	resourceName string,
+	fields []resource.FieldConfig,
+	params aggregation.FetchParameters[projection.BuildRequest],
+) (aggregation.FetchResult[projection.BuildDoc], error) {
+	data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
+	if err != nil {
+		return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
+	}
+
+	root := model.Resource{Type: params.Request.ResourceType, Id: params.Request.ResourceID}
+
+	if data == nil {
+		return aggregation.FetchResult[projection.BuildDoc]{Items: []projection.BuildDoc{{
+			Doc:      nil,
+			Resolved: nil,
+			Root:     root,
+		}}}, nil
+	}
+
+	filtered := filterFields(data, fields)
+
+	return aggregation.FetchResult[projection.BuildDoc]{
+		Items: []projection.BuildDoc{{
+			Doc: map[string]any{
+				"fields": filtered,
+			},
+			Resolved: map[string][]map[string]any{
+				resourceName: {data},
+			},
+			Root: root,
+		}},
+	}, nil
+}
+
+// fetchAllResources lists resources of a type with pagination and returns a
+// page of BuildDocs. The NextPageToken from the provider is passed through so
+// that the RootPlan's pagination loop keeps calling until exhausted.
+func fetchAllResources(
+	provider source.Provider,
+	resourceName string,
+	fields []resource.FieldConfig,
+	params aggregation.FetchParameters[projection.BuildRequest],
+) (aggregation.FetchResult[projection.BuildDoc], error) {
+	var pageToken string
+	if params.NextPageToken != nil {
+		pageToken = params.NextPageToken.(string)
+	}
+
+	resp, err := provider.ListResources(context.Background(), source.ListResourcesParams{
+		ResourceType: params.Request.ResourceType,
+		PageToken:    pageToken,
+		PageSize:     100,
+	})
+	if err != nil {
+		return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("list resources %s: %w", params.Request.ResourceType, err)
+	}
+
+	items := make([]projection.BuildDoc, 0, len(resp.Resources))
+	for _, r := range resp.Resources {
+		if r.Data == nil {
+			continue
+		}
+		filtered := filterFields(r.Data, fields)
+		items = append(items, projection.BuildDoc{
+			Doc: map[string]any{
+				"fields": filtered,
+			},
+			Resolved: map[string][]map[string]any{
+				resourceName: {r.Data},
+			},
+			Root: model.Resource{Type: params.Request.ResourceType, Id: r.ID},
+		})
+	}
+
+	var npt any
+	if resp.NextPageToken != "" {
+		npt = resp.NextPageToken
+	}
+
+	return aggregation.FetchResult[projection.BuildDoc]{
+		Items:         items,
+		NextPageToken: npt,
+	}, nil
 }

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ProviderService_FetchResource_FullMethodName = "/provider.v1.ProviderService/FetchResource"
 	ProviderService_FetchRelated_FullMethodName  = "/provider.v1.ProviderService/FetchRelated"
+	ProviderService_ListResources_FullMethodName = "/provider.v1.ProviderService/ListResources"
 )
 
 // ProviderServiceClient is the client API for ProviderService service.
@@ -36,6 +37,9 @@ type ProviderServiceClient interface {
 	// FetchRelated returns a list of resources related to the given resource type
 	// and key.
 	FetchRelated(ctx context.Context, in *FetchRelatedRequest, opts ...grpc.CallOption) (*FetchRelatedResponse, error)
+	// ListResources returns a paginated list of all resources of a given type.
+	// Used for full index rebuilds.
+	ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error)
 }
 
 type providerServiceClient struct {
@@ -66,6 +70,16 @@ func (c *providerServiceClient) FetchRelated(ctx context.Context, in *FetchRelat
 	return out, nil
 }
 
+func (c *providerServiceClient) ListResources(ctx context.Context, in *ListResourcesRequest, opts ...grpc.CallOption) (*ListResourcesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListResourcesResponse)
+	err := c.cc.Invoke(ctx, ProviderService_ListResources_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProviderServiceServer is the server API for ProviderService service.
 // All implementations should embed UnimplementedProviderServiceServer
 // for forward compatibility.
@@ -79,6 +93,9 @@ type ProviderServiceServer interface {
 	// FetchRelated returns a list of resources related to the given resource type
 	// and key.
 	FetchRelated(context.Context, *FetchRelatedRequest) (*FetchRelatedResponse, error)
+	// ListResources returns a paginated list of all resources of a given type.
+	// Used for full index rebuilds.
+	ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error)
 }
 
 // UnimplementedProviderServiceServer should be embedded to have
@@ -93,6 +110,9 @@ func (UnimplementedProviderServiceServer) FetchResource(context.Context, *FetchR
 }
 func (UnimplementedProviderServiceServer) FetchRelated(context.Context, *FetchRelatedRequest) (*FetchRelatedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method FetchRelated not implemented")
+}
+func (UnimplementedProviderServiceServer) ListResources(context.Context, *ListResourcesRequest) (*ListResourcesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListResources not implemented")
 }
 func (UnimplementedProviderServiceServer) testEmbeddedByValue() {}
 
@@ -150,6 +170,24 @@ func _ProviderService_FetchRelated_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProviderService_ListResources_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListResourcesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProviderServiceServer).ListResources(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProviderService_ListResources_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProviderServiceServer).ListResources(ctx, req.(*ListResourcesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProviderService_ServiceDesc is the grpc.ServiceDesc for ProviderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -164,6 +202,10 @@ var ProviderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "FetchRelated",
 			Handler:    _ProviderService_FetchRelated_Handler,
+		},
+		{
+			MethodName: "ListResources",
+			Handler:    _ProviderService_ListResources_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

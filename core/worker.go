@@ -25,6 +25,12 @@ func (idx *Indexer) HandlerFunc() jobqueue.Handler {
 				return fmt.Errorf("failed to unmarshal delete payload: %w", err)
 			}
 			return idx.handleDelete(ctx, p)
+		case "full_rebuild":
+			p := FullRebuildPayload{}
+			if err := json.Unmarshal(job.Payload, &p); err != nil {
+				return fmt.Errorf("failed to unmarshal full_rebuild payload: %w", err)
+			}
+			return idx.handleFullRebuild(ctx, p)
 		default:
 			return fmt.Errorf("unknown job type: %s", job.Type)
 		}

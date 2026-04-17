@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	IndexService_NotifyChange_FullMethodName      = "/index.v1.IndexService/NotifyChange"
 	IndexService_NotifyChangeBatch_FullMethodName = "/index.v1.IndexService/NotifyChangeBatch"
+	IndexService_Rebuild_FullMethodName           = "/index.v1.IndexService/Rebuild"
 )
 
 // IndexServiceClient is the client API for IndexService service.
@@ -33,6 +34,9 @@ type IndexServiceClient interface {
 	NotifyChange(ctx context.Context, in *NotifyChangeRequest, opts ...grpc.CallOption) (*NotifyChangeResponse, error)
 	// NotifyChangeBatch is the batched version of NotifyChange.
 	NotifyChangeBatch(ctx context.Context, in *NotifyChangeBatchRequest, opts ...grpc.CallOption) (*NotifyChangeBatchResponse, error)
+	// Rebuild triggers a full rebuild of one or more resource indices.
+	// Jobs are enqueued and processed asynchronously by the job queue.
+	Rebuild(ctx context.Context, in *RebuildRequest, opts ...grpc.CallOption) (*RebuildResponse, error)
 }
 
 type indexServiceClient struct {
@@ -63,6 +67,16 @@ func (c *indexServiceClient) NotifyChangeBatch(ctx context.Context, in *NotifyCh
 	return out, nil
 }
 
+func (c *indexServiceClient) Rebuild(ctx context.Context, in *RebuildRequest, opts ...grpc.CallOption) (*RebuildResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebuildResponse)
+	err := c.cc.Invoke(ctx, IndexService_Rebuild_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IndexServiceServer is the server API for IndexService service.
 // All implementations should embed UnimplementedIndexServiceServer
 // for forward compatibility.
@@ -73,6 +87,9 @@ type IndexServiceServer interface {
 	NotifyChange(context.Context, *NotifyChangeRequest) (*NotifyChangeResponse, error)
 	// NotifyChangeBatch is the batched version of NotifyChange.
 	NotifyChangeBatch(context.Context, *NotifyChangeBatchRequest) (*NotifyChangeBatchResponse, error)
+	// Rebuild triggers a full rebuild of one or more resource indices.
+	// Jobs are enqueued and processed asynchronously by the job queue.
+	Rebuild(context.Context, *RebuildRequest) (*RebuildResponse, error)
 }
 
 // UnimplementedIndexServiceServer should be embedded to have
@@ -87,6 +104,9 @@ func (UnimplementedIndexServiceServer) NotifyChange(context.Context, *NotifyChan
 }
 func (UnimplementedIndexServiceServer) NotifyChangeBatch(context.Context, *NotifyChangeBatchRequest) (*NotifyChangeBatchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NotifyChangeBatch not implemented")
+}
+func (UnimplementedIndexServiceServer) Rebuild(context.Context, *RebuildRequest) (*RebuildResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Rebuild not implemented")
 }
 func (UnimplementedIndexServiceServer) testEmbeddedByValue() {}
 
@@ -144,6 +164,24 @@ func _IndexService_NotifyChangeBatch_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IndexService_Rebuild_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebuildRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IndexServiceServer).Rebuild(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IndexService_Rebuild_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IndexServiceServer).Rebuild(ctx, req.(*RebuildRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IndexService_ServiceDesc is the grpc.ServiceDesc for IndexService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -158,6 +196,10 @@ var IndexService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "NotifyChangeBatch",
 			Handler:    _IndexService_NotifyChangeBatch_Handler,
+		},
+		{
+			MethodName: "Rebuild",
+			Handler:    _IndexService_Rebuild_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

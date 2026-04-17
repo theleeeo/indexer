@@ -77,3 +77,30 @@ func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedPara
 func (p *GRPCProvider) Close() error {
 	return p.conn.Close()
 }
+
+func (p *GRPCProvider) ListResources(ctx context.Context, params ListResourcesParams) (ListResourcesResult, error) {
+	resp, err := p.client.ListResources(ctx, &pb.ListResourcesRequest{
+		ResourceType: params.ResourceType,
+		PageToken:    params.PageToken,
+		PageSize:     params.PageSize,
+	})
+	if err != nil {
+		return ListResourcesResult{}, err
+	}
+
+	resources := make([]ListedResource, len(resp.Resources))
+	for i, r := range resp.Resources {
+		var data map[string]any
+		if r.Data != nil {
+			data = r.Data.AsMap()
+		}
+		resources[i] = ListedResource{
+			ID:   r.ResourceId,
+			Data: data,
+		}
+	}
+	return ListResourcesResult{
+		Resources:     resources,
+		NextPageToken: resp.NextPageToken,
+	}, nil
+}

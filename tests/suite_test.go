@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -35,6 +36,32 @@ type FakeProvider struct {
 	mu        sync.Mutex
 	resources map[string]map[string]any   // "type|id" -> data
 	relations map[string][]map[string]any // "type|key" -> []data
+}
+
+// ListResources implements [source.Provider].
+func (f *FakeProvider) ListResources(ctx context.Context, params source.ListResourcesParams) (source.ListResourcesResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var resources []source.ListedResource
+	prefix := params.ResourceType + "|"
+	for key, data := range f.resources {
+		if strings.HasPrefix(key, prefix) {
+			parts := strings.SplitN(key, "|", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			resources = append(resources, source.ListedResource{
+				ID:   parts[1],
+				Data: data,
+			})
+		}
+	}
+
+	return source.ListResourcesResult{
+		Resources:     resources,
+		NextPageToken: "", // Pagination not implemented in this fake
+	}, nil
 }
 
 func NewFakeProvider() *FakeProvider {

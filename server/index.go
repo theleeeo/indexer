@@ -84,3 +84,28 @@ func mapAppError(err error) error {
 	}
 	return status.Error(codes.Internal, err.Error())
 }
+
+func (s *IndexerServer) Rebuild(ctx context.Context, req *index.RebuildRequest) (*index.RebuildResponse, error) {
+	if len(req.Selectors) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "at least one selector is required")
+	}
+
+	selectors := make([]core.ResourceSelector, len(req.Selectors))
+	for i, ps := range req.Selectors {
+		versions := make([]int, len(ps.Versions))
+		for j, v := range ps.Versions {
+			versions[j] = int(v)
+		}
+		selectors[i] = core.ResourceSelector{
+			ResourceType: ps.ResourceType,
+			Versions:     versions,
+			ResourceIDs:  ps.ResourceIds,
+		}
+	}
+
+	if err := s.idx.Rebuild(ctx, selectors); err != nil {
+		return nil, mapAppError(err)
+	}
+
+	return &index.RebuildResponse{}, nil
+}

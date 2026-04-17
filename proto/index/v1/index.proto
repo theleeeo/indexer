@@ -13,6 +13,10 @@ service IndexService {
   // NotifyChangeBatch is the batched version of NotifyChange.
   rpc NotifyChangeBatch(NotifyChangeBatchRequest)
       returns (NotifyChangeBatchResponse);
+
+  // Rebuild triggers a full rebuild of one or more resource indices.
+  // Jobs are enqueued and processed asynchronously by the job queue.
+  rpc Rebuild(RebuildRequest) returns (RebuildResponse);
 }
 
 message NotifyChangeRequest { ChangeNotification notification = 1; }
@@ -42,3 +46,16 @@ enum ChangeKind {
   CHANGE_KIND_UPDATED = 2;
   CHANGE_KIND_DELETED = 3;
 }
+
+// ResourceSelector identifies a set of resources to rebuild.
+// Empty resource_ids means "rebuild all" (discovered via ListResources on the
+// provider). Empty versions means "all configured versions".
+message ResourceSelector {
+  string resource_type = 1;
+  repeated int32 versions = 2;
+  repeated string resource_ids = 3;
+}
+
+message RebuildRequest { repeated ResourceSelector selectors = 1; }
+
+message RebuildResponse {}
