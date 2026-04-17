@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -22,7 +21,6 @@ import (
 	"github.com/theleeeo/indexer/store"
 
 	"github.com/elastic/go-elasticsearch/v8"
-	"github.com/goccy/go-yaml"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -149,20 +147,5 @@ func main() {
 }
 
 func loadResourceConfig(path string) (resource.Configs, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
-	}
-	var cfg map[string]*resource.Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal yaml: %w", err)
-	}
-
-	resources := make([]*resource.Config, 0, len(cfg))
-	for name, rc := range cfg {
-		rc.Resource = name
-		resources = append(resources, rc)
-	}
-
-	return resources, nil
+	return resource.LoadConfig(path)
 }

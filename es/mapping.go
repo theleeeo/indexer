@@ -2,10 +2,10 @@ package es
 
 import "github.com/theleeeo/indexer/resource"
 
-// GenerateMapping builds an Elasticsearch index mapping for a single resource config.
-func GenerateMapping(cfg *resource.Config) map[string]any {
-	fieldsProps := make(map[string]any, len(cfg.Fields))
-	for _, f := range cfg.Fields {
+// GenerateMapping builds an Elasticsearch index mapping from a version config.
+func GenerateMapping(vc *resource.VersionConfig) map[string]any {
+	fieldsProps := make(map[string]any, len(vc.Fields))
+	for _, f := range vc.Fields {
 		fieldsProps[f.Name] = map[string]any{
 			"type": f.ESType(),
 		}
@@ -18,7 +18,7 @@ func GenerateMapping(cfg *resource.Config) map[string]any {
 		},
 	}
 
-	for _, rel := range cfg.Relations {
+	for _, rel := range vc.Relations {
 		relProps := make(map[string]any, len(rel.Fields)+1)
 		relProps["id"] = map[string]any{"type": "keyword"}
 		for _, f := range rel.Fields {
@@ -46,12 +46,14 @@ func GenerateMapping(cfg *resource.Config) map[string]any {
 }
 
 // GenerateMappings builds ES index mappings for all resource configs.
-// Returns a map of index name -> mapping.
+// Returns a map of versioned index name -> mapping.
+// Each version in the config produces a separate entry with its own schema.
 func GenerateMappings(configs resource.Configs) map[string]map[string]any {
-	result := make(map[string]map[string]any, len(configs))
+	result := make(map[string]map[string]any)
 	for _, cfg := range configs {
-		indexName := cfg.Resource + "_search"
-		result[indexName] = GenerateMapping(cfg)
+		for v, vc := range cfg.VersionDefs {
+			result[IndexName(cfg.Resource, v)] = GenerateMapping(vc)
+		}
 	}
 	return result
 }

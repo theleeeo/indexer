@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/gen/search/v1"
 )
 
@@ -28,7 +29,7 @@ func (idx *Indexer) Search(ctx context.Context, req *search.SearchRequest) (*sea
 		req.Page = 0
 	}
 
-	res, err := idx.es.Search(ctx, req, r.Resource+"_search", r.GetSearchableFields())
+	res, err := idx.es.Search(ctx, req, es.AliasName(r.Resource), r.GetSearchableFields())
 	if err != nil {
 		return nil, err
 	}

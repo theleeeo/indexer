@@ -2,7 +2,6 @@ package resource
 
 import (
 	"fmt"
-	"slices"
 )
 
 func (c Configs) Validate() error {
@@ -32,53 +31,62 @@ func (c Configs) Validate() error {
 // that key sources reference valid resources, and that there are no dependency cycles.
 func (c Configs) verifyFieldRelations() error {
 	for _, rCfg := range c {
-		for _, currentRel := range rCfg.Relations {
-			// Verify that the related resource exists
-			relRCfg := c.Get(currentRel.Resource)
-			if relRCfg == nil {
-				return fmt.Errorf("relation '%s'->'%s' is specified but resource '%s' does not exist", rCfg.Resource, currentRel.Resource, currentRel.Resource)
-			}
-
-			// Verify that the related resource has the fields defined in the relation
-			for _, f := range currentRel.Fields {
-				if !slices.ContainsFunc(relRCfg.Fields, func(relF FieldConfig) bool {
-					return relF.Name == f.Name
-				}) {
-					return fmt.Errorf("relation '%s'->'%s' specifies field '%s' which does not exist on '%s'", rCfg.Resource, currentRel.Resource, f.Name, currentRel.Resource)
+		// Check relations in every version definition.
+		for v, vc := range rCfg.VersionDefs {
+			for _, currentRel := range vc.Relations {
+				// Verify that the related resource exists
+				relRCfg := c.Get(currentRel.Resource)
+				if relRCfg == nil {
+					return fmt.Errorf("version %d: relation '%s'->'%s' is specified but resource '%s' does not exist", v, rCfg.Resource, currentRel.Resource, currentRel.Resource)
 				}
-			}
 
-			// Verify key source: must be the owning resource or a sibling relation
-			if currentRel.Key.Source != rCfg.Resource {
-				found := false
-				for _, siblingRel := range rCfg.Relations {
-					if siblingRel.Resource == currentRel.Key.Source {
-						found = true
-						break
+				// Collect all field names across all versions of the target resource.
+				allTargetFields := make(map[string]bool)
+				for _, tvc := range relRCfg.VersionDefs {
+					for _, f := range tvc.Fields {
+						allTargetFields[f.Name] = true
 					}
 				}
-				if !found {
-					return fmt.Errorf("relation '%s'->'%s' key source '%s' is not the root resource and not a sibling relation", rCfg.Resource, currentRel.Resource, currentRel.Key.Source)
+
+				// Verify that the related resource has the fields defined in the relation
+				for _, f := range currentRel.Fields {
+					if !allTargetFields[f.Name] {
+						return fmt.Errorf("version %d: relation '%s'->'%s' specifies field '%s' which does not exist on '%s'", v, rCfg.Resource, currentRel.Resource, f.Name, currentRel.Resource)
+					}
+				}
+
+				// Verify key source: must be the owning resource or a sibling relation in this version
+				if currentRel.Key.Source != rCfg.Resource {
+					found := false
+					for _, siblingRel := range vc.Relations {
+						if siblingRel.Resource == currentRel.Key.Source {
+							found = true
+							break
+						}
+					}
+					if !found {
+						return fmt.Errorf("version %d: relation '%s'->'%s' key source '%s' is not the root resource and not a sibling relation", v, rCfg.Resource, currentRel.Resource, currentRel.Key.Source)
+					}
 				}
 			}
-		}
 
-		// Verify no cycles in relation key dependencies
-		if err := verifyNoCycles(rCfg); err != nil {
-			return err
+			// Verify no cycles in relation key dependencies for this version
+			if err := verifyNoCyclesVersion(rCfg.Resource, vc); err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-// verifyNoCycles checks that the relation key dependencies within a single
-// resource config form a DAG (no cycles).
-func verifyNoCycles(rCfg *Config) error {
+// verifyNoCyclesVersion checks that the relation key dependencies within a single
+// version config form a DAG (no cycles).
+func verifyNoCyclesVersion(resourceName string, vc *VersionConfig) error {
 	// Build adjacency: relation resource name -> list of deps (key sources that are sibling relations)
 	deps := make(map[string]string) // relation -> dependency (its key source, if it's a sibling)
-	for _, rel := range rCfg.Relations {
-		if rel.Key.Source != rCfg.Resource {
+	for _, rel := range vc.Relations {
+		if rel.Key.Source != resourceName {
 			deps[rel.Resource] = rel.Key.Source
 		}
 	}
@@ -90,7 +98,7 @@ func verifyNoCycles(rCfg *Config) error {
 	var visit func(node string) error
 	visit = func(node string) error {
 		if inStack[node] {
-			return fmt.Errorf("resource %q has a cycle in relation key dependencies involving %q", rCfg.Resource, node)
+			return fmt.Errorf("resource %q has a cycle in relation key dependencies involving %q", resourceName, node)
 		}
 		if visited[node] {
 			return nil
@@ -108,7 +116,7 @@ func verifyNoCycles(rCfg *Config) error {
 		return nil
 	}
 
-	for _, rel := range rCfg.Relations {
+	for _, rel := range vc.Relations {
 		if err := visit(rel.Resource); err != nil {
 			return err
 		}
@@ -120,6 +128,26 @@ func verifyNoCycles(rCfg *Config) error {
 func (c Config) Validate() error {
 	if c.Resource == "" {
 		return fmt.Errorf("resource required")
+	}
+
+	// Validate version configuration.
+	if len(c.VersionDefs) > 0 {
+		for v, vc := range c.VersionDefs {
+			if v <= 0 {
+				return fmt.Errorf("version %d: must be a positive integer", v)
+			}
+			if vc == nil {
+				return fmt.Errorf("version %d: definition is nil", v)
+			}
+			if err := vc.Validate(c.Resource, v); err != nil {
+				return err
+			}
+		}
+	}
+	if c.ReadVersion != 0 {
+		if _, ok := c.VersionDefs[c.ReadVersion]; !ok {
+			return fmt.Errorf("readVersion %d is not in versions %v", c.ReadVersion, c.SortedVersions())
+		}
 	}
 
 	for i, f := range c.Fields {
@@ -137,6 +165,28 @@ func (c Config) Validate() error {
 				return fmt.Errorf("relation %q: %w", r.Resource, err)
 			}
 			return fmt.Errorf("relation %d: %w", i, err)
+		}
+	}
+
+	return nil
+}
+
+func (vc VersionConfig) Validate(resourceName string, version int) error {
+	for i, f := range vc.Fields {
+		if err := f.Validate(); err != nil {
+			if f.Name != "" {
+				return fmt.Errorf("version %d: field %q: %w", version, f.Name, err)
+			}
+			return fmt.Errorf("version %d: field %d: %w", version, i, err)
+		}
+	}
+
+	for i, r := range vc.Relations {
+		if err := r.Validate(); err != nil {
+			if r.Resource != "" {
+				return fmt.Errorf("version %d: relation %q: %w", version, r.Resource, err)
+			}
+			return fmt.Errorf("version %d: relation %d: %w", version, i, err)
 		}
 	}
 

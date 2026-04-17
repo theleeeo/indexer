@@ -13,8 +13,6 @@ import (
 
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/resource"
-
-	"github.com/goccy/go-yaml"
 )
 
 func main() {
@@ -40,8 +38,10 @@ func main() {
 		if cfg == nil {
 			log.Fatalf("unknown resource %q", *index)
 		}
-		indexName := cfg.Resource + "_search"
-		mappings[indexName] = es.GenerateMapping(cfg)
+		for v, vc := range cfg.VersionDefs {
+			indexName := es.IndexName(cfg.Resource, v)
+			mappings[indexName] = es.GenerateMapping(vc)
+		}
 	} else {
 		mappings = es.GenerateMappings(resources)
 	}
@@ -53,6 +53,20 @@ func main() {
 				log.Fatalf("apply mapping for %s: %v", indexName, err)
 			}
 			log.Printf("applied mapping to %s", indexName)
+		}
+
+		// Set up read aliases: point each alias to the readVersion index.
+		targetResources := resources
+		if *index != "" {
+			targetResources = resource.Configs{resources.Get(*index)}
+		}
+		for _, cfg := range targetResources {
+			aliasName := es.AliasName(cfg.Resource)
+			targetIndex := es.IndexName(cfg.Resource, cfg.ReadVersion)
+			if err := applyAlias(addr, aliasName, targetIndex, *esUser, *esPass); err != nil {
+				log.Fatalf("apply alias %s -> %s: %v", aliasName, targetIndex, err)
+			}
+			log.Printf("alias %s -> %s", aliasName, targetIndex)
 		}
 		return
 	}
@@ -126,20 +140,43 @@ func doRequest(method, url string, body []byte, user, pass string) (int, []byte,
 }
 
 func loadResourceConfig(path string) (resource.Configs, error) {
-	data, err := os.ReadFile(path)
+	return resource.LoadConfig(path)
+}
+
+// applyAlias creates or updates an ES alias to point to the given index using
+// the _aliases API. It first removes any existing targets of the alias, then
+// adds the new target atomically.
+func applyAlias(addr, aliasName, indexName, user, pass string) error {
+	body := map[string]any{
+		"actions": []any{
+			map[string]any{
+				"remove": map[string]any{
+					"index": "*",
+					"alias": aliasName,
+				},
+			},
+			map[string]any{
+				"add": map[string]any{
+					"index": indexName,
+					"alias": aliasName,
+				},
+			},
+		},
+	}
+
+	b, err := json.Marshal(body)
 	if err != nil {
-		return nil, fmt.Errorf("reading file: %w", err)
-	}
-	var cfg map[string]*resource.Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("unmarshal yaml: %w", err)
+		return err
 	}
 
-	resources := make([]*resource.Config, 0, len(cfg))
-	for name, rc := range cfg {
-		rc.Resource = name
-		resources = append(resources, rc)
+	url := fmt.Sprintf("%s/_aliases", addr)
+	statusCode, respBody, err := doRequest(http.MethodPost, url, b, user, pass)
+	if err != nil {
+		return err
+	}
+	if statusCode == http.StatusOK {
+		return nil
 	}
 
-	return resources, nil
+	return fmt.Errorf("unexpected response %d: %s", statusCode, string(respBody))
 }

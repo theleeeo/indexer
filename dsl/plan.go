@@ -11,20 +11,24 @@ import (
 	"github.com/theleeeo/indexer/source"
 )
 
-// BuildPlansFromConfig constructs an aggregation plan for each resource type
-// in the config. This is the default plan builder used by the standalone binary.
+// BuildPlansFromConfig constructs aggregation plans for each resource type
+// and version in the config. This is the default plan builder used by the standalone binary.
 // Library users can build their own plans and pass them to NewBuilder directly.
-func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]projection.Plan {
-	plans := make(map[string]projection.Plan, len(resources))
+func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]map[int]projection.Plan {
+	plans := make(map[string]map[int]projection.Plan, len(resources))
 	for _, rCfg := range resources {
-		plans[rCfg.Resource] = buildPlanForResource(provider, rCfg)
+		versionPlans := make(map[int]projection.Plan, len(rCfg.VersionDefs))
+		for v, vc := range rCfg.VersionDefs {
+			versionPlans[v] = buildPlanForVersion(provider, rCfg.Resource, vc)
+		}
+		plans[rCfg.Resource] = versionPlans
 	}
 	return plans
 }
 
-// buildPlanForResource creates a RootPlan for the resource and chains SubPlans
+// buildPlanForVersion creates a RootPlan for the resource version and chains SubPlans
 // for each relation in topological order.
-func buildPlanForResource(provider source.Provider, rCfg *resource.Config) projection.Plan {
+func buildPlanForVersion(provider source.Provider, resourceName string, vc *resource.VersionConfig) projection.Plan {
 	// Root plan: fetches the root resource and initialises the BuildDoc.
 	rootPlan := aggregation.NewRootPlan(func(params aggregation.FetchParameters[projection.BuildRequest]) (aggregation.FetchResult[projection.BuildDoc], error) {
 		data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
@@ -42,7 +46,7 @@ func buildPlanForResource(provider source.Provider, rCfg *resource.Config) proje
 			}}}, nil
 		}
 
-		fields := filterFields(data, rCfg.Fields)
+		fields := filterFields(data, vc.Fields)
 
 		return aggregation.FetchResult[projection.BuildDoc]{
 			Items: []projection.BuildDoc{{
@@ -50,7 +54,7 @@ func buildPlanForResource(provider source.Provider, rCfg *resource.Config) proje
 					"fields": fields,
 				},
 				Resolved: map[string][]map[string]any{
-					rCfg.Resource: {data},
+					resourceName: {data},
 				},
 				Root: root,
 			}},
@@ -58,7 +62,7 @@ func buildPlanForResource(provider source.Provider, rCfg *resource.Config) proje
 	})
 
 	// Resolve the topological order of relations.
-	ordered, err := resolveOrder(rCfg.Resource, rCfg.Relations)
+	ordered, err := resolveOrder(resourceName, vc.Relations)
 	if err != nil {
 		// If the config is invalid the plan will never execute successfully,
 		// but we defer the error to execution time rather than panicking at

@@ -1,54 +1,72 @@
-a:
-  indexName: a_search
-  fields:
-    - name: searchField
-    - name: secondaryField
-      type: text
-  relations:
-    - resource: b
-      key:
-        source: a
-        fields:
-          - b_id
-      cardinality: one
-      fields:
-        - name: name
-    - resource: c
-      key:
-        source: a
-        fields:
-          - id
-      cardinality: many
-      fields:
-        - name: number
-          type: integer
-
-b:
-  indexName: b_search
-  fields:
-    - name: name
-
-c:
-  indexName: c_search
-  fields:
-    - name: number
-  relations:
-    - resource: a
-      key:
-        source: c
-        fields:
-          - a_id
+resources:
+  - type: a
+    version: 1
+    fields:
       fields:
         - name: searchField
-    - resource: b
-      key:
-        source: c
-        fields:
-          - b_id
+        - name: secondaryField
+          type: text
+      relations:
+        - resource: c
+          key:
+            source: a
+            fields:
+              - id
+          cardinality: many
+          fields:
+            - name: number
+              type: integer
+
+  - type: a
+    version: 2
+    fields:
       fields:
-        - name: name
-          # Control whether this field is searchable or not.
-          # It will still be filterable, just not available for full text search.
-          # Default is true.
-          query:
-            search: false
+        - name: searchField
+        - name: secondaryField
+          type: text
+      relations:
+        - resource: b
+          key:
+            source: a
+            fields:
+              - b_id
+          cardinality: one
+          fields:
+            - name: name
+        - resource: c
+          key:
+            source: a
+            fields:
+              - id
+          cardinality: many
+          fields:
+            - name: number
+              type: integer
+
+  - type: b
+    fields:
+      - name: name
+
+  - type: c
+    fields:
+      - name: number
+    relations:
+      - resource: a
+        key:
+          source: c
+          fields:
+            - a_id
+        fields:
+          - name: searchField
+      - resource: b
+        key:
+          source: c
+          fields:
+            - b_id
+        fields:
+          - name: name
+            # Control whether this field is searchable or not.
+            # It will still be filterable, just not available for full text search.
+            # Default is true.
+            query:
+              search: false

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -192,6 +193,12 @@ var RelatedResourceConfig = resource.Configs{
 }
 
 func (t *TestSuite) verifyResourceConfigs() {
+	for _, c := range DefaultResourceConfig {
+		c.ApplyDefaults()
+	}
+	for _, c := range RelatedResourceConfig {
+		c.ApplyDefaults()
+	}
 	must(t.T(), DefaultResourceConfig.Validate())
 	must(t.T(), RelatedResourceConfig.Validate())
 }
@@ -332,9 +339,44 @@ func (t *TestSuite) SetupTest() {
 // setResourceConfig rebuilds the aggregation plans from the given resource
 // config and updates the indexer's builder. This is the test equivalent of
 // dynamically changing the resource configuration at runtime.
+// It also creates the versioned ES indices and read aliases.
 func (t *TestSuite) setResourceConfig(resources resource.Configs) {
 	plans := dsl.BuildPlansFromConfig(t.fakeProvider, resources)
 	t.idx.SetPlans(plans, resources)
+
+	// Create versioned indexes and aliases for each resource.
+	for _, cfg := range resources {
+		for v, vc := range cfg.VersionDefs {
+			indexName := es.IndexName(cfg.Resource, v)
+			mapping := es.GenerateMapping(vc)
+			body, err := json.Marshal(mapping)
+			t.Require().NoError(err)
+
+			res, err := t.esClient.Indices.Create(
+				indexName,
+				t.esClient.Indices.Create.WithBody(bytes.NewReader(body)),
+			)
+			t.Require().NoError(err)
+			res.Body.Close()
+			// Ignore if already exists (e.g. re-set within same test)
+		}
+
+		// Set up read alias.
+		aliasName := es.AliasName(cfg.Resource)
+		targetIndex := es.IndexName(cfg.Resource, cfg.ReadVersion)
+
+		aliasBody := map[string]any{
+			"actions": []any{
+				map[string]any{"remove": map[string]any{"index": "*", "alias": aliasName}},
+				map[string]any{"add": map[string]any{"index": targetIndex, "alias": aliasName}},
+			},
+		}
+		ab, err := json.Marshal(aliasBody)
+		t.Require().NoError(err)
+		res, err := t.esClient.Indices.UpdateAliases(bytes.NewReader(ab))
+		t.Require().NoError(err)
+		res.Body.Close()
+	}
 }
 
 func (t *TestSuite) BeforeTest(suiteName, testName string) {

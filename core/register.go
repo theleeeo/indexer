@@ -40,15 +40,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 			continue
 		}
 
-		hasRelation := false
-		for _, rel := range rCfg.Relations {
-			if rel.Resource == n.ResourceType {
-				hasRelation = true
-				break
-			}
-		}
-
-		if !hasRelation {
+		if !rCfg.HasRelationTo(n.ResourceType) {
 			continue
 		}
 
