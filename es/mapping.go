@@ -51,8 +51,8 @@ func GenerateMapping(vc *resource.VersionConfig) map[string]any {
 func GenerateMappings(configs resource.Configs) map[string]map[string]any {
 	result := make(map[string]map[string]any)
 	for _, cfg := range configs {
-		for v, vc := range cfg.VersionDefs {
-			result[IndexName(cfg.Resource, v)] = GenerateMapping(vc)
+		for _, vc := range cfg.Versions {
+			result[IndexName(cfg.Resource, vc.Version)] = GenerateMapping(&vc)
 		}
 	}
 	return result

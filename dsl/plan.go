@@ -17,9 +17,9 @@ import (
 func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]map[int]projection.Plan {
 	plans := make(map[string]map[int]projection.Plan, len(resources))
 	for _, rCfg := range resources {
-		versionPlans := make(map[int]projection.Plan, len(rCfg.VersionDefs))
-		for v, vc := range rCfg.VersionDefs {
-			versionPlans[v] = buildPlanForVersion(provider, rCfg.Resource, vc)
+		versionPlans := make(map[int]projection.Plan, len(rCfg.Versions))
+		for _, vc := range rCfg.Versions {
+			versionPlans[vc.Version] = buildPlanForVersion(provider, rCfg.Resource, &vc)
 		}
 		plans[rCfg.Resource] = versionPlans
 	}

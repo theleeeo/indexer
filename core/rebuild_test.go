@@ -12,8 +12,13 @@ func testResources() resource.Configs {
 	cfgs := resource.Configs{
 		{
 			Resource: "product",
-			Fields: []resource.FieldConfig{
-				{Name: "title", Type: "text"},
+			Versions: []resource.VersionConfig{
+				{
+					Version: 1,
+					Fields: []resource.FieldConfig{
+						{Name: "title", Type: "text"},
+					},
+				},
 			},
 		},
 	}
@@ -66,9 +71,9 @@ func TestRebuild_MultiVersionValidation(t *testing.T) {
 	cfgs := resource.Configs{
 		{
 			Resource: "product",
-			VersionDefs: map[int]*resource.VersionConfig{
-				1: {Fields: []resource.FieldConfig{{Name: "title"}}},
-				2: {Fields: []resource.FieldConfig{{Name: "title"}, {Name: "price"}}},
+			Versions: []resource.VersionConfig{
+				{Version: 1, Fields: []resource.FieldConfig{{Name: "title"}}},
+				{Version: 2, Fields: []resource.FieldConfig{{Name: "title"}, {Name: "price"}}},
 			},
 			ReadVersion: 1,
 		},
@@ -95,8 +100,8 @@ func TestRebuild_MultiVersionValidation(t *testing.T) {
 
 func TestRebuild_MultipleSelectorsValidation(t *testing.T) {
 	cfgs := resource.Configs{
-		{Resource: "product", Fields: []resource.FieldConfig{{Name: "title"}}},
-		{Resource: "order", Fields: []resource.FieldConfig{{Name: "number"}}},
+		{Resource: "product", Versions: []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "title"}}}}},
+		{Resource: "order", Versions: []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "number"}}}}},
 	}
 	for _, c := range cfgs {
 		c.ApplyDefaults()

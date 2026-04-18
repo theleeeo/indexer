@@ -32,7 +32,9 @@ func (c Configs) Validate() error {
 func (c Configs) verifyFieldRelations() error {
 	for _, rCfg := range c {
 		// Check relations in every version definition.
-		for v, vc := range rCfg.VersionDefs {
+		for i := range rCfg.Versions {
+			vc := &rCfg.Versions[i]
+			v := vc.Version
 			for _, currentRel := range vc.Relations {
 				// Verify that the related resource exists
 				relRCfg := c.Get(currentRel.Resource)
@@ -42,7 +44,7 @@ func (c Configs) verifyFieldRelations() error {
 
 				// Collect all field names across all versions of the target resource.
 				allTargetFields := make(map[string]bool)
-				for _, tvc := range relRCfg.VersionDefs {
+				for _, tvc := range relRCfg.Versions {
 					for _, f := range tvc.Fields {
 						allTargetFields[f.Name] = true
 					}
@@ -131,40 +133,17 @@ func (c Config) Validate() error {
 	}
 
 	// Validate version configuration.
-	if len(c.VersionDefs) > 0 {
-		for v, vc := range c.VersionDefs {
-			if v <= 0 {
-				return fmt.Errorf("version %d: must be a positive integer", v)
-			}
-			if vc == nil {
-				return fmt.Errorf("version %d: definition is nil", v)
-			}
-			if err := vc.Validate(c.Resource, v); err != nil {
-				return err
-			}
+	for _, vc := range c.Versions {
+		if vc.Version <= 0 {
+			return fmt.Errorf("version %d: must be a positive integer", vc.Version)
+		}
+		if err := vc.Validate(c.Resource, vc.Version); err != nil {
+			return err
 		}
 	}
 	if c.ReadVersion != 0 {
-		if _, ok := c.VersionDefs[c.ReadVersion]; !ok {
+		if c.GetVersion(c.ReadVersion) == nil {
 			return fmt.Errorf("readVersion %d is not in versions %v", c.ReadVersion, c.SortedVersions())
-		}
-	}
-
-	for i, f := range c.Fields {
-		if err := f.Validate(); err != nil {
-			if f.Name != "" {
-				return fmt.Errorf("field %q: %w", f.Name, err)
-			}
-			return fmt.Errorf("field %d: %w", i, err)
-		}
-	}
-
-	for i, r := range c.Relations {
-		if err := r.Validate(); err != nil {
-			if r.Resource != "" {
-				return fmt.Errorf("relation %q: %w", r.Resource, err)
-			}
-			return fmt.Errorf("relation %d: %w", i, err)
 		}
 	}
 

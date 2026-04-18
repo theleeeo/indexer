@@ -17,16 +17,21 @@ func TestGetCapabilities_Empty(t *testing.T) {
 }
 
 func TestGetCapabilities_SingleResource(t *testing.T) {
-	idx := New(Config{
-		Resources: resource.Configs{
+	cfg := &resource.Config{
+		Resource: "product",
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "product",
+				Version: 1,
 				Fields: []resource.FieldConfig{
 					{Name: "title", Type: "text"},
 					{Name: "status"},
 				},
 			},
 		},
+	}
+	cfg.ApplyDefaults()
+	idx := New(Config{
+		Resources: resource.Configs{cfg},
 	})
 
 	resp := idx.GetCapabilities()
@@ -53,10 +58,11 @@ func TestGetCapabilities_SingleResource(t *testing.T) {
 }
 
 func TestGetCapabilities_WithRelations(t *testing.T) {
-	idx := New(Config{
-		Resources: resource.Configs{
+	cfg := &resource.Config{
+		Resource: "order",
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "order",
+				Version: 1,
 				Fields: []resource.FieldConfig{
 					{Name: "order_number"},
 				},
@@ -71,6 +77,10 @@ func TestGetCapabilities_WithRelations(t *testing.T) {
 				},
 			},
 		},
+	}
+	cfg.ApplyDefaults()
+	idx := New(Config{
+		Resources: resource.Configs{cfg},
 	})
 
 	resp := idx.GetCapabilities()
@@ -87,15 +97,20 @@ func TestGetCapabilities_WithRelations(t *testing.T) {
 }
 
 func TestGetCapabilities_SearchDisabled(t *testing.T) {
-	idx := New(Config{
-		Resources: resource.Configs{
+	cfg := &resource.Config{
+		Resource: "item",
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "item",
+				Version: 1,
 				Fields: []resource.FieldConfig{
 					{Name: "code", Query: resource.QueryConfig{Search: new(false)}},
 				},
 			},
 		},
+	}
+	cfg.ApplyDefaults()
+	idx := New(Config{
+		Resources: resource.Configs{cfg},
 	})
 
 	resp := idx.GetCapabilities()
@@ -105,11 +120,12 @@ func TestGetCapabilities_SearchDisabled(t *testing.T) {
 }
 
 func TestGetCapabilities_MultipleResources(t *testing.T) {
+	cfgA := &resource.Config{Resource: "a", Versions: []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}}}}
+	cfgB := &resource.Config{Resource: "b", Versions: []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "y", Type: "integer"}}}}}
+	cfgA.ApplyDefaults()
+	cfgB.ApplyDefaults()
 	idx := New(Config{
-		Resources: resource.Configs{
-			{Resource: "a", Fields: []resource.FieldConfig{{Name: "x"}}},
-			{Resource: "b", Fields: []resource.FieldConfig{{Name: "y", Type: "integer"}}},
-		},
+		Resources: resource.Configs{cfgA, cfgB},
 	})
 
 	resp := idx.GetCapabilities()

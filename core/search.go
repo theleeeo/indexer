@@ -29,7 +29,7 @@ func (idx *Indexer) Search(ctx context.Context, req *search.SearchRequest) (*sea
 		req.Page = 0
 	}
 
-	res, err := idx.es.Search(ctx, req, es.AliasName(r.Resource), r.GetSearchableFields())
+	res, err := idx.es.Search(ctx, req, es.AliasName(r.Resource), r.ReadVersionConfig().GetSearchableFields())
 	if err != nil {
 		return nil, err
 	}

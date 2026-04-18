@@ -18,42 +18,82 @@ func (c Configs) Get(resource string) *Config {
 
 // VersionConfig holds the schema definition for a single version of a resource.
 type VersionConfig struct {
+	Version   int              `yaml:"version"`
 	Fields    []FieldConfig    `yaml:"fields"`
 	Relations []RelationConfig `yaml:"relations"`
+}
+
+// GetSearchableFields returns the list of ES field paths that are included
+// in multi_match full-text search for this version.
+func (vc *VersionConfig) GetSearchableFields() []string {
+	var fields []string
+	for _, f := range vc.Fields {
+		if f.Query.Search == nil || *f.Query.Search {
+			fields = append(fields, "fields."+f.Name)
+		}
+	}
+
+	for _, r := range vc.Relations {
+		for _, f := range r.Fields {
+			if f.Query.Search == nil || *f.Query.Search {
+				fields = append(fields, fmt.Sprintf("%s.%s", r.Resource, f.Name))
+			}
+		}
+	}
+
+	return fields
+}
+
+// GetRelation returns the relation config for the given resource name, or nil.
+func (vc *VersionConfig) GetRelation(resource string) *RelationConfig {
+	for _, r := range vc.Relations {
+		if r.Resource == resource {
+			return &r
+		}
+	}
+	return nil
 }
 
 type Config struct {
 	Resource string `yaml:"resource"`
 
-	// Per-version schema definitions. Keys are version numbers (positive ints).
-	// When omitted, the top-level Fields/Relations are treated as version 1.
-	VersionDefs map[int]*VersionConfig `yaml:"versions,omitempty"`
+	// Versions holds the schema definitions for each version of the resource.
+	Versions []VersionConfig `yaml:"versions,omitempty"`
 
 	// ReadVersion is the version whose index the read alias points to.
-	// Must be one of the VersionDefs keys. Defaults to the lowest version.
+	// Must match one of the Versions entries. Defaults to the lowest version.
 	ReadVersion int `yaml:"readVersion"`
-
-	// Top-level fields/relations — for backward compatibility with configs
-	// that don't use versioned definitions. After ApplyDefaults, these are
-	// always populated from the ReadVersion's VersionConfig.
-	Fields    []FieldConfig    `yaml:"fields,omitempty"`
-	Relations []RelationConfig `yaml:"relations,omitempty"`
 }
 
 // SortedVersions returns the version numbers in ascending order.
 func (c *Config) SortedVersions() []int {
-	versions := make([]int, 0, len(c.VersionDefs))
-	for v := range c.VersionDefs {
-		versions = append(versions, v)
+	versions := make([]int, 0, len(c.Versions))
+	for _, vc := range c.Versions {
+		versions = append(versions, vc.Version)
 	}
 	sort.Ints(versions)
 	return versions
 }
 
+// GetVersion returns the VersionConfig for the given version number, or nil.
+func (c *Config) GetVersion(v int) *VersionConfig {
+	for i := range c.Versions {
+		if c.Versions[i].Version == v {
+			return &c.Versions[i]
+		}
+	}
+	return nil
+}
+
+// ReadVersionConfig returns the VersionConfig for the active read version.
+func (c *Config) ReadVersionConfig() *VersionConfig {
+	return c.GetVersion(c.ReadVersion)
+}
+
 // HasRelationTo reports whether any version of this resource has a relation
 // to the given resource type.
 func (c *Config) HasRelationTo(resourceType string) bool {
-	for _, vc := range c.VersionDefs {
+	for _, vc := range c.Versions {
 		for _, rel := range vc.Relations {
 			if rel.Resource == resourceType {
 				return true
@@ -66,52 +106,9 @@ func (c *Config) HasRelationTo(resourceType string) bool {
 // ApplyDefaults fills in zero-value fields with sensible defaults.
 // Call this after unmarshalling config from YAML.
 func (c *Config) ApplyDefaults() {
-	// If no versioned definitions, promote top-level fields/relations to version 1.
-	if len(c.VersionDefs) == 0 {
-		c.VersionDefs = map[int]*VersionConfig{
-			1: {Fields: c.Fields, Relations: c.Relations},
-		}
-	}
-
 	if c.ReadVersion == 0 {
 		c.ReadVersion = c.SortedVersions()[0]
 	}
-
-	// Populate top-level Fields/Relations from the read version's config
-	// so existing code (search, validation, etc.) works unchanged.
-	rv := c.VersionDefs[c.ReadVersion]
-	if rv != nil {
-		c.Fields = rv.Fields
-		c.Relations = rv.Relations
-	}
-}
-
-func (c Config) GetSearchableFields() []string {
-	var fields []string
-	for _, f := range c.Fields {
-		if f.Query.Search == nil || *f.Query.Search {
-			fields = append(fields, "fields."+f.Name)
-		}
-	}
-
-	for _, r := range c.Relations {
-		for _, f := range r.Fields {
-			if f.Query.Search == nil || *f.Query.Search {
-				fields = append(fields, fmt.Sprintf("%s.%s", r.Resource, f.Name))
-			}
-		}
-	}
-
-	return fields
-}
-
-func (c Config) GetRelation(resource string) *RelationConfig {
-	for _, r := range c.Relations {
-		if r.Resource == resource {
-			return &r
-		}
-	}
-	return nil
 }
 
 type FieldConfig struct {

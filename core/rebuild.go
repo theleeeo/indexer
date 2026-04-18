@@ -34,7 +34,7 @@ func (idx *Indexer) Rebuild(ctx context.Context, selectors []ResourceSelector) e
 			return fmt.Errorf("resource type %q: %w", sel.ResourceType, ErrUnknownResource)
 		}
 		for _, v := range sel.Versions {
-			if _, ok := cfg.VersionDefs[v]; !ok {
+			if cfg.GetVersion(v) == nil {
 				return &InvalidArgumentError{Msg: fmt.Sprintf("resource %q has no version %d", sel.ResourceType, v)}
 			}
 		}

@@ -58,9 +58,9 @@ Single shared identity type: `Resource{Type, Id}` used across all layers as the 
 
 ### `resource/`
 
-YAML DSL and runtime config. `Config` describes one resource: its own fields, and `[]RelationConfig` specifying how to hydrate related resources (which fields to pull, cardinality, key sources). `Validate()` checks for inter-resource consistency (no cycles, valid field references). Config path defaults to `resources.yml` and can be set via app config file or `RESOURCE_CONFIG_PATH` env override.
+YAML DSL and runtime config. `Config` describes one resource via its `Versions []VersionConfig` slice, where each `VersionConfig` holds a `Version int`, `[]FieldConfig`, and `[]RelationConfig` specifying how to hydrate related resources (which fields to pull, cardinality, key sources). `ReadVersion int` indicates which version the read alias points to. Utility methods: `SortedVersions()`, `GetVersion(v)`, `ReadVersionConfig()`, `HasRelationTo(type)`. `Validate()` checks for inter-resource consistency (no cycles, valid field references). Config path defaults to `resources.yml` and can be set via app config file or `RESOURCE_CONFIG_PATH` env override.
 
-Key types: `Config`, `RelationConfig`, `FieldConfig`, `KeyConfig`.
+Key types: `Config`, `VersionConfig`, `RelationConfig`, `FieldConfig`, `KeyConfig`.
 
 ### `store/`
 
@@ -161,12 +161,13 @@ Generated code lives in `gen/`. Regenerate with `buf generate`.
 
 ## Resource Config DSL
 
-Resources are defined in `resources.yml`. The schema per resource:
+Resources are defined in `resources.yml`. Each entry in the flat `resources:` list defines a single version of a resource type. Multiple entries with the same `type` but different `version` numbers define multiple versions (for zero-downtime schema migrations). The `readVersion` field controls which version the read alias points to.
 
 ```yaml
 resources:
-  - myResource:
-    indexName: my-resource-index
+  - type: myResource
+    version: 1
+    readVersion: 1
     fields:
       - name: title
         type: text
@@ -178,11 +179,26 @@ resources:
         cardinality: one # "one" → ES object, anything else → ES nested
         key:
           source: myResource # which resolved resource holds the FK
-          fields:
-            - name: other_id # field name in source doc
-              as: id # field name in target resource's ID
+          field: other_id # field name in source doc
         fields:
           - name: label
+
+  - type: myResource
+    version: 2
+    fields:
+      fields:
+        - name: title
+          type: text
+        - name: status
+        - name: newField
+      relations:
+        - resource: otherResource
+          cardinality: one
+          key:
+            source: myResource
+            field: other_id
+          fields:
+            - name: label
 ```
 
 Key chaining: a relation's `key.source` may reference another relation's resource name, enabling `A → B → C` fetch chains processed in topological order.

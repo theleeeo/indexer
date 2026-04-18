@@ -144,73 +144,98 @@ type TestSuite struct {
 var DefaultResourceConfig = resource.Configs{
 	{
 		Resource: "a",
-		Fields: []resource.FieldConfig{
-			{Name: "field1"},
-			{Name: "field2"},
-		},
-		Relations: []resource.RelationConfig{
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Field: "id"},
+				Version: 1,
 				Fields: []resource.FieldConfig{
 					{Name: "field1"},
 					{Name: "field2"},
+				},
+				Relations: []resource.RelationConfig{
+					{
+						Resource: "b",
+						Key:      resource.KeyConfig{Source: "a", Field: "id"},
+						Fields: []resource.FieldConfig{
+							{Name: "field1"},
+							{Name: "field2"},
+						},
+					},
 				},
 			},
 		},
 	},
 	{
 		Resource: "b",
-		Fields: []resource.FieldConfig{
-			{Name: "field1"},
-			{Name: "field2"},
+		Versions: []resource.VersionConfig{
+			{
+				Version: 1,
+				Fields: []resource.FieldConfig{
+					{Name: "field1"},
+					{Name: "field2"},
+				},
+				Relations: []resource.RelationConfig{},
+			},
 		},
-		Relations: []resource.RelationConfig{},
 	},
 }
 
 var RelatedResourceConfig = resource.Configs{
 	{
 		Resource: "a",
-		Fields: []resource.FieldConfig{
-			{Name: "f1"},
-		},
-		Relations: []resource.RelationConfig{
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Field: "id"},
-				Fields:   []resource.FieldConfig{{Name: "f1"}},
+				Version: 1,
+				Fields: []resource.FieldConfig{
+					{Name: "f1"},
+				},
+				Relations: []resource.RelationConfig{
+					{
+						Resource: "b",
+						Key:      resource.KeyConfig{Source: "a", Field: "id"},
+						Fields:   []resource.FieldConfig{{Name: "f1"}},
+					},
+				},
 			},
 		},
 	},
 	{
 		Resource: "b",
-		Fields: []resource.FieldConfig{
-			{Name: "f1"},
-		},
-		Relations: []resource.RelationConfig{
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "a",
-				Key:      resource.KeyConfig{Source: "b", Field: "id"},
-				Fields:   []resource.FieldConfig{{Name: "f1"}},
+				Version: 1,
+				Fields: []resource.FieldConfig{
+					{Name: "f1"},
+				},
+				Relations: []resource.RelationConfig{
+					{
+						Resource: "a",
+						Key:      resource.KeyConfig{Source: "b", Field: "id"},
+						Fields:   []resource.FieldConfig{{Name: "f1"}},
+					},
+				},
 			},
 		},
 	},
 	{
 		Resource: "c",
-		Fields: []resource.FieldConfig{
-			{Name: "f1"},
-		},
-		Relations: []resource.RelationConfig{
+		Versions: []resource.VersionConfig{
 			{
-				Resource: "a",
-				Key:      resource.KeyConfig{Source: "c", Field: "id"},
-				Fields:   []resource.FieldConfig{{Name: "f1"}},
-			},
-			{
-				Resource: "b",
-				Key:      resource.KeyConfig{Source: "c", Field: "id"},
-				Fields:   []resource.FieldConfig{{Name: "f1"}},
+				Version: 1,
+				Fields: []resource.FieldConfig{
+					{Name: "f1"},
+				},
+				Relations: []resource.RelationConfig{
+					{
+						Resource: "a",
+						Key:      resource.KeyConfig{Source: "c", Field: "id"},
+						Fields:   []resource.FieldConfig{{Name: "f1"}},
+					},
+					{
+						Resource: "b",
+						Key:      resource.KeyConfig{Source: "c", Field: "id"},
+						Fields:   []resource.FieldConfig{{Name: "f1"}},
+					},
+				},
 			},
 		},
 	},
@@ -370,9 +395,9 @@ func (t *TestSuite) setResourceConfig(resources resource.Configs) {
 
 	// Create versioned indexes and aliases for each resource.
 	for _, cfg := range resources {
-		for v, vc := range cfg.VersionDefs {
-			indexName := es.IndexName(cfg.Resource, v)
-			mapping := es.GenerateMapping(vc)
+		for _, vc := range cfg.Versions {
+			indexName := es.IndexName(cfg.Resource, vc.Version)
+			mapping := es.GenerateMapping(&vc)
 			body, err := json.Marshal(mapping)
 			t.Require().NoError(err)
 

@@ -38,9 +38,9 @@ func main() {
 		if cfg == nil {
 			log.Fatalf("unknown resource %q", *index)
 		}
-		for v, vc := range cfg.VersionDefs {
-			indexName := es.IndexName(cfg.Resource, v)
-			mappings[indexName] = es.GenerateMapping(vc)
+		for _, vc := range cfg.Versions {
+			indexName := es.IndexName(cfg.Resource, vc.Version)
+			mappings[indexName] = es.GenerateMapping(&vc)
 		}
 	} else {
 		mappings = es.GenerateMappings(resources)

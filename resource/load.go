@@ -52,8 +52,7 @@ func ParseConfig(data []byte) (Configs, error) {
 		cfg, exists := configMap[entry.Type]
 		if !exists {
 			cfg = &Config{
-				Resource:    entry.Type,
-				VersionDefs: make(map[int]*VersionConfig),
+				Resource: entry.Type,
 			}
 			configMap[entry.Type] = cfg
 			configOrder = append(configOrder, entry.Type)
@@ -72,11 +71,15 @@ func ParseConfig(data []byte) (Configs, error) {
 		if err != nil {
 			return nil, fmt.Errorf("resource %q version %d: %w", entry.Type, version, err)
 		}
+		vc.Version = version
 
-		if _, dup := cfg.VersionDefs[version]; dup {
-			return nil, fmt.Errorf("resource %q version %d defined more than once", entry.Type, version)
+		// Check for duplicate version.
+		for _, existing := range cfg.Versions {
+			if existing.Version == version {
+				return nil, fmt.Errorf("resource %q version %d defined more than once", entry.Type, version)
+			}
 		}
-		cfg.VersionDefs[version] = vc
+		cfg.Versions = append(cfg.Versions, *vc)
 	}
 
 	configs := make(Configs, 0, len(configOrder))

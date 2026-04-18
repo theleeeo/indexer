@@ -18,11 +18,13 @@ func (idx *Indexer) GetCapabilities() *search.GetCapabilitiesResponse {
 			Resource: rc.Resource,
 		}
 
-		for _, f := range rc.Fields {
+		vc := rc.ReadVersionConfig()
+
+		for _, f := range vc.Fields {
 			cap.Fields = append(cap.Fields, fieldCapability("fields."+f.Name, f))
 		}
 
-		for _, rel := range rc.Relations {
+		for _, rel := range vc.Relations {
 			for _, f := range rel.Fields {
 				cap.Fields = append(cap.Fields, fieldCapability(fmt.Sprintf("%s.%s", rel.Resource, f.Name), f))
 			}

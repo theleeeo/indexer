@@ -49,7 +49,8 @@ func main() {
 
 	log.Printf("loaded %d resource configurations", len(resources))
 	for _, rc := range resources {
-		log.Printf(" - resource %q with %d field/s and %d relation/s", rc.Resource, len(rc.Fields), len(rc.Relations))
+		vc := rc.ReadVersionConfig()
+		log.Printf(" - resource %q with %d field/s and %d relation/s", rc.Resource, len(vc.Fields), len(vc.Relations))
 	}
 
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
