@@ -6,20 +6,19 @@ import (
 	"log/slog"
 
 	"github.com/theleeeo/indexer/model"
-	"github.com/theleeeo/indexer/source"
 )
 
 // RegisterChange handles a single change notification from a source service.
 // It determines which root search documents are affected and enqueues
 // rebuild (or delete) jobs for each.
-func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) error {
+func (idx *Indexer) RegisterChange(ctx context.Context, n Notification) error {
 	if err := idx.verifyResourceConfig(n); err != nil {
 		return err
 	}
 
 	// Track the resource itself in the resources table.
 	res := model.Resource{Type: n.ResourceType, Id: n.ResourceID}
-	if n.Kind == source.ChangeDeleted {
+	if n.Kind == ChangeDeleted {
 		if err := idx.st.DeleteResource(ctx, res); err != nil {
 			return fmt.Errorf("delete resource %s/%s: %w", n.ResourceType, n.ResourceID, err)
 		}
@@ -64,7 +63,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n source.Notification) e
 		jobType := "rebuild"
 
 		// If this is a delete of a root resource itself, enqueue a delete job.
-		if n.Kind == source.ChangeDeleted && root.Type == n.ResourceType && root.Id == n.ResourceID {
+		if n.Kind == ChangeDeleted && root.Type == n.ResourceType && root.Id == n.ResourceID {
 			jobType = "delete"
 		}
 

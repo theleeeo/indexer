@@ -8,7 +8,6 @@ import (
 	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
-	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 )
 
@@ -75,7 +74,7 @@ func (idx *Indexer) SetPlans(plans map[string]map[int]projection.Plan, resources
 
 }
 
-func (idx *Indexer) verifyResourceConfig(n source.Notification) error {
+func (idx *Indexer) verifyResourceConfig(n Notification) error {
 	if n.ResourceType == "" {
 		return fmt.Errorf("resource_type required")
 	}

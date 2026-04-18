@@ -1,4 +1,4 @@
-package source
+package core
 
 // ChangeKind describes the type of change that occurred.
 type ChangeKind int

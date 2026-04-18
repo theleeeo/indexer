@@ -6,7 +6,6 @@ import (
 
 	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/gen/index/v1"
-	"github.com/theleeeo/indexer/source"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -56,19 +55,19 @@ func (s *IndexerServer) NotifyChangeBatch(ctx context.Context, req *index.Notify
 	return &index.NotifyChangeBatchResponse{}, nil
 }
 
-func protoToNotification(pn *index.ChangeNotification) source.Notification {
-	n := source.Notification{
+func protoToNotification(pn *index.ChangeNotification) core.Notification {
+	n := core.Notification{
 		ResourceType: pn.ResourceType,
 		ResourceID:   pn.ResourceId,
 	}
 
 	switch pn.Kind {
 	case index.ChangeKind_CHANGE_KIND_CREATED:
-		n.Kind = source.ChangeCreated
+		n.Kind = core.ChangeCreated
 	case index.ChangeKind_CHANGE_KIND_UPDATED:
-		n.Kind = source.ChangeUpdated
+		n.Kind = core.ChangeUpdated
 	case index.ChangeKind_CHANGE_KIND_DELETED:
-		n.Kind = source.ChangeDeleted
+		n.Kind = core.ChangeDeleted
 	}
 
 	return n

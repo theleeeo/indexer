@@ -3,7 +3,6 @@ package tests
 import (
 	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/gen/search/v1"
-	"github.com/theleeeo/indexer/source"
 )
 
 // resourceTracked reports whether (resourceType, resourceID) is present in the
@@ -32,20 +31,20 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("create resources", func() {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a",
 			ResourceID:   "1",
-			Kind:         source.ChangeCreated,
+			Kind:         core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 		t.Require().True(t.resourceTracked("a", "1"))
 
 		t.worker.Drain(t.T().Context())
 
-		err = t.idx.RegisterChange(t.T().Context(), source.Notification{
+		err = t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a",
 			ResourceID:   "2",
-			Kind:         source.ChangeCreated,
+			Kind:         core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 		t.Require().True(t.resourceTracked("a", "2"))
@@ -87,10 +86,10 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 			"field1": "updated_value",
 		})
 
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a",
 			ResourceID:   "1",
-			Kind:         source.ChangeUpdated,
+			Kind:         core.ChangeUpdated,
 		})
 		t.Require().NoError(err)
 		t.Require().True(t.resourceTracked("a", "1"))
@@ -109,10 +108,10 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	t.Run("delete resource", func() {
 		t.fakeProvider.DeleteResource("a", "1")
 
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a",
 			ResourceID:   "1",
-			Kind:         source.ChangeDeleted,
+			Kind:         core.ChangeDeleted,
 		})
 		t.Require().NoError(err)
 		t.Require().False(t.resourceTracked("a", "1"))
@@ -125,10 +124,10 @@ func (t *TestSuite) Test_Resource_CRUD_OneIndex() {
 	})
 
 	t.Run("delete non-existing resource", func() {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a",
 			ResourceID:   "non_existing_id",
-			Kind:         source.ChangeDeleted,
+			Kind:         core.ChangeDeleted,
 		})
 		t.Require().NoError(err)
 		t.worker.Drain(t.T().Context())
@@ -142,13 +141,13 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 	t.fakeProvider.SetResource("b", "2", map[string]any{"id": "2"})
 
 	t.Run("create resources in different indices", func() {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "a", ResourceID: "1", Kind: source.ChangeCreated,
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 
-		err = t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "b", ResourceID: "2", Kind: source.ChangeCreated,
+		err = t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "b", ResourceID: "2", Kind: core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 
@@ -179,13 +178,13 @@ func (t *TestSuite) Test_Resource_CRUD_MultipleIndices() {
 		t.fakeProvider.DeleteResource("a", "1")
 		t.fakeProvider.DeleteResource("b", "2")
 
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "a", ResourceID: "1", Kind: source.ChangeDeleted,
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a", ResourceID: "1", Kind: core.ChangeDeleted,
 		})
 		t.Require().NoError(err)
 
-		err = t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "b", ResourceID: "2", Kind: source.ChangeDeleted,
+		err = t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "b", ResourceID: "2", Kind: core.ChangeDeleted,
 		})
 		t.Require().NoError(err)
 
@@ -213,8 +212,8 @@ func (t *TestSuite) Test_Create_WithRelation() {
 	})
 
 	t.Run("create root resource that has a related resource", func() {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "a", ResourceID: "1", Kind: source.ChangeCreated,
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 		t.worker.Drain(t.T().Context())
@@ -243,8 +242,8 @@ func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
 	})
 
 	// Create and build a/1.
-	err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-		ResourceType: "a", ResourceID: "1", Kind: source.ChangeCreated,
+	err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+		ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated,
 	})
 	t.Require().NoError(err)
 
@@ -252,8 +251,8 @@ func (t *TestSuite) Test_Create_ParentRelation_Already_Exists() {
 	// its rebuild, AffectedRoots("b","1") should find a/1 and re-rebuild it.
 	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1"})
 
-	err = t.idx.RegisterChange(t.T().Context(), source.Notification{
-		ResourceType: "b", ResourceID: "1", Kind: source.ChangeCreated,
+	err = t.idx.RegisterChange(t.T().Context(), core.Notification{
+		ResourceType: "b", ResourceID: "1", Kind: core.ChangeCreated,
 	})
 	t.Require().NoError(err)
 
@@ -294,10 +293,10 @@ func (t *TestSuite) Test_RelatedRelations_FullGraph() {
 	})
 
 	// Create all resources.
-	for _, n := range []source.Notification{
-		{ResourceType: "b", ResourceID: "1", Kind: source.ChangeCreated},
-		{ResourceType: "a", ResourceID: "1", Kind: source.ChangeCreated},
-		{ResourceType: "c", ResourceID: "1", Kind: source.ChangeCreated},
+	for _, n := range []core.Notification{
+		{ResourceType: "b", ResourceID: "1", Kind: core.ChangeCreated},
+		{ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated},
+		{ResourceType: "c", ResourceID: "1", Kind: core.ChangeCreated},
 	} {
 		err := t.idx.RegisterChange(t.T().Context(), n)
 		t.Require().NoError(err)
@@ -336,8 +335,8 @@ func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
 	})
 
 	// Build c/1 to establish the relation graph in PG.
-	err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-		ResourceType: "c", ResourceID: "1", Kind: source.ChangeCreated,
+	err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+		ResourceType: "c", ResourceID: "1", Kind: core.ChangeCreated,
 	})
 	t.Require().NoError(err)
 	t.worker.Drain(t.T().Context())
@@ -348,8 +347,8 @@ func (t *TestSuite) Test_ChildUpdate_Rebuilds_Parent() {
 		{"id": "1", "f1": "aval_updated"},
 	})
 
-	err = t.idx.RegisterChange(t.T().Context(), source.Notification{
-		ResourceType: "a", ResourceID: "1", Kind: source.ChangeUpdated,
+	err = t.idx.RegisterChange(t.T().Context(), core.Notification{
+		ResourceType: "a", ResourceID: "1", Kind: core.ChangeUpdated,
 	})
 	t.Require().NoError(err)
 	t.worker.Drain(t.T().Context())
@@ -379,8 +378,8 @@ func (t *TestSuite) Test_Rebuild_SpecificIDs() {
 	})
 
 	for _, id := range []string{"1", "2"} {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "a", ResourceID: id, Kind: source.ChangeCreated,
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a", ResourceID: id, Kind: core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 	}
@@ -428,8 +427,8 @@ func (t *TestSuite) Test_Rebuild_All() {
 	})
 
 	for _, id := range []string{"1", "2"} {
-		err := t.idx.RegisterChange(t.T().Context(), source.Notification{
-			ResourceType: "a", ResourceID: id, Kind: source.ChangeCreated,
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a", ResourceID: id, Kind: core.ChangeCreated,
 		})
 		t.Require().NoError(err)
 	}
