@@ -27,6 +27,7 @@ func (k ChangeKind) String() string {
 //
 // The notification says "resource X changed" — the indexer then determines which
 // root search documents are affected and rebuilds them from authoritative source data.
+// TODO: Move to core
 type Notification struct {
 	// ResourceType is the type of the resource that changed (e.g. "a", "b", "c").
 	ResourceType string

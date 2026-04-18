@@ -114,10 +114,7 @@ func (f *FakeProvider) FetchRelated(_ context.Context, params source.FetchRelate
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	// Build lookup key by joining all field values in order.
-	key := params.ResourceType
-	for _, kv := range params.Keys {
-		key += "|" + kv.Value
-	}
+	key := params.ResourceType + "|" + params.Key.Value
 	data, ok := f.relations[key]
 	if !ok {
 		return source.FetchRelatedResult{}, nil
@@ -154,7 +151,7 @@ var DefaultResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "a", Field: "id"},
 				Fields: []resource.FieldConfig{
 					{Name: "field1"},
 					{Name: "field2"},
@@ -181,7 +178,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "a", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "a", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -194,7 +191,7 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Key:      resource.KeyConfig{Source: "b", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "b", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},
@@ -207,12 +204,12 @@ var RelatedResourceConfig = resource.Configs{
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "a",
-				Key:      resource.KeyConfig{Source: "c", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "c", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 			{
 				Resource: "b",
-				Key:      resource.KeyConfig{Source: "c", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "c", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "f1"}},
 			},
 		},

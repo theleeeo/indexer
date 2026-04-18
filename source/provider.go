@@ -4,7 +4,6 @@ import (
 	"context"
 )
 
-// TODO: Move this to the core
 type Provider interface {
 	FetchResource(ctx context.Context, resourceType, resourceId string) (map[string]any, error)
 	// FetchRelated fetches resources of resourceType associated with key.
@@ -25,8 +24,8 @@ type FetchRelatedParams struct {
 	RootResource RootResource
 	// The resource type to fetch.
 	ResourceType string
-	// Keys are the extracted field-value pairs used to identify the related resources.
-	Keys []ResourceKey
+	// Key is the extracted field-value pair used to identify the related resource.
+	Key ResourceKey
 }
 
 type RootResource struct {

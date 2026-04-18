@@ -37,10 +37,7 @@ func (m *mockProvider) FetchResource(_ context.Context, resourceType, resourceID
 }
 
 func (m *mockProvider) FetchRelated(_ context.Context, params source.FetchRelatedParams) (source.FetchRelatedResult, error) {
-	key := params.ResourceType
-	for _, kv := range params.Keys {
-		key += "|" + kv.Value
-	}
+	key := params.ResourceType + "|" + params.Key.Value
 	data, ok := m.related[key]
 	if !ok {
 		return source.FetchRelatedResult{}, nil
@@ -231,7 +228,7 @@ func TestBuildPlanForVersion_FetchAll_WithRelation(t *testing.T) {
 		Relations: []resource.RelationConfig{
 			{
 				Resource: "customer",
-				Key:      resource.KeyConfig{Source: "order", Fields: []string{"id"}},
+				Key:      resource.KeyConfig{Source: "order", Field: "id"},
 				Fields:   []resource.FieldConfig{{Name: "name"}},
 			},
 		},

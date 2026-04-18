@@ -25,15 +25,13 @@ func (f *relationFetcher) Fetch(parent projection.BuildDoc) (any, error) {
 		return &fetchedRelation{}, nil
 	}
 
-	var keys []source.ResourceKey
-	for _, field := range f.rel.Key.Fields {
-		if val, ok := sourceData[0][field]; ok {
-			if valStr, ok := val.(string); ok {
-				keys = append(keys, source.ResourceKey{Field: field, Value: valStr})
-			}
+	var key source.ResourceKey
+	if val, ok := sourceData[0][f.rel.Key.Field]; ok {
+		if valStr, ok := val.(string); ok {
+			key = source.ResourceKey{Field: f.rel.Key.Field, Value: valStr}
 		}
 	}
-	if len(keys) == 0 {
+	if key.Value == "" {
 		return &fetchedRelation{}, nil
 	}
 
@@ -43,7 +41,7 @@ func (f *relationFetcher) Fetch(parent projection.BuildDoc) (any, error) {
 			Id:   parent.Root.Id,
 		},
 		ResourceType: f.rel.Resource,
-		Keys:         keys,
+		Key:          key,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetch related %s for %s/%s: %w", f.rel.Resource, parent.Root.Type, parent.Root.Id, err)

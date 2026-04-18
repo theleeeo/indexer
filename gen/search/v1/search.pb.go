@@ -77,6 +77,8 @@ type SearchRequest struct {
 	Query    string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
 	Filters  []*Filter              `protobuf:"bytes,3,rep,name=filters,proto3" json:"filters,omitempty"`
 	// Pagination (simple from/size)
+	// TODO: Support page tokens?
+	// TODO: Support pit:s?
 	Page     int32 `protobuf:"varint,4,opt,name=page,proto3" json:"page,omitempty"`
 	PageSize int32 `protobuf:"varint,5,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
 	// TODO: Multiple fields? Why?
@@ -289,7 +291,9 @@ type Filter struct {
 	Values []string `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty"`
 	// If you need nested filtering (e.g. c is mapped as "nested"):
 	// nested_path="c", field="c.state", op=EQ, value="active"
-	// TODO: Remove. Nested fields are not used
+	// TODO: Can it be more ergonomic to specify nested filters? Maybe a separate
+	// message for nested filters? Or calculate on the fly based on the resource
+	// configured
 	NestedPath    string `protobuf:"bytes,5,opt,name=nested_path,json=nestedPath,proto3" json:"nested_path,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache

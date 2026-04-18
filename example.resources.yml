@@ -10,8 +10,7 @@ resources:
         - resource: c
           key:
             source: a
-            fields:
-              - id
+            field: id
           cardinality: many
           fields:
             - name: number
@@ -28,16 +27,14 @@ resources:
         - resource: b
           key:
             source: a
-            fields:
-              - b_id
+            field: b_id
           cardinality: one
           fields:
             - name: name
         - resource: c
           key:
             source: a
-            fields:
-              - id
+            field: id
           cardinality: many
           fields:
             - name: number
@@ -54,15 +51,13 @@ resources:
       - resource: a
         key:
           source: c
-          fields:
-            - a_id
+          field: a_id
         fields:
           - name: searchField
       - resource: b
         key:
           source: c
-          fields:
-            - b_id
+          field: b_id
         fields:
           - name: name
             # Control whether this field is searchable or not.
