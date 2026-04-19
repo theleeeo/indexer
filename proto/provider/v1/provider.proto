@@ -25,6 +25,7 @@ service ProviderService {
 message FetchResourceRequest {
   string resource_type = 1;
   string resource_id = 2;
+  map<string, string> metadata = 3;
 }
 
 message FetchResourceResponse { google.protobuf.Struct data = 1; }
@@ -33,6 +34,7 @@ message FetchRelatedRequest {
   string resource_type = 1;
   ResourceKey key = 2;
   RootResource root_resource = 3;
+  map<string, string> metadata = 4;
 }
 
 message ResourceKey {
@@ -51,6 +53,7 @@ message ListResourcesRequest {
   string resource_type = 1;
   string page_token = 2;
   int32 page_size = 3;
+  map<string, string> metadata = 4;
 }
 
 message ListResourcesResponse {

@@ -32,18 +32,19 @@ func NewGRPCProvider(addr string) (*GRPCProvider, error) {
 	}, nil
 }
 
-func (p *GRPCProvider) FetchResource(ctx context.Context, resourceType, resourceID string) (map[string]any, error) {
+func (p *GRPCProvider) FetchResource(ctx context.Context, params FetchResourceParams) (FetchResourceResult, error) {
 	resp, err := p.client.FetchResource(ctx, &pb.FetchResourceRequest{
-		ResourceType: resourceType,
-		ResourceId:   resourceID,
+		ResourceType: params.ResourceType,
+		ResourceId:   params.ResourceID,
+		Metadata:     params.Metadata,
 	})
 	if err != nil {
-		return nil, err
+		return FetchResourceResult{}, err
 	}
 	if resp.Data == nil {
-		return nil, nil
+		return FetchResourceResult{}, nil
 	}
-	return resp.Data.AsMap(), nil
+	return FetchResourceResult{Data: resp.Data.AsMap()}, nil
 }
 
 func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedParams) (FetchRelatedResult, error) {
@@ -57,6 +58,7 @@ func (p *GRPCProvider) FetchRelated(ctx context.Context, params FetchRelatedPara
 			Type: params.RootResource.Type,
 			Id:   params.RootResource.Id,
 		},
+		Metadata: params.Metadata,
 	})
 	if err != nil {
 		return FetchRelatedResult{}, err
@@ -78,6 +80,7 @@ func (p *GRPCProvider) ListResources(ctx context.Context, params ListResourcesPa
 		ResourceType: params.ResourceType,
 		PageToken:    params.PageToken,
 		PageSize:     params.PageSize,
+		Metadata:     params.Metadata,
 	})
 	if err != nil {
 		return ListResourcesResult{}, err

@@ -240,8 +240,11 @@ type ChangeNotification struct {
 	// The type of change.
 	Kind ChangeKind `protobuf:"varint,1,opt,name=kind,proto3,enum=index.v1.ChangeKind" json:"kind,omitempty"`
 	// The resource that changed.
-	ResourceType  string `protobuf:"bytes,2,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
-	ResourceId    string `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	ResourceType string `protobuf:"bytes,2,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
+	ResourceId   string `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	// Arbitrary caller-provided metadata forwarded to provider calls triggered
+	// by this notification (for example tenant, trace, or trigger identifiers).
+	Metadata      map[string]string `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -295,6 +298,13 @@ func (x *ChangeNotification) GetResourceId() string {
 		return x.ResourceId
 	}
 	return ""
+}
+
+func (x *ChangeNotification) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
 }
 
 // ResourceSelector identifies a set of resources to rebuild.
@@ -450,12 +460,16 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\x14NotifyChangeResponse\"^\n" +
 	"\x18NotifyChangeBatchRequest\x12B\n" +
 	"\rnotifications\x18\x01 \x03(\v2\x1c.index.v1.ChangeNotificationR\rnotifications\"\x1b\n" +
-	"\x19NotifyChangeBatchResponse\"\x84\x01\n" +
+	"\x19NotifyChangeBatchResponse\"\x89\x02\n" +
 	"\x12ChangeNotification\x12(\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x14.index.v1.ChangeKindR\x04kind\x12#\n" +
 	"\rresource_type\x18\x02 \x01(\tR\fresourceType\x12\x1f\n" +
 	"\vresource_id\x18\x03 \x01(\tR\n" +
-	"resourceId\"v\n" +
+	"resourceId\x12F\n" +
+	"\bmetadata\x18\x04 \x03(\v2*.index.v1.ChangeNotification.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"v\n" +
 	"\x10ResourceSelector\x12#\n" +
 	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x1a\n" +
 	"\bversions\x18\x02 \x03(\x05R\bversions\x12!\n" +
@@ -489,7 +503,7 @@ func file_index_v1_index_proto_rawDescGZIP() []byte {
 }
 
 var file_index_v1_index_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
+var file_index_v1_index_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_index_v1_index_proto_goTypes = []any{
 	(ChangeKind)(0),                   // 0: index.v1.ChangeKind
 	(*NotifyChangeRequest)(nil),       // 1: index.v1.NotifyChangeRequest
@@ -500,23 +514,25 @@ var file_index_v1_index_proto_goTypes = []any{
 	(*ResourceSelector)(nil),          // 6: index.v1.ResourceSelector
 	(*RebuildRequest)(nil),            // 7: index.v1.RebuildRequest
 	(*RebuildResponse)(nil),           // 8: index.v1.RebuildResponse
+	nil,                               // 9: index.v1.ChangeNotification.MetadataEntry
 }
 var file_index_v1_index_proto_depIdxs = []int32{
 	5, // 0: index.v1.NotifyChangeRequest.notification:type_name -> index.v1.ChangeNotification
 	5, // 1: index.v1.NotifyChangeBatchRequest.notifications:type_name -> index.v1.ChangeNotification
 	0, // 2: index.v1.ChangeNotification.kind:type_name -> index.v1.ChangeKind
-	6, // 3: index.v1.RebuildRequest.selectors:type_name -> index.v1.ResourceSelector
-	1, // 4: index.v1.IndexService.NotifyChange:input_type -> index.v1.NotifyChangeRequest
-	3, // 5: index.v1.IndexService.NotifyChangeBatch:input_type -> index.v1.NotifyChangeBatchRequest
-	7, // 6: index.v1.IndexService.Rebuild:input_type -> index.v1.RebuildRequest
-	2, // 7: index.v1.IndexService.NotifyChange:output_type -> index.v1.NotifyChangeResponse
-	4, // 8: index.v1.IndexService.NotifyChangeBatch:output_type -> index.v1.NotifyChangeBatchResponse
-	8, // 9: index.v1.IndexService.Rebuild:output_type -> index.v1.RebuildResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	9, // 3: index.v1.ChangeNotification.metadata:type_name -> index.v1.ChangeNotification.MetadataEntry
+	6, // 4: index.v1.RebuildRequest.selectors:type_name -> index.v1.ResourceSelector
+	1, // 5: index.v1.IndexService.NotifyChange:input_type -> index.v1.NotifyChangeRequest
+	3, // 6: index.v1.IndexService.NotifyChangeBatch:input_type -> index.v1.NotifyChangeBatchRequest
+	7, // 7: index.v1.IndexService.Rebuild:input_type -> index.v1.RebuildRequest
+	2, // 8: index.v1.IndexService.NotifyChange:output_type -> index.v1.NotifyChangeResponse
+	4, // 9: index.v1.IndexService.NotifyChangeBatch:output_type -> index.v1.NotifyChangeBatchResponse
+	8, // 10: index.v1.IndexService.Rebuild:output_type -> index.v1.RebuildResponse
+	8, // [8:11] is the sub-list for method output_type
+	5, // [5:8] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_index_v1_index_proto_init() }
@@ -530,7 +546,7 @@ func file_index_v1_index_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_index_v1_index_proto_rawDesc), len(file_index_v1_index_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   8,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

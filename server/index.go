@@ -59,6 +59,7 @@ func protoToNotification(pn *index.ChangeNotification) core.Notification {
 	n := core.Notification{
 		ResourceType: pn.ResourceType,
 		ResourceID:   pn.ResourceId,
+		Metadata:     pn.Metadata,
 	}
 
 	switch pn.Kind {

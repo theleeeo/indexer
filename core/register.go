@@ -71,6 +71,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n Notification) error {
 		if _, err := idx.queue.Enqueue(ctx, jobGroup, jobType, RebuildPayload{
 			ResourceType: root.Type,
 			ResourceID:   root.Id,
+			Metadata:     n.Metadata,
 		}, nil); err != nil {
 			return fmt.Errorf("enqueueing job for root %s|%s: %w", root.Type, root.Id, err)
 		}

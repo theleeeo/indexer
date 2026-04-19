@@ -38,6 +38,10 @@ message ChangeNotification {
   // The resource that changed.
   string resource_type = 2;
   string resource_id = 3;
+
+  // Arbitrary caller-provided metadata forwarded to provider calls triggered
+  // by this notification (for example tenant, trace, or trigger identifiers).
+  map<string, string> metadata = 4;
 }
 
 enum ChangeKind {

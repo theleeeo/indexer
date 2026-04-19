@@ -9,12 +9,14 @@ import (
 type BuildRequest struct {
 	ResourceType string
 	ResourceID   string
+	Metadata     map[string]string
 }
 
 // BuildDoc is the intermediate document flowing through the aggregation plan.
 // It carries the final doc, the resolved data for chained relations, and root info.
 type BuildDoc struct {
-	Root model.Resource
+	Root     model.Resource
+	Metadata map[string]string
 
 	Doc      map[string]any
 	Resolved map[string][]map[string]any

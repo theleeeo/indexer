@@ -20,6 +20,7 @@ type ResourceSelector struct {
 // FullRebuildPayload is the job payload for a "full_rebuild" job.
 type FullRebuildPayload struct {
 	Selector ResourceSelector
+	Metadata map[string]string
 }
 
 // Rebuild validates the selectors and enqueues a "full_rebuild" job per selector.
@@ -43,6 +44,8 @@ func (idx *Indexer) Rebuild(ctx context.Context, selectors []ResourceSelector) e
 	for _, sel := range selectors {
 		payload := FullRebuildPayload{
 			Selector: sel,
+			// TODO: Should we allow passing metadata for full rebuilds?
+			Metadata: nil,
 		}
 
 		jobGroup := fmt.Sprintf("full_rebuild|%s", sel.ResourceType)
@@ -83,7 +86,7 @@ func (idx *Indexer) handleFullRebuild(ctx context.Context, p FullRebuildPayload)
 
 	// "Rebuild all": execute each version's plan with an empty ResourceID.
 	// The plan streams pages of BuildDocs via provider.ListResources internally.
-	return idx.handleFullRebuildAll(ctx, logger, p.Selector.ResourceType, versions)
+	return idx.handleFullRebuildAll(ctx, logger, p.Selector.ResourceType, versions, p.Metadata)
 }
 
 // handleFullRebuildByIDs rebuilds specific resources across the given versions.
@@ -110,7 +113,7 @@ func (idx *Indexer) handleFullRebuildByIDs(ctx context.Context, logger *slog.Log
 // handleFullRebuildAll streams all resources through each version's plan
 // (which internally calls provider.ListResources with pagination) and
 // upserts the resulting documents to Elasticsearch.
-func (idx *Indexer) handleFullRebuildAll(ctx context.Context, logger *slog.Logger, resourceType string, versions []int) error {
+func (idx *Indexer) handleFullRebuildAll(ctx context.Context, logger *slog.Logger, resourceType string, versions []int, metadata map[string]string) error {
 	versionPlans, ok := idx.plans[resourceType]
 	if !ok {
 		return fmt.Errorf("unknown resource type %q", resourceType)
@@ -138,6 +141,7 @@ func (idx *Indexer) handleFullRebuildAll(ctx context.Context, logger *slog.Logge
 		ch := plan.Execute(ctx, projection.BuildRequest{
 			ResourceType: resourceType,
 			ResourceID:   "",
+			Metadata:     metadata,
 		})
 
 		for page := range ch {
@@ -207,6 +211,7 @@ func (idx *Indexer) handleRebuildVersions(ctx context.Context, resourceType, res
 		ch := plan.Execute(ctx, projection.BuildRequest{
 			ResourceType: resourceType,
 			ResourceID:   resourceID,
+			Metadata:     nil,
 		})
 
 		var result *projection.BuildDoc

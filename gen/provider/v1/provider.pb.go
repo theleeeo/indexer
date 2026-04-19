@@ -26,6 +26,7 @@ type FetchResourceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
 	ResourceId    string                 `protobuf:"bytes,2,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,3,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -72,6 +73,13 @@ func (x *FetchResourceRequest) GetResourceId() string {
 		return x.ResourceId
 	}
 	return ""
+}
+
+func (x *FetchResourceRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
 }
 
 type FetchResourceResponse struct {
@@ -123,6 +131,7 @@ type FetchRelatedRequest struct {
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
 	Key           *ResourceKey           `protobuf:"bytes,2,opt,name=key,proto3" json:"key,omitempty"`
 	RootResource  *RootResource          `protobuf:"bytes,3,opt,name=root_resource,json=rootResource,proto3" json:"root_resource,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -174,6 +183,13 @@ func (x *FetchRelatedRequest) GetKey() *ResourceKey {
 func (x *FetchRelatedRequest) GetRootResource() *RootResource {
 	if x != nil {
 		return x.RootResource
+	}
+	return nil
+}
+
+func (x *FetchRelatedRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
 	}
 	return nil
 }
@@ -331,6 +347,7 @@ type ListResourcesRequest struct {
 	ResourceType  string                 `protobuf:"bytes,1,opt,name=resource_type,json=resourceType,proto3" json:"resource_type,omitempty"`
 	PageToken     string                 `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	PageSize      int32                  `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	Metadata      map[string]string      `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -384,6 +401,13 @@ func (x *ListResourcesRequest) GetPageSize() int32 {
 		return x.PageSize
 	}
 	return 0
+}
+
+func (x *ListResourcesRequest) GetMetadata() map[string]string {
+	if x != nil {
+		return x.Metadata
+	}
+	return nil
 }
 
 type ListResourcesResponse struct {
@@ -494,17 +518,25 @@ var File_provider_v1_provider_proto protoreflect.FileDescriptor
 
 const file_provider_v1_provider_proto_rawDesc = "" +
 	"\n" +
-	"\x1aprovider/v1/provider.proto\x12\vprovider.v1\x1a\x1cgoogle/protobuf/struct.proto\"\\\n" +
+	"\x1aprovider/v1/provider.proto\x12\vprovider.v1\x1a\x1cgoogle/protobuf/struct.proto\"\xe6\x01\n" +
 	"\x14FetchResourceRequest\x12#\n" +
 	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x1f\n" +
 	"\vresource_id\x18\x02 \x01(\tR\n" +
-	"resourceId\"D\n" +
+	"resourceId\x12K\n" +
+	"\bmetadata\x18\x03 \x03(\v2/.provider.v1.FetchResourceRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"D\n" +
 	"\x15FetchResourceResponse\x12+\n" +
-	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\xa6\x01\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.google.protobuf.StructR\x04data\"\xaf\x02\n" +
 	"\x13FetchRelatedRequest\x12#\n" +
 	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12*\n" +
 	"\x03key\x18\x02 \x01(\v2\x18.provider.v1.ResourceKeyR\x03key\x12>\n" +
-	"\rroot_resource\x18\x03 \x01(\v2\x19.provider.v1.RootResourceR\frootResource\"9\n" +
+	"\rroot_resource\x18\x03 \x01(\v2\x19.provider.v1.RootResourceR\frootResource\x12J\n" +
+	"\bmetadata\x18\x04 \x03(\v2..provider.v1.FetchRelatedRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"9\n" +
 	"\vResourceKey\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value\"2\n" +
@@ -512,12 +544,16 @@ const file_provider_v1_provider_proto_rawDesc = "" +
 	"\x04type\x18\x01 \x01(\tR\x04type\x12\x0e\n" +
 	"\x02id\x18\x02 \x01(\tR\x02id\"C\n" +
 	"\x14FetchRelatedResponse\x12+\n" +
-	"\x04data\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x04data\"w\n" +
+	"\x04data\x18\x01 \x03(\v2\x17.google.protobuf.StructR\x04data\"\x81\x02\n" +
 	"\x14ListResourcesRequest\x12#\n" +
 	"\rresource_type\x18\x01 \x01(\tR\fresourceType\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x02 \x01(\tR\tpageToken\x12\x1b\n" +
-	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"x\n" +
+	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\x12K\n" +
+	"\bmetadata\x18\x04 \x03(\v2/.provider.v1.ListResourcesRequest.MetadataEntryR\bmetadata\x1a;\n" +
+	"\rMetadataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"x\n" +
 	"\x15ListResourcesResponse\x127\n" +
 	"\tresources\x18\x01 \x03(\v2\x19.provider.v1.ResourceItemR\tresources\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\\\n" +
@@ -543,7 +579,7 @@ func file_provider_v1_provider_proto_rawDescGZIP() []byte {
 	return file_provider_v1_provider_proto_rawDescData
 }
 
-var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_provider_v1_provider_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_provider_v1_provider_proto_goTypes = []any{
 	(*FetchResourceRequest)(nil),  // 0: provider.v1.FetchResourceRequest
 	(*FetchResourceResponse)(nil), // 1: provider.v1.FetchResourceResponse
@@ -554,26 +590,32 @@ var file_provider_v1_provider_proto_goTypes = []any{
 	(*ListResourcesRequest)(nil),  // 6: provider.v1.ListResourcesRequest
 	(*ListResourcesResponse)(nil), // 7: provider.v1.ListResourcesResponse
 	(*ResourceItem)(nil),          // 8: provider.v1.ResourceItem
-	(*structpb.Struct)(nil),       // 9: google.protobuf.Struct
+	nil,                           // 9: provider.v1.FetchResourceRequest.MetadataEntry
+	nil,                           // 10: provider.v1.FetchRelatedRequest.MetadataEntry
+	nil,                           // 11: provider.v1.ListResourcesRequest.MetadataEntry
+	(*structpb.Struct)(nil),       // 12: google.protobuf.Struct
 }
 var file_provider_v1_provider_proto_depIdxs = []int32{
-	9, // 0: provider.v1.FetchResourceResponse.data:type_name -> google.protobuf.Struct
-	3, // 1: provider.v1.FetchRelatedRequest.key:type_name -> provider.v1.ResourceKey
-	4, // 2: provider.v1.FetchRelatedRequest.root_resource:type_name -> provider.v1.RootResource
-	9, // 3: provider.v1.FetchRelatedResponse.data:type_name -> google.protobuf.Struct
-	8, // 4: provider.v1.ListResourcesResponse.resources:type_name -> provider.v1.ResourceItem
-	9, // 5: provider.v1.ResourceItem.data:type_name -> google.protobuf.Struct
-	0, // 6: provider.v1.ProviderService.FetchResource:input_type -> provider.v1.FetchResourceRequest
-	2, // 7: provider.v1.ProviderService.FetchRelated:input_type -> provider.v1.FetchRelatedRequest
-	6, // 8: provider.v1.ProviderService.ListResources:input_type -> provider.v1.ListResourcesRequest
-	1, // 9: provider.v1.ProviderService.FetchResource:output_type -> provider.v1.FetchResourceResponse
-	5, // 10: provider.v1.ProviderService.FetchRelated:output_type -> provider.v1.FetchRelatedResponse
-	7, // 11: provider.v1.ProviderService.ListResources:output_type -> provider.v1.ListResourcesResponse
-	9, // [9:12] is the sub-list for method output_type
-	6, // [6:9] is the sub-list for method input_type
-	6, // [6:6] is the sub-list for extension type_name
-	6, // [6:6] is the sub-list for extension extendee
-	0, // [0:6] is the sub-list for field type_name
+	9,  // 0: provider.v1.FetchResourceRequest.metadata:type_name -> provider.v1.FetchResourceRequest.MetadataEntry
+	12, // 1: provider.v1.FetchResourceResponse.data:type_name -> google.protobuf.Struct
+	3,  // 2: provider.v1.FetchRelatedRequest.key:type_name -> provider.v1.ResourceKey
+	4,  // 3: provider.v1.FetchRelatedRequest.root_resource:type_name -> provider.v1.RootResource
+	10, // 4: provider.v1.FetchRelatedRequest.metadata:type_name -> provider.v1.FetchRelatedRequest.MetadataEntry
+	12, // 5: provider.v1.FetchRelatedResponse.data:type_name -> google.protobuf.Struct
+	11, // 6: provider.v1.ListResourcesRequest.metadata:type_name -> provider.v1.ListResourcesRequest.MetadataEntry
+	8,  // 7: provider.v1.ListResourcesResponse.resources:type_name -> provider.v1.ResourceItem
+	12, // 8: provider.v1.ResourceItem.data:type_name -> google.protobuf.Struct
+	0,  // 9: provider.v1.ProviderService.FetchResource:input_type -> provider.v1.FetchResourceRequest
+	2,  // 10: provider.v1.ProviderService.FetchRelated:input_type -> provider.v1.FetchRelatedRequest
+	6,  // 11: provider.v1.ProviderService.ListResources:input_type -> provider.v1.ListResourcesRequest
+	1,  // 12: provider.v1.ProviderService.FetchResource:output_type -> provider.v1.FetchResourceResponse
+	5,  // 13: provider.v1.ProviderService.FetchRelated:output_type -> provider.v1.FetchRelatedResponse
+	7,  // 14: provider.v1.ProviderService.ListResources:output_type -> provider.v1.ListResourcesResponse
+	12, // [12:15] is the sub-list for method output_type
+	9,  // [9:12] is the sub-list for method input_type
+	9,  // [9:9] is the sub-list for extension type_name
+	9,  // [9:9] is the sub-list for extension extendee
+	0,  // [0:9] is the sub-list for field type_name
 }
 
 func init() { file_provider_v1_provider_proto_init() }
@@ -587,7 +629,7 @@ func file_provider_v1_provider_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_provider_v1_provider_proto_rawDesc), len(file_provider_v1_provider_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

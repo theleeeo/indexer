@@ -42,6 +42,7 @@ func (f *relationFetcher) Fetch(parent projection.BuildDoc) (any, error) {
 		},
 		ResourceType: f.rel.Resource,
 		Key:          key,
+		Metadata:     parent.Metadata,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetch related %s for %s/%s: %w", f.rel.Resource, parent.Root.Type, parent.Root.Id, err)

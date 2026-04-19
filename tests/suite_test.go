@@ -100,14 +100,14 @@ func (f *FakeProvider) SetRelated(resourceType string, keyValues []string, relat
 	f.relations[key] = related
 }
 
-func (f *FakeProvider) FetchResource(_ context.Context, resourceType, resourceID string) (map[string]any, error) {
+func (f *FakeProvider) FetchResource(_ context.Context, params source.FetchResourceParams) (source.FetchResourceResult, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	data, ok := f.resources[resourceType+"|"+resourceID]
+	data, ok := f.resources[params.ResourceType+"|"+params.ResourceID]
 	if !ok {
-		return nil, nil
+		return source.FetchResourceResult{}, nil
 	}
-	return data, nil
+	return source.FetchResourceResult{Data: data}, nil
 }
 
 func (f *FakeProvider) FetchRelated(_ context.Context, params source.FetchRelatedParams) (source.FetchRelatedResult, error) {

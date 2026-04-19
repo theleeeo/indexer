@@ -10,21 +10,21 @@ The core parts of the library are also available to be used as a library for use
 
 ```
 External microservice
-       │  NotifyChange / NotifyChangeBatch  (gRPC → IndexService)
+  │  NotifyChange / NotifyChangeBatch  (gRPC → IndexService, optional metadata)
        ▼
 server/ — translates proto → source.Notification
        ▼
 core/Indexer.RegisterChange
        │  UpsertResource / DeleteResource    → Postgres (resources table)
        │  AffectedRoots ←                   ← Postgres (relations table)
-       │  Enqueue("rebuild" / "delete")      → Postgres (jobs table)
+  │  Enqueue("rebuild" / "delete")      → Postgres (jobs table, metadata in payload)
        ▼
 jobqueue/Worker  (polls Postgres, serialised per job_group = "type|id")
        ▼
 core/handleRebuild
-       │  projection/Builder.Build
-       │    ├─ aggregation/RootPlan  → provider.FetchResource  (gRPC → ProviderService)
-       │    └─ aggregation/SubPlan   → provider.FetchRelated   (gRPC → ProviderService)
+      │  projection/Builder.Build
+      │    ├─ aggregation/RootPlan  → provider.FetchResource  (gRPC → ProviderService, metadata)
+      │    └─ aggregation/SubPlan   → provider.FetchRelated   (gRPC → ProviderService, metadata)
        │  store.AddChildResources    → Postgres (relations)
        │  es.Client.Upsert           → Elasticsearch
        ▼
@@ -80,7 +80,7 @@ Schema: [jobqueue/schema.sql](jobqueue/schema.sql).
 
 Inbound and outbound data contracts.
 
-- `Notification{ResourceType, ResourceID, Kind}` — what changed (`ChangeCreated`, `ChangeUpdated`, `ChangeDeleted`).
+- `Notification{ResourceType, ResourceID, Kind, Metadata}` — what changed (`ChangeCreated`, `ChangeUpdated`, `ChangeDeleted`) plus arbitrary caller-provided key-value context.
 - `Provider` interface — `FetchResource`, `FetchRelated`, and `ListResources`. All live data retrieval goes through this boundary.
 - `GRPCProvider` — implements `Provider` by calling a remote `ProviderService` plugin.
 - `ListResourcesParams` / `ListResourcesResult` / `ListedResource` — paginated listing types for full rebuilds.
@@ -151,8 +151,8 @@ CLI tool. Reads resource config, generates ES index mappings, and optionally `PU
 
 | Proto                              | Service                              | Key Messages                                                                                                                                                                                                                             |
 | ---------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `proto/index/v1/index.proto`       | `IndexService` (inbound)             | `ChangeNotification{kind, resource_type, resource_id}`, `RebuildRequest{repeated ResourceSelector}`, `RebuildResponse`                                                                                                                   |
-| `proto/provider/v1/provider.proto` | `ProviderService` (plugin, outbound) | `FetchResourceRequest/Response`, `FetchRelatedRequest/Response`, `ListResourcesRequest/Response` (data as `google.protobuf.Struct`)                                                                                                      |
+| `proto/index/v1/index.proto`       | `IndexService` (inbound)             | `ChangeNotification{kind, resource_type, resource_id, metadata}`, `RebuildRequest{repeated ResourceSelector}`, `RebuildResponse`                                                                                                         |
+| `proto/provider/v1/provider.proto` | `ProviderService` (plugin, outbound) | `FetchResourceRequest{..., metadata}` / `Response`, `FetchRelatedRequest{..., metadata}` / `Response`, `ListResourcesRequest{..., metadata}` / `Response` (data as `google.protobuf.Struct`)                                             |
 | `proto/search/v1/search.proto`     | `SearchService`                      | `SearchRequest{resource, query, filters, page, page_size, sort}`, `SearchResponse{total, hits}`, `GetCapabilitiesRequest`, `GetCapabilitiesResponse{resources: []{resource, fields: []{field, type, filter_ops, searchable, sortable}}}` |
 
 Generated code lives in `gen/`. Regenerate with `buf generate`.

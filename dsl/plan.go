@@ -170,22 +170,27 @@ func fetchSingleResource(
 	fields []resource.FieldConfig,
 	params aggregation.FetchParameters[projection.BuildRequest],
 ) (aggregation.FetchResult[projection.BuildDoc], error) {
-	data, err := provider.FetchResource(context.Background(), params.Request.ResourceType, params.Request.ResourceID)
+	data, err := provider.FetchResource(context.Background(), source.FetchResourceParams{
+		ResourceType: params.Request.ResourceType,
+		ResourceID:   params.Request.ResourceID,
+		Metadata:     params.Request.Metadata,
+	})
 	if err != nil {
 		return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("fetch resource %s/%s: %w", params.Request.ResourceType, params.Request.ResourceID, err)
 	}
 
 	root := model.Resource{Type: params.Request.ResourceType, Id: params.Request.ResourceID}
 
-	if data == nil {
+	if data.Data == nil {
 		return aggregation.FetchResult[projection.BuildDoc]{Items: []projection.BuildDoc{{
 			Doc:      nil,
 			Resolved: nil,
 			Root:     root,
+			Metadata: params.Request.Metadata,
 		}}}, nil
 	}
 
-	filtered := filterFields(data, fields)
+	filtered := filterFields(data.Data, fields)
 
 	return aggregation.FetchResult[projection.BuildDoc]{
 		Items: []projection.BuildDoc{{
@@ -193,9 +198,10 @@ func fetchSingleResource(
 				"fields": filtered,
 			},
 			Resolved: map[string][]map[string]any{
-				resourceName: {data},
+				resourceName: {data.Data},
 			},
-			Root: root,
+			Root:     root,
+			Metadata: params.Request.Metadata,
 		}},
 	}, nil
 }
@@ -218,6 +224,7 @@ func fetchAllResources(
 		ResourceType: params.Request.ResourceType,
 		PageToken:    pageToken,
 		PageSize:     100,
+		Metadata:     params.Request.Metadata,
 	})
 	if err != nil {
 		return aggregation.FetchResult[projection.BuildDoc]{}, fmt.Errorf("list resources %s: %w", params.Request.ResourceType, err)
@@ -236,7 +243,8 @@ func fetchAllResources(
 			Resolved: map[string][]map[string]any{
 				resourceName: {r.Data},
 			},
-			Root: model.Resource{Type: params.Request.ResourceType, Id: r.ID},
+			Root:     model.Resource{Type: params.Request.ResourceType, Id: r.ID},
+			Metadata: params.Request.Metadata,
 		})
 	}
 

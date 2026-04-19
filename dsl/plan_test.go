@@ -15,6 +15,10 @@ type mockProvider struct {
 	resources map[string]map[string]any   // "type|id" -> data
 	related   map[string][]map[string]any // "type|keyval" -> []data
 	listed    map[string][]source.ListedResource
+	// last* metadata snapshots for verifying request propagation.
+	lastFetchResourceMetadata map[string]string
+	lastFetchRelatedMetadata  map[string]string
+	lastListMetadata          map[string]string
 	// pageSize controls how many items are returned per ListResources page.
 	pageSize int
 }
@@ -28,15 +32,28 @@ func newMockProvider() *mockProvider {
 	}
 }
 
-func (m *mockProvider) FetchResource(_ context.Context, resourceType, resourceID string) (map[string]any, error) {
-	data, ok := m.resources[resourceType+"|"+resourceID]
-	if !ok {
-		return nil, nil
+func copyMetadata(in map[string]string) map[string]string {
+	if in == nil {
+		return nil
 	}
-	return data, nil
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func (m *mockProvider) FetchResource(_ context.Context, params source.FetchResourceParams) (source.FetchResourceResult, error) {
+	m.lastFetchResourceMetadata = copyMetadata(params.Metadata)
+	data, ok := m.resources[params.ResourceType+"|"+params.ResourceID]
+	if !ok {
+		return source.FetchResourceResult{}, nil
+	}
+	return source.FetchResourceResult{Data: data}, nil
 }
 
 func (m *mockProvider) FetchRelated(_ context.Context, params source.FetchRelatedParams) (source.FetchRelatedResult, error) {
+	m.lastFetchRelatedMetadata = copyMetadata(params.Metadata)
 	key := params.ResourceType + "|" + params.Key.Value
 	data, ok := m.related[key]
 	if !ok {
@@ -46,6 +63,7 @@ func (m *mockProvider) FetchRelated(_ context.Context, params source.FetchRelate
 }
 
 func (m *mockProvider) ListResources(_ context.Context, params source.ListResourcesParams) (source.ListResourcesResult, error) {
+	m.lastListMetadata = copyMetadata(params.Metadata)
 	all, ok := m.listed[params.ResourceType]
 	if !ok {
 		return source.ListResourcesResult{}, nil
@@ -80,6 +98,45 @@ func (m *mockProvider) ListResources(_ context.Context, params source.ListResour
 		Resources:     all[start:end],
 		NextPageToken: npt,
 	}, nil
+}
+
+func TestBuildPlanForVersion_PropagatesMetadata(t *testing.T) {
+	prov := newMockProvider()
+	prov.resources["order|1"] = map[string]any{"id": "1", "number": "ORD-1"}
+	prov.related["customer|1"] = []map[string]any{{"id": "c1", "name": "Alice"}}
+
+	vc := &resource.VersionConfig{
+		Fields: []resource.FieldConfig{{Name: "number"}},
+		Relations: []resource.RelationConfig{{
+			Resource: "customer",
+			Key:      resource.KeyConfig{Source: "order", Field: "id"},
+			Fields:   []resource.FieldConfig{{Name: "name"}},
+		}},
+	}
+
+	plan := buildPlanForVersion(prov, "order", vc)
+	metadata := map[string]string{"tenant-id": "t1", "trace-id": "abc"}
+
+	ch := plan.Execute(context.Background(), projection.BuildRequest{
+		ResourceType: "order",
+		ResourceID:   "1",
+		Metadata:     metadata,
+	})
+
+	for r := range ch {
+		require.NoError(t, r.Err)
+	}
+
+	require.Equal(t, metadata, prov.lastFetchResourceMetadata)
+	require.Equal(t, prov.lastFetchResourceMetadata, prov.lastFetchRelatedMetadata)
+
+	// List-all path should forward metadata as well.
+	prov.listed["order"] = []source.ListedResource{{ID: "1", Data: map[string]any{"id": "1", "number": "ORD-1"}}}
+	ch = plan.Execute(context.Background(), projection.BuildRequest{ResourceType: "order", Metadata: metadata})
+	for r := range ch {
+		require.NoError(t, r.Err)
+	}
+	require.Equal(t, metadata, prov.lastListMetadata)
 }
 
 func TestBuildPlanForVersion_FetchSingle(t *testing.T) {
@@ -271,9 +328,9 @@ func TestBuildPlansFromConfig_VersionedPlans(t *testing.T) {
 	cfgs := resource.Configs{
 		{
 			Resource: "product",
-			VersionDefs: map[int]*resource.VersionConfig{
-				1: {Fields: []resource.FieldConfig{{Name: "title"}}},
-				2: {Fields: []resource.FieldConfig{{Name: "title"}, {Name: "price"}}},
+			Versions: []resource.VersionConfig{
+				{Version: 1, Fields: []resource.FieldConfig{{Name: "title"}}},
+				{Version: 2, Fields: []resource.FieldConfig{{Name: "title"}, {Name: "price"}}},
 			},
 			ReadVersion: 1,
 		},

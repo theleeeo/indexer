@@ -14,6 +14,7 @@ import (
 type RebuildPayload struct {
 	ResourceType string
 	ResourceID   string
+	Metadata     map[string]string
 }
 
 // handleRebuild fetches the full document from the authoritative source via the
@@ -43,6 +44,7 @@ func (idx *Indexer) handleRebuild(ctx context.Context, p RebuildPayload) error {
 		ch := plan.Execute(ctx, projection.BuildRequest{
 			ResourceType: p.ResourceType,
 			ResourceID:   p.ResourceID,
+			Metadata:     p.Metadata,
 		})
 
 		var result projection.BuildDoc
