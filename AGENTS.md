@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`github.com/theleeeo/indexer` is a **generic search-index synchronisation engine**. It bridges arbitrary backend microservices (via pluggable gRPC "Provider" plugins) with an Elasticsearch cluster, keeping search indices fresh as data changes. External services notify it via gRPC when resources change; the indexer determines which denormalised ES documents are affected, rebuilds them, and writes them to ES. A Postgres-backed job queue ensures reliable, ordered, at-least-once processing.
+`github.com/theleeeo/indexer` is a **generic search-index synchronisation engine**. It bridges arbitrary backend microservices (via pluggable gRPC "Provider" plugins) with an Elasticsearch cluster, keeping search indices fresh as data changes. External services notify it via gRPC when resources change; the indexer determines which denormalised ES documents are affected, rebuilds them, and writes them to ES. A [River](https://riverqueue.com)-backed Postgres job queue provides at-least-once processing.
 
 The core parts of the library are also available to be used as a library for users who need more control over all requests and handling of the resources.
 
@@ -17,9 +17,9 @@ server/ — translates proto → source.Notification
 core/Indexer.RegisterChange
        │  UpsertResource / DeleteResource    → Postgres (resources table)
        │  AffectedRoots ←                   ← Postgres (relations table)
-  │  Enqueue("rebuild" / "delete")      → Postgres (jobs table, metadata in payload)
+  │  riverClient.Insert(RebuildArgs/DeleteArgs)   → River (river_job table)
        ▼
-jobqueue/Worker  (polls Postgres, serialised per job_group = "type|id")
+River Client workers (core/RebuildWorker, DeleteWorker)
        ▼
 core/handleRebuild
       │  projection/Builder.Build
@@ -33,11 +33,9 @@ core/handleRebuild
 Full rebuild path:
 Client → server/IndexerServer.Rebuild → core/Indexer.Rebuild
        │  Validate selectors
-       │  Enqueue("full_rebuild")  → Postgres (jobs, group = "full_rebuild|type")
+       │  riverClient.Insert(FullRebuildArgs) → River
        ▼
-jobqueue/Worker
-       ▼
-core/handleFullRebuild
+core/FullRebuildWorker → handleFullRebuild
        │  If resource_ids given: handleRebuildVersions per ID
        │  If empty: execute plan with ResourceID="" per version
        │    └─ plan streams pages of BuildDocs via provider.ListResources internally
@@ -69,12 +67,17 @@ Postgres relation graph. Tracks known resource instances (`resources` table) and
 Key types: `PostgresStore`, `Relation`.  
 Schema: [store/pg_schema.sql](store/pg_schema.sql).
 
-### `jobqueue/`
+### Job queue
 
-Postgres-backed durable job queue with group-ordered processing. Jobs are enqueued with a `jobGroup` (`"type|id"`), guaranteeing serial execution per root resource. Supports retries, heartbeating, lease expiry reaping, and dead-letter tracking.
+The indexer uses [River](https://riverqueue.com) (`github.com/riverqueue/river`) as its durable Postgres job queue. Job args + workers live in [core/worker.go](core/worker.go):
 
-Key types: `Queue` (enqueue API), `Worker` (poll/execute), `Job`.  
-Schema: [jobqueue/schema.sql](jobqueue/schema.sql).
+- `RebuildArgs` / `RebuildWorker` — incremental root rebuild.
+- `DeleteArgs` / `DeleteWorker` — delete a root document from ES and remove relations.
+- `FullRebuildArgs` / `FullRebuildWorker` — full rebuild of a resource type, optionally scoped to specific IDs and/or versions.
+
+There is **no per-resource serialization guarantee**: concurrent rebuilds of the same root can run in parallel. ES upserts are idempotent, and `store.AddChildResources` converges relation state. Callers should expect eventual consistency under bursts.
+
+River's schema is applied at startup via `rivermigrate` — there is no local SQL schema file to apply manually. Use [riverui](https://github.com/riverqueue/riverui) or River's own Go API for operational inspection (listing, counts, error summaries).
 
 ### `source/`
 
@@ -109,8 +112,9 @@ Central orchestrator (`Indexer` struct).
 - `RegisterChange` — inbound change handler: updates PG, finds affected roots, enqueues jobs.
 - `handleRebuild` / `handleDelete` — job handlers; rebuild calls `Builder.Build` then ES upsert; delete calls ES delete and removes PG records.
 - `handleFullRebuild` — job handler for `"full_rebuild"` jobs; for specific IDs calls `handleRebuildVersions` per resource; for "rebuild all" executes each version's plan with `ResourceID=""` which streams all resources via the plan's internal `ListResources` pagination.
-- `Rebuild` — validates selectors, enqueues one `"full_rebuild"` job per `ResourceSelector` (grouped by `"full_rebuild|type"`).
-- `HandlerFunc()` — returns the `jobqueue.Handler` that dispatches job types (`rebuild`, `delete`, `full_rebuild`).
+- `Rebuild` — validates selectors, enqueues one `FullRebuildArgs` River job per `ResourceSelector`.
+- `RegisterWorkers(workers, idx)` — registers the three River workers (`rebuild`, `delete`, `full_rebuild`) against a `river.Workers` registry so callers can pass it to `river.NewClient`.
+- `SetRiverClient(client)` — assigns the River client used to enqueue jobs. Needed because workers reference the `Indexer`, so the client is created after the `Indexer` and wired back in.
 - `Search` — validates resource type, caps pagination, delegates to ES.
 - `GetCapabilities` — returns the search capabilities (available resources, filterable fields, supported operations) derived from the resource configs.
 
@@ -227,7 +231,7 @@ go test ./...
 
 ## Conventions
 
-- **Job grouping:** incremental change jobs are keyed on `"type|id"` to guarantee serial execution per resource. Full rebuild jobs use `"full_rebuild|type"` to serialize rebuilds of the same resource type.
+- **No per-resource serialization:** rebuilds of the same root may run concurrently under bursts. ES upserts are idempotent and `store.AddChildResources` converges; callers should expect eventual consistency. If strict ordering is needed later, add an advisory-lock guard inside the rebuild worker or use River's `UniqueOpts`.
 - **Relation graph is the source of truth for "what to reindex":** when a child resource changes, `AffectedRoots` is the mechanism for finding parent documents — not a config lookup.
 - **ES mappings are derived from config:** use `gen-mapping` after changing resource configs; do not hand-edit ES mappings.
 - **BuildRequest conventions:** `BuildRequest.ResourceID == ""` triggers "get all" mode in the root plan fetcher, which calls `provider.ListResources` with pagination. A non-empty `ResourceID` fetches a single resource.

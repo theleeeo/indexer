@@ -8,13 +8,13 @@ import (
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 
 	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/dsl"
 	"github.com/theleeeo/indexer/es"
 	"github.com/theleeeo/indexer/gen/index/v1"
 	"github.com/theleeeo/indexer/gen/search/v1"
-	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/server"
 	"github.com/theleeeo/indexer/source"
@@ -22,6 +22,9 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
@@ -74,7 +77,15 @@ func main() {
 
 	st := store.NewPostgresStore(dbpool)
 
-	queue := jobqueue.NewQueue(dbpool)
+	// Apply River migrations before starting the client.
+	riverDriver := riverpgxv5.New(dbpool)
+	migrator, err := rivermigrate.New(riverDriver, nil)
+	if err != nil {
+		log.Fatalf("river migrator: %v", err)
+	}
+	if _, err := migrator.Migrate(context.Background(), rivermigrate.DirectionUp, nil); err != nil {
+		log.Fatalf("apply river migrations: %v", err)
+	}
 
 	sourceProvider, err := source.NewGRPCProvider(cfg.Provider.Addr)
 	if err != nil {
@@ -89,12 +100,21 @@ func main() {
 		Resources: resources,
 		ES:        esClientImpl,
 		Store:     st,
-		Queue:     queue,
 	})
 
-	worker := jobqueue.NewWorker(dbpool, idx.HandlerFunc(), jobqueue.WorkerConfig{
-		Logger: log.Default(),
+	workers := river.NewWorkers()
+	core.RegisterWorkers(workers, idx)
+
+	riverClient, err := river.NewClient(riverDriver, &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 10},
+		},
+		Workers: workers,
 	})
+	if err != nil {
+		log.Fatalf("river client: %v", err)
+	}
+	idx.SetRiverClient(riverClient)
 
 	idxSrv := server.NewIndexer(idx)
 	searchSrv := server.NewSearcher(idx)
@@ -118,9 +138,13 @@ func main() {
 	defer cancel()
 
 	wg.Go(func() {
-		log.Printf("starting job queue worker")
-		worker.Run(ctx)
-		log.Printf("job queue worker stopped")
+		log.Printf("starting river client")
+		if err := riverClient.Start(ctx); err != nil {
+			log.Printf("river client start error: %v", err)
+			return
+		}
+		<-riverClient.Stopped()
+		log.Printf("river client stopped")
 	})
 
 	wg.Go(func() {
@@ -139,6 +163,13 @@ func main() {
 		log.Printf("force shutdown")
 		os.Exit(1)
 	}()
+
+	// Ask River to stop gracefully; cancelling ctx would force an immediate stop.
+	stopCtx, stopCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	if err := riverClient.Stop(stopCtx); err != nil {
+		log.Printf("river client stop error: %v", err)
+	}
+	stopCancel()
 
 	cancel()
 

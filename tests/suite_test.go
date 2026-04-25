@@ -18,13 +18,16 @@ import (
 	"github.com/theleeeo/indexer/core"
 	"github.com/theleeeo/indexer/dsl"
 	"github.com/theleeeo/indexer/es"
-	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/source"
 	"github.com/theleeeo/indexer/store"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 	"github.com/stretchr/testify/suite"
 	"github.com/testcontainers/testcontainers-go"
 	esContainer "github.com/testcontainers/testcontainers-go/modules/elasticsearch"
@@ -135,7 +138,7 @@ type TestSuite struct {
 	idx *core.Indexer
 
 	cancelWorker context.CancelFunc
-	worker       *jobqueue.Worker
+	worker       *riverDrainer
 
 	fakeProvider *FakeProvider
 	st           *store.PostgresStore
@@ -335,13 +338,14 @@ func (t *TestSuite) SetupSuite() {
 		t.T().Fatalf("failed to apply schema: %v", err)
 	}
 
-	jobQueueSchema, err := os.ReadFile(filepath.Join("..", "jobqueue", "schema.sql"))
+	// Apply River migrations.
+	riverDriver := riverpgxv5.New(dbpool)
+	migrator, err := rivermigrate.New[pgx.Tx](riverDriver, nil)
 	if err != nil {
-		t.T().Fatal(err)
+		t.T().Fatalf("failed to create river migrator: %v", err)
 	}
-
-	if _, err := t.pool.Exec(t.T().Context(), string(jobQueueSchema)); err != nil {
-		t.T().Fatalf("failed to apply job queue schema: %v", err)
+	if _, err := migrator.Migrate(t.T().Context(), rivermigrate.DirectionUp, nil); err != nil {
+		t.T().Fatalf("failed to apply river migrations: %v", err)
 	}
 
 	t.st = store.NewPostgresStore(dbpool)
@@ -354,16 +358,29 @@ func (t *TestSuite) SetupSuite() {
 		Resources: DefaultResourceConfig,
 		ES:        es.New(esClient, true),
 		Store:     t.st,
-		Queue:     jobqueue.NewQueue(dbpool),
 	})
 
-	t.worker = jobqueue.NewWorker(t.pool, t.idx.HandlerFunc(), jobqueue.WorkerConfig{
-		Logger: log.Default(),
+	workers := river.NewWorkers()
+	core.RegisterWorkers(workers, t.idx)
+
+	riverClient, err := river.NewClient(riverDriver, &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 10},
+		},
+		Workers: workers,
 	})
+	if err != nil {
+		t.T().Fatalf("failed to create river client: %v", err)
+	}
+	t.idx.SetRiverClient(riverClient)
+
+	t.worker = &riverDrainer{client: riverClient, pool: dbpool}
 
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	t.cancelWorker = cancelWorker
-	go t.worker.Run(workerCtx)
+	if err := riverClient.Start(workerCtx); err != nil {
+		t.T().Fatalf("failed to start river client: %v", err)
+	}
 }
 
 func (t *TestSuite) TearDownSuite() {
@@ -379,7 +396,11 @@ func (t *TestSuite) TearDownSuite() {
 
 	t.cancelWorker()
 
-	t.worker.Wait()
+	stopCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	if err := t.worker.client.Stop(stopCtx); err != nil {
+		log.Printf("failed to stop river client: %s", err)
+	}
 }
 
 func (t *TestSuite) SetupTest() {

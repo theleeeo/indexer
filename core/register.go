@@ -60,20 +60,24 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n Notification) error {
 	)
 
 	for _, root := range roots {
-		jobType := "rebuild"
-
 		// If this is a delete of a root resource itself, enqueue a delete job.
 		if n.Kind == ChangeDeleted && root.Type == n.ResourceType && root.Id == n.ResourceID {
-			jobType = "delete"
+			if _, err := idx.river.Insert(ctx, DeleteArgs{
+				ResourceType: root.Type,
+				ResourceID:   root.Id,
+				Metadata:     n.Metadata,
+			}, nil); err != nil {
+				return fmt.Errorf("enqueueing delete for root %s|%s: %w", root.Type, root.Id, err)
+			}
+			continue
 		}
 
-		jobGroup := fmt.Sprintf("%s|%s", root.Type, root.Id)
-		if _, err := idx.queue.Enqueue(ctx, jobGroup, jobType, RebuildPayload{
+		if _, err := idx.river.Insert(ctx, RebuildArgs{
 			ResourceType: root.Type,
 			ResourceID:   root.Id,
 			Metadata:     n.Metadata,
 		}, nil); err != nil {
-			return fmt.Errorf("enqueueing job for root %s|%s: %w", root.Type, root.Id, err)
+			return fmt.Errorf("enqueueing rebuild for root %s|%s: %w", root.Type, root.Id, err)
 		}
 	}
 

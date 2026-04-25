@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
+
 	"github.com/theleeeo/indexer/es"
-	"github.com/theleeeo/indexer/jobqueue"
 	"github.com/theleeeo/indexer/projection"
 	"github.com/theleeeo/indexer/resource"
 	"github.com/theleeeo/indexer/store"
@@ -36,8 +38,11 @@ type Config struct {
 	// Store is the PostgreSQL relation-graph store.
 	Store *store.PostgresStore
 
-	// Queue is the job queue for enqueuing rebuild/delete jobs.
-	Queue *jobqueue.Queue
+	// RiverClient is the River job queue client for enqueuing rebuild/delete
+	// and full-rebuild jobs. It may be left nil at construction and assigned
+	// later via [Indexer.SetRiverClient]; this lets callers wire workers
+	// that reference the Indexer before the client is created.
+	RiverClient *river.Client[pgx.Tx]
 }
 
 // Indexer is the core indexing engine. It receives change notifications,
@@ -49,7 +54,7 @@ type Indexer struct {
 
 	plans map[string]map[int]projection.Plan
 
-	queue *jobqueue.Queue
+	river *river.Client[pgx.Tx]
 
 	resources resource.Configs
 }
@@ -59,10 +64,17 @@ func New(cfg Config) *Indexer {
 	return &Indexer{
 		st:        cfg.Store,
 		es:        cfg.ES,
-		queue:     cfg.Queue,
+		river:     cfg.RiverClient,
 		resources: cfg.Resources,
 		plans:     cfg.Plans,
 	}
+}
+
+// SetRiverClient assigns the River client used to enqueue jobs. It is
+// intended for the wiring sequence where workers (which reference the
+// Indexer) must be constructed before the River client itself.
+func (idx *Indexer) SetRiverClient(c *river.Client[pgx.Tx]) {
+	idx.river = c
 }
 
 // SetPlans replaces the aggregation plans and resource configuration.

@@ -42,14 +42,11 @@ func (idx *Indexer) Rebuild(ctx context.Context, selectors []ResourceSelector) e
 	}
 
 	for _, sel := range selectors {
-		payload := FullRebuildPayload{
+		if _, err := idx.river.Insert(ctx, FullRebuildArgs{
 			Selector: sel,
 			// TODO: Should we allow passing metadata for full rebuilds?
 			Metadata: nil,
-		}
-
-		jobGroup := fmt.Sprintf("full_rebuild|%s", sel.ResourceType)
-		if _, err := idx.queue.Enqueue(ctx, jobGroup, "full_rebuild", payload, nil); err != nil {
+		}, nil); err != nil {
 			return fmt.Errorf("enqueue full_rebuild for %s: %w", sel.ResourceType, err)
 		}
 	}
