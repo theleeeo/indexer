@@ -30,7 +30,7 @@ type Config struct {
 	// Resources defines the resource types, fields, and relations.
 	Resources resource.Configs
 
-	Plans map[string]map[int]projection.Plan
+	Plans map[string][]projection.Plan
 
 	// ES is the Elasticsearch client for indexing and searching.
 	ES *es.Client
@@ -52,7 +52,7 @@ type Indexer struct {
 	st *store.PostgresStore
 	es *es.Client
 
-	plans map[string]map[int]projection.Plan
+	plans map[string][]projection.Plan
 
 	river *river.Client[pgx.Tx]
 
@@ -80,7 +80,7 @@ func (idx *Indexer) SetRiverClient(c *river.Client[pgx.Tx]) {
 // SetPlans replaces the aggregation plans and resource configuration.
 // This is primarily used by the standalone application with YAML DSL;
 // library users typically set these once at construction via Config.
-func (idx *Indexer) SetPlans(plans map[string]map[int]projection.Plan, resources resource.Configs) {
+func (idx *Indexer) SetPlans(plans map[string][]projection.Plan, resources resource.Configs) {
 	idx.plans = plans
 	idx.resources = resources
 

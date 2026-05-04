@@ -2,6 +2,7 @@ package dsl
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -337,13 +338,11 @@ func TestBuildPlansFromConfig_VersionedPlans(t *testing.T) {
 	}
 
 	plans := BuildPlansFromConfig(prov, cfgs)
-
-	require.Contains(t, plans, "product")
-	require.Contains(t, plans["product"], 1)
-	require.Contains(t, plans["product"], 2)
+	require.Len(t, plans, 1)
+	require.Len(t, plans["product"], 2)
 
 	// Version 1: only title.
-	ch1 := plans["product"][1].Execute(context.Background(), projection.BuildRequest{
+	ch1 := plans["product"][0].Execute(context.Background(), projection.BuildRequest{
 		ResourceType: "product", ResourceID: "1",
 	})
 	var docs1 []projection.BuildDoc
@@ -352,12 +351,14 @@ func TestBuildPlansFromConfig_VersionedPlans(t *testing.T) {
 		docs1 = append(docs1, r.Items...)
 	}
 	require.Len(t, docs1, 1)
+	fmt.Printf("Version 1 doc: %+v\n", docs1[0].Doc)
 	fields1 := docs1[0].Doc["fields"].(map[string]any)
+	fmt.Printf("Version 1 fields: %+v\n", fields1)
 	require.Equal(t, "Widget", fields1["title"])
 	require.NotContains(t, fields1, "price")
 
 	// Version 2: title + price.
-	ch2 := plans["product"][2].Execute(context.Background(), projection.BuildRequest{
+	ch2 := plans["product"][1].Execute(context.Background(), projection.BuildRequest{
 		ResourceType: "product", ResourceID: "1",
 	})
 	var docs2 []projection.BuildDoc

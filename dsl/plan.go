@@ -14,12 +14,12 @@ import (
 // BuildPlansFromConfig constructs aggregation plans for each resource type
 // and version in the config. This is the default plan builder used by the standalone binary.
 // Library users can build their own plans and pass them to NewBuilder directly.
-func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string]map[int]projection.Plan {
-	plans := make(map[string]map[int]projection.Plan, len(resources))
+func BuildPlansFromConfig(provider source.Provider, resources resource.Configs) map[string][]projection.Plan {
+	plans := make(map[string][]projection.Plan, len(resources))
 	for _, rCfg := range resources {
-		versionPlans := make(map[int]projection.Plan, len(rCfg.Versions))
-		for _, vc := range rCfg.Versions {
-			versionPlans[vc.Version] = buildPlanForVersion(provider, rCfg.Resource, &vc)
+		versionPlans := make([]projection.Plan, len(rCfg.Versions))
+		for i, vc := range rCfg.Versions {
+			versionPlans[i] = buildPlanForVersion(provider, rCfg.Resource, &vc)
 		}
 		plans[rCfg.Resource] = versionPlans
 	}
@@ -46,22 +46,29 @@ func buildPlanForVersion(provider source.Provider, resourceName string, vc *reso
 		// If the config is invalid the plan will never execute successfully,
 		// but we defer the error to execution time rather than panicking at
 		// startup so that validation can catch it first.
-		return rootPlan
+		// TODO: Error here? Or at least log it so it's not silent?
+		return projection.Plan{
+			Version:  vc.Version,
+			Executer: rootPlan,
+		}
 	}
 
 	// Chain a SubPlan for each relation.
-	var current projection.Plan = rootPlan
+	var current aggregation.Executer[projection.BuildRequest, projection.BuildDoc] = rootPlan
 	for _, rel := range ordered {
 		current = buildRelationSubPlan(provider, current, rel)
 	}
 
-	return current
+	return projection.Plan{
+		Version:  vc.Version,
+		Executer: current,
+	}
 }
 
 // buildRelationSubPlan creates a SubPlan for a single relation.
 func buildRelationSubPlan(
 	provider source.Provider,
-	parent projection.Plan,
+	parent aggregation.Executer[projection.BuildRequest, projection.BuildDoc],
 	rel resource.RelationConfig,
 ) *aggregation.SubPlan[projection.BuildRequest, projection.BuildDoc, projection.BuildDoc] {
 	fetcher := &relationFetcher{

@@ -72,9 +72,10 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n Notification) error {
 			continue
 		}
 
-		if _, err := idx.river.Insert(ctx, RebuildArgs{
+		// TODO: Group per resource type
+		if _, err := idx.river.Insert(ctx, BuildArgs{
 			ResourceType: root.Type,
-			ResourceID:   root.Id,
+			ResourceIds:  []string{root.Id},
 			Metadata:     n.Metadata,
 		}, nil); err != nil {
 			return fmt.Errorf("enqueueing rebuild for root %s|%s: %w", root.Type, root.Id, err)

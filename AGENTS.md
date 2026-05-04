@@ -17,16 +17,20 @@ server/ — translates proto → source.Notification
 core/Indexer.RegisterChange
        │  UpsertResource / DeleteResource    → Postgres (resources table)
        │  AffectedRoots ←                   ← Postgres (relations table)
-  │  riverClient.Insert(RebuildArgs/DeleteArgs)   → River (river_job table)
+       │  riverClient.Insert(RebuildArgs/DeleteArgs)   → River (river_job table)
        ▼
-River Client workers (core/RebuildWorker, DeleteWorker)
+River Client workers (core/RebuildWorker, DeleteWorker, FullRebuildWorker)
        ▼
-core/handleRebuild
-      │  projection/Builder.Build
-      │    ├─ aggregation/RootPlan  → provider.FetchResource  (gRPC → ProviderService, metadata)
-      │    └─ aggregation/SubPlan   → provider.FetchRelated   (gRPC → ProviderService, metadata)
-       │  store.AddChildResources    → Postgres (relations)
-       │  es.Client.Upsert           → Elasticsearch
+core/Indexer.Build (unified build entry point)
+       │  If ResourceIDs given: buildOne per ID
+       │    ├─ plan.Execute per version → provider.FetchResource (gRPC → ProviderService, metadata)
+       │    ├─ delete-detection: if source returns nil → handleDelete
+       │    ├─ es.Client.Upsert        → Elasticsearch
+       │    └─ store.AddChildResources  → Postgres (relations)
+       │  If ResourceIDs empty: buildAll (stream all)
+       │    ├─ plan.Execute with ResourceID="" per version → provider.ListResources (paginated)
+       │    ├─ es.Client.BulkUpsert     → Elasticsearch
+       │    └─ store.AddChildResources  → Postgres (relations)
        ▼
       Done
 
@@ -35,12 +39,7 @@ Client → server/IndexerServer.Rebuild → core/Indexer.Rebuild
        │  Validate selectors
        │  riverClient.Insert(FullRebuildArgs) → River
        ▼
-core/FullRebuildWorker → handleFullRebuild
-       │  If resource_ids given: handleRebuildVersions per ID
-       │  If empty: execute plan with ResourceID="" per version
-       │    └─ plan streams pages of BuildDocs via provider.ListResources internally
-       │    └─ per BuildDoc: upsert ES, collect relations
-       │  Persist relation union for all discovered resources
+core/FullRebuildWorker → Indexer.Build(ResourceIDs from selector)
 
 Search path:
 Client → server/SearcherServer → core/Indexer.Search → es/Client.Search → Elasticsearch
@@ -110,8 +109,8 @@ Key types: `Builder`, `BuildDoc`.
 Central orchestrator (`Indexer` struct).
 
 - `RegisterChange` — inbound change handler: updates PG, finds affected roots, enqueues jobs.
-- `handleRebuild` / `handleDelete` — job handlers; rebuild calls `Builder.Build` then ES upsert; delete calls ES delete and removes PG records.
-- `handleFullRebuild` — job handler for `"full_rebuild"` jobs; for specific IDs calls `handleRebuildVersions` per resource; for "rebuild all" executes each version's plan with `ResourceID=""` which streams all resources via the plan's internal `ListResources` pagination.
+- `Build(ctx, BuildParams)` — unified build entry point. When `ResourceIDs` is non-empty, builds each resource individually with delete-detection and relation tracking (`buildOne`). When empty, streams all resources via the plan's `ListResources` pagination and bulk-upserts to ES (`buildAll`).
+- `handleDelete` — deletes a root document from ES across all versions and removes relation edges from PG.
 - `Rebuild` — validates selectors, enqueues one `FullRebuildArgs` River job per `ResourceSelector`.
 - `RegisterWorkers(workers, idx)` — registers the three River workers (`rebuild`, `delete`, `full_rebuild`) against a `river.Workers` registry so callers can pass it to `river.NewClient`.
 - `SetRiverClient(client)` — assigns the River client used to enqueue jobs. Needed because workers reference the `Indexer`, so the client is created after the `Indexer` and wired back in.

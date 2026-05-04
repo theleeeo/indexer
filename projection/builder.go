@@ -1,6 +1,8 @@
 package projection
 
 import (
+	"context"
+
 	"github.com/theleeeo/indexer/aggregation"
 	"github.com/theleeeo/indexer/model"
 )
@@ -24,5 +26,14 @@ type BuildDoc struct {
 	Relations []model.Resource
 }
 
+// TODO: NewPlan builder
 // Plan is an aggregation executor that produces BuildDoc results.
-type Plan = aggregation.Executer[BuildRequest, BuildDoc]
+type Plan struct {
+	Version  int
+	Executer aggregation.Executer[BuildRequest, BuildDoc]
+}
+
+// TODO: Abstract away
+func (p Plan) Execute(ctx context.Context, req BuildRequest) <-chan aggregation.ExecutionResult[BuildDoc] {
+	return p.Executer.Execute(ctx, req)
+}

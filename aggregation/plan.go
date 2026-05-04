@@ -14,6 +14,7 @@ type FetchResult[P any] struct {
 	NextPageToken any
 }
 
+// TODO: Cancellation + cleanup + drain
 func NewRootPlan[Req any, P any](fetcher func(FetchParameters[Req]) (FetchResult[P], error)) *RootPlan[Req, P] {
 	return &RootPlan[Req, P]{fetcher: fetcher}
 }
