@@ -15,6 +15,7 @@ import (
 
 var (
 	ErrUnknownResource = errors.New("unknown resource")
+	ErrStaleVersion    = store.ErrStaleVersion
 )
 
 type InvalidArgumentError struct {

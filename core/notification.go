@@ -40,4 +40,10 @@ type Notification struct {
 	// Metadata contains arbitrary caller-provided context propagated through
 	// rebuild processing and provider fetches.
 	Metadata map[string]string
+
+	// Version is a monotonically increasing version of the resource at the source.
+	// When non-zero, the indexer rejects notifications whose version is not
+	// strictly greater than the currently stored version. Zero means "no version
+	// control" — the notification is always accepted. Ignored for deletes.
+	Version int64
 }

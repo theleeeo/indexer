@@ -42,6 +42,13 @@ message ChangeNotification {
   // Arbitrary caller-provided metadata forwarded to provider calls triggered
   // by this notification (for example tenant, trace, or trigger identifiers).
   map<string, string> metadata = 4;
+
+  // Monotonically increasing version of the resource at the source.
+  // When non-zero, the indexer rejects notifications whose version is not
+  // strictly greater than the currently stored version (returns
+  // FAILED_PRECONDITION). Zero means "no version control" — the notification
+  // is always accepted. Ignored for delete notifications.
+  int64 version = 5;
 }
 
 enum ChangeKind {

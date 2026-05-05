@@ -548,3 +548,127 @@ func (t *TestSuite) Test_Rebuild_EmptySelectors() {
 	err := t.idx.Rebuild(t.T().Context(), nil)
 	t.Require().Error(err)
 }
+
+// resourceVersion returns the version stored in the resources table for the
+// given resource, or 0 if not found.
+func (t *TestSuite) resourceVersion(resourceType, resourceID string) int64 {
+	var version int64
+	err := t.pool.QueryRow(t.T().Context(),
+		`SELECT version FROM resources WHERE type=$1 AND id=$2`,
+		resourceType, resourceID,
+	).Scan(&version)
+	if err != nil {
+		return 0
+	}
+	return version
+}
+
+func (t *TestSuite) Test_VersionControl() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	t.fakeProvider.SetResource("a", "1", map[string]any{
+		"id":     "1",
+		"field1": "v1_data",
+	})
+
+	t.Run("create with version=1 succeeds", func() {
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeCreated,
+			Version:      1,
+		})
+		t.Require().NoError(err)
+		t.Require().True(t.resourceTracked("a", "1"))
+		t.Require().Equal(int64(1), t.resourceVersion("a", "1"))
+		t.worker.Drain(t.T().Context())
+	})
+
+	t.Run("update with version=2 succeeds", func() {
+		t.fakeProvider.SetResource("a", "1", map[string]any{
+			"id":     "1",
+			"field1": "v2_data",
+		})
+
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeUpdated,
+			Version:      2,
+		})
+		t.Require().NoError(err)
+		t.Require().Equal(int64(2), t.resourceVersion("a", "1"))
+		t.worker.Drain(t.T().Context())
+
+		resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{
+			Resource: "a", Query: "v2_data",
+		})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+	})
+
+	t.Run("update with stale version=1 returns error", func() {
+		t.fakeProvider.SetResource("a", "1", map[string]any{
+			"id":     "1",
+			"field1": "stale_data",
+		})
+
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeUpdated,
+			Version:      1,
+		})
+		t.Require().ErrorIs(err, core.ErrStaleVersion)
+		// Version in DB should remain 2.
+		t.Require().Equal(int64(2), t.resourceVersion("a", "1"))
+	})
+
+	t.Run("update with same version=2 returns error", func() {
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeUpdated,
+			Version:      2,
+		})
+		t.Require().ErrorIs(err, core.ErrStaleVersion)
+	})
+
+	t.Run("update with version=0 skips check and succeeds", func() {
+		t.fakeProvider.SetResource("a", "1", map[string]any{
+			"id":     "1",
+			"field1": "no_version_data",
+		})
+
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeUpdated,
+			Version:      0,
+		})
+		t.Require().NoError(err)
+		// Version in DB should remain 2 (version=0 does DO NOTHING on conflict).
+		t.Require().Equal(int64(2), t.resourceVersion("a", "1"))
+		t.worker.Drain(t.T().Context())
+
+		resp, err := t.idx.Search(t.T().Context(), &search.SearchRequest{
+			Resource: "a", Query: "no_version_data",
+		})
+		t.Require().NoError(err)
+		t.Require().Len(resp.Hits, 1)
+	})
+
+	t.Run("delete ignores version and always proceeds", func() {
+		t.fakeProvider.DeleteResource("a", "1")
+
+		err := t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "a",
+			ResourceID:   "1",
+			Kind:         core.ChangeDeleted,
+			Version:      1, // stale version, but should not matter for deletes
+		})
+		t.Require().NoError(err)
+		t.Require().False(t.resourceTracked("a", "1"))
+		t.worker.Drain(t.T().Context())
+	})
+}

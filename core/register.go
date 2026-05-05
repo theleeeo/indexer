@@ -23,7 +23,7 @@ func (idx *Indexer) RegisterChange(ctx context.Context, n Notification) error {
 			return fmt.Errorf("delete resource %s/%s: %w", n.ResourceType, n.ResourceID, err)
 		}
 	} else {
-		if err := idx.st.UpsertResource(ctx, res); err != nil {
+		if err := idx.st.UpsertResource(ctx, res, n.Version); err != nil {
 			return fmt.Errorf("upsert resource %s/%s: %w", n.ResourceType, n.ResourceID, err)
 		}
 	}

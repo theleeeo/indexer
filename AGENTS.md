@@ -10,13 +10,14 @@ The core parts of the library are also available to be used as a library for use
 
 ```
 External microservice
-  │  NotifyChange / NotifyChangeBatch  (gRPC → IndexService, optional metadata)
+  │  NotifyChange / NotifyChangeBatch  (gRPC → IndexService, optional metadata + version)
        ▼
-server/ — translates proto → source.Notification
+server/ — translates proto → core.Notification
        ▼
 core/Indexer.RegisterChange
-       │  UpsertResource / DeleteResource    → Postgres (resources table)
-       │  AffectedRoots ←                   ← Postgres (relations table)
+       │  UpsertResource(version) / DeleteResource → Postgres (resources table)
+       │    └─ version>0: conditional upsert rejects stale versions (ErrStaleVersion)
+       │  AffectedRoots ←                         ← Postgres (relations table)
        │  riverClient.Insert(RebuildArgs/DeleteArgs)   → River (river_job table)
        ▼
 River Client workers (core/RebuildWorker, DeleteWorker, FullRebuildWorker)
@@ -61,7 +62,7 @@ Key types: `Config`, `VersionConfig`, `RelationConfig`, `FieldConfig`, `KeyConfi
 
 ### `store/`
 
-Postgres relation graph. Tracks known resource instances (`resources` table) and directed parent→child dependency edges (`relations` table). The relation graph is the mechanism by which `AffectedRoots` discovers all root documents that embed a changed resource and must be reindexed.
+Postgres relation graph. Tracks known resource instances (`resources` table with an optional monotonic `version` column for optimistic concurrency) and directed parent→child dependency edges (`relations` table). The relation graph is the mechanism by which `AffectedRoots` discovers all root documents that embed a changed resource and must be reindexed. `UpsertResource(ctx, resource, version)` performs a conditional insert/update when version > 0, returning `ErrStaleVersion` if the stored version is already >= the provided one; version 0 means "no version control".
 
 Key types: `PostgresStore`, `Relation`.  
 Schema: [store/pg_schema.sql](store/pg_schema.sql).
@@ -82,7 +83,7 @@ River's schema is applied at startup via `rivermigrate` — there is no local SQ
 
 Inbound and outbound data contracts.
 
-- `Notification{ResourceType, ResourceID, Kind, Metadata}` — what changed (`ChangeCreated`, `ChangeUpdated`, `ChangeDeleted`) plus arbitrary caller-provided key-value context.
+- `Notification{ResourceType, ResourceID, Kind, Metadata, Version}` — what changed (`ChangeCreated`, `ChangeUpdated`, `ChangeDeleted`) plus arbitrary caller-provided key-value context. Lives in `core/notification.go`. `Version` (int64) enables optimistic concurrency: non-zero triggers conditional upsert; zero means unconditional.
 - `Provider` interface — `FetchResource`, `FetchRelated`, and `ListResources`. All live data retrieval goes through this boundary.
 - `GRPCProvider` — implements `Provider` by calling a remote `ProviderService` plugin.
 - `ListResourcesParams` / `ListResourcesResult` / `ListedResource` — paginated listing types for full rebuilds.
@@ -108,7 +109,7 @@ Key types: `Builder`, `BuildDoc`.
 
 Central orchestrator (`Indexer` struct).
 
-- `RegisterChange` — inbound change handler: updates PG, finds affected roots, enqueues jobs.
+- `RegisterChange` — inbound change handler: updates PG (with optimistic version control when `Version > 0`), finds affected roots, enqueues jobs. Returns `ErrStaleVersion` if the notification's version is not strictly greater than the stored one.
 - `Build(ctx, BuildParams)` — unified build entry point. When `ResourceIDs` is non-empty, builds each resource individually with delete-detection and relation tracking (`buildOne`). When empty, streams all resources via the plan's `ListResources` pagination and bulk-upserts to ES (`buildAll`).
 - `handleDelete` — deletes a root document from ES across all versions and removes relation edges from PG.
 - `Rebuild` — validates selectors, enqueues one `FullRebuildArgs` River job per `ResourceSelector`.
@@ -154,7 +155,7 @@ CLI tool. Reads resource config, generates ES index mappings, and optionally `PU
 
 | Proto                              | Service                              | Key Messages                                                                                                                                                                                                                             |
 | ---------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `proto/index/v1/index.proto`       | `IndexService` (inbound)             | `ChangeNotification{kind, resource_type, resource_id, metadata}`, `RebuildRequest{repeated ResourceSelector}`, `RebuildResponse`                                                                                                         |
+| `proto/index/v1/index.proto`       | `IndexService` (inbound)             | `ChangeNotification{kind, resource_type, resource_id, metadata, version}`, `RebuildRequest{repeated ResourceSelector}`, `RebuildResponse`                                                                                                |
 | `proto/provider/v1/provider.proto` | `ProviderService` (plugin, outbound) | `FetchResourceRequest{..., metadata}` / `Response`, `FetchRelatedRequest{..., metadata}` / `Response`, `ListResourcesRequest{..., metadata}` / `Response` (data as `google.protobuf.Struct`)                                             |
 | `proto/search/v1/search.proto`     | `SearchService`                      | `SearchRequest{resource, query, filters, page, page_size, sort}`, `SearchResponse{total, hits}`, `GetCapabilitiesRequest`, `GetCapabilitiesResponse{resources: []{resource, fields: []{field, type, filter_ops, searchable, sortable}}}` |
 

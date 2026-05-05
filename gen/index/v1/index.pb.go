@@ -244,7 +244,13 @@ type ChangeNotification struct {
 	ResourceId   string `protobuf:"bytes,3,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
 	// Arbitrary caller-provided metadata forwarded to provider calls triggered
 	// by this notification (for example tenant, trace, or trigger identifiers).
-	Metadata      map[string]string `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Metadata map[string]string `protobuf:"bytes,4,rep,name=metadata,proto3" json:"metadata,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	// Monotonically increasing version of the resource at the source.
+	// When non-zero, the indexer rejects notifications whose version is not
+	// strictly greater than the currently stored version (returns
+	// FAILED_PRECONDITION). Zero means "no version control" — the notification
+	// is always accepted. Ignored for delete notifications.
+	Version       int64 `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -305,6 +311,13 @@ func (x *ChangeNotification) GetMetadata() map[string]string {
 		return x.Metadata
 	}
 	return nil
+}
+
+func (x *ChangeNotification) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 // ResourceSelector identifies a set of resources to rebuild.
@@ -460,13 +473,14 @@ const file_index_v1_index_proto_rawDesc = "" +
 	"\x14NotifyChangeResponse\"^\n" +
 	"\x18NotifyChangeBatchRequest\x12B\n" +
 	"\rnotifications\x18\x01 \x03(\v2\x1c.index.v1.ChangeNotificationR\rnotifications\"\x1b\n" +
-	"\x19NotifyChangeBatchResponse\"\x89\x02\n" +
+	"\x19NotifyChangeBatchResponse\"\xa3\x02\n" +
 	"\x12ChangeNotification\x12(\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x14.index.v1.ChangeKindR\x04kind\x12#\n" +
 	"\rresource_type\x18\x02 \x01(\tR\fresourceType\x12\x1f\n" +
 	"\vresource_id\x18\x03 \x01(\tR\n" +
 	"resourceId\x12F\n" +
-	"\bmetadata\x18\x04 \x03(\v2*.index.v1.ChangeNotification.MetadataEntryR\bmetadata\x1a;\n" +
+	"\bmetadata\x18\x04 \x03(\v2*.index.v1.ChangeNotification.MetadataEntryR\bmetadata\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x03R\aversion\x1a;\n" +
 	"\rMetadataEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"v\n" +

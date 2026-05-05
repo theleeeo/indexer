@@ -5,7 +5,6 @@ go 1.26
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0
 	github.com/goccy/go-yaml v1.19.0
-	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.1
 	github.com/riverqueue/river v0.35.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.35.0
@@ -41,6 +40,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.27.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

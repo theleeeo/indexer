@@ -60,6 +60,7 @@ func protoToNotification(pn *index.ChangeNotification) core.Notification {
 		ResourceType: pn.ResourceType,
 		ResourceID:   pn.ResourceId,
 		Metadata:     pn.Metadata,
+		Version:      pn.Version,
 	}
 
 	switch pn.Kind {
@@ -77,6 +78,9 @@ func protoToNotification(pn *index.ChangeNotification) core.Notification {
 func mapAppError(err error) error {
 	if errors.Is(err, core.ErrUnknownResource) {
 		return status.Error(codes.InvalidArgument, "unknown resource")
+	}
+	if errors.Is(err, core.ErrStaleVersion) {
+		return status.Error(codes.FailedPrecondition, "stale version")
 	}
 	var invalidArgsErr *core.InvalidArgumentError
 	if errors.As(err, &invalidArgsErr) {

@@ -175,13 +175,34 @@ func (s *PostgresStore) AddChildResources(ctx context.Context, parent model.Reso
 	return s.AddRelations(ctx, relations)
 }
 
-// UpsertResource inserts or ignores the resource in the resources table.
-func (s *PostgresStore) UpsertResource(ctx context.Context, resource model.Resource) error {
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO resources (type, id) VALUES ($1, $2) ON CONFLICT (type, id) DO NOTHING`,
-		resource.Type, resource.Id,
+// UpsertResource inserts or updates the resource in the resources table.
+// When version is 0, the resource is inserted without version control (existing
+// rows are left unchanged). When version > 0, the resource is only inserted or
+// updated if the new version is strictly greater than the stored one; otherwise
+// ErrStaleVersion is returned.
+func (s *PostgresStore) UpsertResource(ctx context.Context, resource model.Resource, version int64) error {
+	// TODO: Always require version, set it at a higher level if omitted in the api.
+	if version == 0 {
+		_, err := s.pool.Exec(ctx,
+			`INSERT INTO resources (type, id) VALUES ($1, $2) ON CONFLICT (type, id) DO NOTHING`,
+			resource.Type, resource.Id,
+		)
+		return err
+	}
+
+	tag, err := s.pool.Exec(ctx,
+		`INSERT INTO resources (type, id, version) VALUES ($1, $2, $3)
+		 ON CONFLICT (type, id) DO UPDATE SET version = EXCLUDED.version
+		 WHERE resources.version < EXCLUDED.version`,
+		resource.Type, resource.Id, version,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrStaleVersion
+	}
+	return nil
 }
 
 // DeleteResource removes a resource from the resources table.
