@@ -1,6 +1,6 @@
 module github.com/theleeeo/laika
 
-go 1.26.1
+go 1.27
 
 require (
 	github.com/elastic/go-elasticsearch/v8 v8.15.0

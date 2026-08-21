@@ -59,7 +59,7 @@ Search path: `app/server/SearcherServer` -> `core.Indexer.Search` -> `SearchBack
 
 ```bash
 # run the app
-GOEXPERIMENT=jsonv2 go run ./app/cmd/indexer
+go run ./app/cmd/indexer
 
 # mapping generation
 go run ./app/cmd/gen-mapping -config resources.yml
@@ -68,10 +68,10 @@ go run ./app/cmd/gen-mapping -config resources.yml
 buf generate
 
 # unit tests (no Docker)
-GOEXPERIMENT=jsonv2 go test ./core/... ./es/... ./app/server/... ./app/dsl/...
+go test ./core/... ./es/... ./app/server/... ./app/dsl/...
 
 # integration tests (Docker required)
-GOEXPERIMENT=jsonv2 go test ./app/tests/...
+go test ./app/tests/...
 ```
 
 ## Change Rules

@@ -6,21 +6,19 @@ Canonical vocabulary lives in [CONTEXT.md](CONTEXT.md); architectural decisions 
 
 ## Commands
 
-All Go commands require the `GOEXPERIMENT=jsonv2` flag (Go 1.26.1).
-
 ```bash
 # Run the application (from repo root)
-GOEXPERIMENT=jsonv2 go run ./app/cmd/indexer
+go run ./app/cmd/indexer
 
 # Run unit tests only (no Docker needed)
-GOEXPERIMENT=jsonv2 go test ./core/... ./app/server/... ./app/dsl/...
+go test ./core/... ./app/server/... ./app/dsl/...
 
 # Run integration tests (requires Docker for testcontainers):
 # storage/postgres, backend/elasticsearch, and app/tests all hit real infra
-GOEXPERIMENT=jsonv2 go test ./storage/... ./backend/... ./app/tests/...
+go test ./storage/... ./backend/... ./app/tests/...
 
 # Run all tests
-GOEXPERIMENT=jsonv2 go test ./...
+go test ./...
 
 # Generate Elasticsearch mappings from resource config
 go run ./app/cmd/gen-mapping -config resources.yml

@@ -1,5 +1,5 @@
 # App runtime configuration for cmd/indexer.
-# Start with: APP_CONFIG_PATH=example.indexer.yml GOEXPERIMENT=jsonv2 go run ./cmd/indexer
+# Start with: APP_CONFIG_PATH=example.indexer.yml go run ./cmd/indexer
 #
 # Each key maps to an env var by uppercasing and replacing '.' with '_':
 #   grpc.public_addr -> GRPC_PUBLIC_ADDR

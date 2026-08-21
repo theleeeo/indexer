@@ -216,7 +216,7 @@ The quickest way to run Laika is as a standalone binary:
 
 ```bash
 # Run from repo root
-APP_CONFIG_PATH=example.indexer.yml GOEXPERIMENT=jsonv2 go run ./app/cmd/indexer
+APP_CONFIG_PATH=example.indexer.yml go run ./app/cmd/indexer
 ```
 
 You provide `indexer.yml` and `resources.yml`; Laika handles the rest. Your services connect to the `IndexService` to push change events and to the `SearchService` to run queries. You implement one gRPC server (the `ProviderService`) that Laika calls to fetch data.
@@ -249,13 +249,13 @@ Construct an `Indexer` with your own `SearchBackend`, `Store`, and aggregation p
 
 ```bash
 # Unit tests — no Docker required
-GOEXPERIMENT=jsonv2 go test ./core/... ./es/... ./app/server/... ./app/dsl/...
+go test ./core/... ./es/... ./app/server/... ./app/dsl/...
 
 # Integration tests — requires Docker (testcontainers spins up Postgres + Elasticsearch)
-GOEXPERIMENT=jsonv2 go test ./app/tests/...
+go test ./app/tests/...
 
 # All tests
-GOEXPERIMENT=jsonv2 go test ./...
+go test ./...
 ```
 
 ---

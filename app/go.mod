@@ -1,6 +1,6 @@
 module github.com/theleeeo/laika/app
 
-go 1.26.1
+go 1.27
 
 require (
 	connectrpc.com/connect v1.20.0
