@@ -40,7 +40,7 @@ func buildPlanForVersion(provider source.Provider, resourceName string, vc *reso
 	// pagination via provider.ListResources. When set, it fetches a single
 	// resource as before. After fetching, it derives the Parents to bootstrap
 	// from the root's own data (see ADR 0006).
-	rootPlan := aggregation.NewRootPlan(func(ctx context.Context, params aggregation.FetchParameters[projection.BuildRequest]) (aggregation.FetchResult[projection.BuildDoc], error) {
+	plan := aggregation.Root(func(ctx context.Context, params aggregation.FetchParameters[projection.BuildRequest]) (aggregation.FetchResult[projection.BuildDoc], error) {
 		var result aggregation.FetchResult[projection.BuildDoc]
 		var err error
 		if params.Request.ResourceID == "" {
@@ -58,12 +58,11 @@ func buildPlanForVersion(provider source.Provider, resourceName string, vc *reso
 		return result, nil
 	})
 
-	// Chain a SubPlan for each relation, in topological order.
-	var current aggregation.Executer[projection.BuildRequest, projection.BuildDoc] = rootPlan
-	// Resolve the topological order of relations. If the config is invalid the
-	// plan will never execute successfully, but we defer the error to execution
-	// time rather than panicking at startup so that validation can catch it
-	// first — the root plan alone (no relations) becomes the chain.
+	// Extend the plan with a relation stage for each relation, in topological
+	// order. Resolve that order first: if the config is invalid the plan will
+	// never execute successfully, but we defer the error to execution time
+	// rather than panicking at startup so that validation can catch it first —
+	// the root plan alone (no relations) becomes the chain.
 	// TODO: Error here? Or at least log it so it's not silent?
 	if ordered, err := resolveOrder(vc.Relations); err == nil {
 		for _, rel := range ordered {
@@ -72,41 +71,27 @@ func buildPlanForVersion(provider source.Provider, resourceName string, vc *reso
 				// or denormalized into the document.
 				continue
 			}
-			current = buildRelationSubPlan(provider, current, rel)
+			plan = plan.Sub(newRelationFetcher(provider, rel), relationBuilder(rel))
 		}
 	}
 
 	// Terminal stage: populate the standardized search surfaces from the
 	// per-field tier selectors, once every relation is denormalized into Doc.
-	current = aggregation.NewMapPlan(current, func(d projection.BuildDoc) projection.BuildDoc {
-		return populateStandardizedSearchFields(vc, d)
-	})
-
 	return projection.Plan{
-		Version:  vc.Version,
-		Executer: current,
+		Version: vc.Version,
+		Executer: plan.Map(func(d projection.BuildDoc) projection.BuildDoc {
+			return populateStandardizedSearchFields(vc, d)
+		}),
 	}
 }
 
-// buildRelationSubPlan creates a SubPlan for a single relation.
-func buildRelationSubPlan(
-	provider source.Provider,
-	parent aggregation.Executer[projection.BuildRequest, projection.BuildDoc],
-	rel resource.RelationConfig,
-) *aggregation.SubPlan[projection.BuildRequest, projection.BuildDoc, projection.BuildDoc] {
-	fetcher := &relationFetcher{
-		provider: provider,
-		rel:      rel,
-	}
-
+// relationBuilder returns the build stage for a single relation: it folds the
+// resources the fetcher returned into the parent document. A nil fetch result
+// means the relation resolved to nothing, and the document is left untouched.
+func relationBuilder(rel resource.RelationConfig) func(projection.BuildDoc, *fetchedRelation) projection.BuildDoc {
 	// TODO: There are a bunch of things here that can go wrong, like missing id, incorrect types, etc. Handle that better.
-	builder := func(parentDoc projection.BuildDoc, fetchResult any) projection.BuildDoc {
-		if parentDoc.Doc == nil {
-			return parentDoc
-		}
-
-		fr, ok := fetchResult.(*fetchedRelation)
-		if !ok || fr == nil {
+	return func(parentDoc projection.BuildDoc, fr *fetchedRelation) projection.BuildDoc {
+		if parentDoc.Doc == nil || fr == nil {
 			return parentDoc
 		}
 
@@ -149,8 +134,6 @@ func buildRelationSubPlan(
 		}
 		return parentDoc
 	}
-
-	return aggregation.NewSubPlan(parent, fetcher, builder)
 }
 
 func filterFields(data map[string]any, fields []resource.FieldConfig) map[string]any {

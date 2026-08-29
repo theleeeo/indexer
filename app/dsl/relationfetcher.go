@@ -9,15 +9,19 @@ import (
 	"github.com/theleeeo/laika/projection"
 )
 
-// relationFetcher implements aggregation.SubFetcher[BuildDoc].
+// relationFetcher implements aggregation.SubFetcher[BuildDoc, *fetchedRelation].
 type relationFetcher struct {
 	provider source.Provider
 	rel      resource.RelationConfig
 }
 
-func (f *relationFetcher) Fetch(ctx context.Context, parent projection.BuildDoc) (any, error) {
+func newRelationFetcher(provider source.Provider, rel resource.RelationConfig) *relationFetcher {
+	return &relationFetcher{provider: provider, rel: rel}
+}
+
+func (f *relationFetcher) Fetch(ctx context.Context, parent projection.BuildDoc) (*fetchedRelation, error) {
 	if parent.Doc == nil {
-		return (*fetchedRelation)(nil), nil
+		return nil, nil
 	}
 
 	sourceData, ok := parent.Resolved[f.rel.LocalSource(parent.Root.Type)]

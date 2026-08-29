@@ -7,11 +7,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type MockFetcher[Parent any, Result any] struct {
-	FetchFunc func(Parent) (any, error)
+// MockFetcher names the fetched type, so FetchFunc and the builders that
+// consume it are typed end to end.
+type MockFetcher[Parent, Fetched any] struct {
+	FetchFunc func(Parent) (Fetched, error)
 }
 
-func (m *MockFetcher[Parent, Result]) Fetch(_ context.Context, parent Parent) (any, error) {
+func (m *MockFetcher[Parent, Fetched]) Fetch(_ context.Context, parent Parent) (Fetched, error) {
 	return m.FetchFunc(parent)
 }
 
@@ -23,9 +25,7 @@ func Test_RootPlan(t *testing.T) {
 		return FetchResult[string]{Items: []string{"c"}, NextPageToken: nil}, nil
 	}
 
-	rootPlan := NewRootPlan(fetcher)
-
-	ch := rootPlan.Execute(context.Background(), "request")
+	ch := Root(fetcher).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -46,19 +46,16 @@ func Test_SubPlan_Execute(t *testing.T) {
 	}
 
 	subFetcher := &MockFetcher[string, string]{
-		FetchFunc: func(parent string) (any, error) {
+		FetchFunc: func(parent string) (string, error) {
 			return parent + "_sub", nil
 		},
 	}
 
-	builder := func(parent string, fetchResult any) string {
-		return parent + "_" + fetchResult.(string)
+	builder := func(parent string, fetched string) string {
+		return parent + "_" + fetched
 	}
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -75,9 +72,7 @@ func Test_RootPlan_Execute_WithError(t *testing.T) {
 		return FetchResult[string]{Items: nil, NextPageToken: nil}, context.Canceled
 	}
 
-	rootPlan := NewRootPlan(fetcher)
-
-	ch := rootPlan.Execute(context.Background(), "request")
+	ch := Root(fetcher).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -94,22 +89,17 @@ func Test_SubPlan_WithError(t *testing.T) {
 	}
 
 	subFetcher := &MockFetcher[string, string]{
-		FetchFunc: func(parent string) (any, error) {
+		FetchFunc: func(parent string) (string, error) {
 			if parent == "a" {
-				return nil, context.Canceled
+				return "", context.Canceled
 			}
 			return parent + "_sub", nil
 		},
 	}
 
-	builder := func(parent string, fetchResult any) string {
-		return parent + "_" + fetchResult.(string)
-	}
+	builder := func(parent string, fetched string) string { return parent + "_" + fetched }
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -126,19 +116,12 @@ func Test_SubPlan_WithParentError(t *testing.T) {
 	}
 
 	subFetcher := &MockFetcher[string, string]{
-		FetchFunc: func(parent string) (any, error) {
-			return parent + "_sub", nil
-		},
+		FetchFunc: func(parent string) (string, error) { return parent + "_sub", nil },
 	}
 
-	builder := func(parent string, fetchResult any) string {
-		return parent + "_" + fetchResult.(string)
-	}
+	builder := func(parent string, fetched string) string { return parent + "_" + fetched }
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -154,8 +137,8 @@ func Test_SubPlan_MultipleSubItems(t *testing.T) {
 		return FetchResult[string]{Items: []string{"a", "b"}, NextPageToken: nil}, nil
 	}
 
-	subFetcher := &MockFetcher[string, string]{
-		FetchFunc: func(parent string) (any, error) {
+	subFetcher := &MockFetcher[string, []string]{
+		FetchFunc: func(parent string) ([]string, error) {
 			return []string{parent + "_sub1", parent + "_sub2"}, nil
 		},
 	}
@@ -165,17 +148,11 @@ func Test_SubPlan_MultipleSubItems(t *testing.T) {
 		Subs   []string
 	}
 
-	builder := func(parent string, fetchResult any) SubResult {
-		return SubResult{
-			Parent: parent,
-			Subs:   fetchResult.([]string),
-		}
+	builder := func(parent string, fetched []string) SubResult {
+		return SubResult{Parent: parent, Subs: fetched}
 	}
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[SubResult]
 	for res := range ch {
@@ -189,6 +166,8 @@ func Test_SubPlan_MultipleSubItems(t *testing.T) {
 	require.Equal(t, []string{"b_sub1", "b_sub2"}, results[0].Items[1].Subs)
 }
 
+// Two chained relations where the element type changes at each hop, expressed
+// as one method chain.
 func Test_MultipleSubPlans(t *testing.T) {
 	rootFetcher := func(_ context.Context, params FetchParameters[string]) (FetchResult[string], error) {
 		return FetchResult[string]{Items: []string{"a", "b"}, NextPageToken: nil}, nil
@@ -206,30 +185,21 @@ func Test_MultipleSubPlans(t *testing.T) {
 	}
 
 	subFetcher1 := &MockFetcher[string, SubResult1]{
-		FetchFunc: func(parent string) (any, error) {
+		FetchFunc: func(parent string) (SubResult1, error) {
 			return SubResult1{Parent: parent, Sub1: parent + "_sub1"}, nil
 		},
 	}
 
 	subFetcher2 := &MockFetcher[SubResult1, SubResult2]{
-		FetchFunc: func(parent SubResult1) (any, error) {
+		FetchFunc: func(parent SubResult1) (SubResult2, error) {
 			return SubResult2{Parent: parent.Parent, Sub1: parent.Sub1, Sub2: parent.Sub1 + "_sub2"}, nil
 		},
 	}
 
-	builder1 := func(parent string, fetchResult any) SubResult1 {
-		return fetchResult.(SubResult1)
-	}
-
-	builder2 := func(parent SubResult1, fetchResult any) SubResult2 {
-		return fetchResult.(SubResult2)
-	}
-
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan1 := NewSubPlan(rootPlan, subFetcher1, builder1)
-	subPlan2 := NewSubPlan(subPlan1, subFetcher2, builder2)
-
-	ch := subPlan2.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).
+		Sub(subFetcher1, func(_ string, fetched SubResult1) SubResult1 { return fetched }).
+		Sub(subFetcher2, func(_ SubResult1, fetched SubResult2) SubResult2 { return fetched }).
+		Execute(context.Background(), "request")
 
 	var results []ExecutionResult[SubResult2]
 	for res := range ch {
@@ -251,19 +221,12 @@ func Test_SubPlan_EmptyParentResults(t *testing.T) {
 	}
 
 	subFetcher := &MockFetcher[string, string]{
-		FetchFunc: func(parent string) (any, error) {
-			return parent + "_sub", nil
-		},
+		FetchFunc: func(parent string) (string, error) { return parent + "_sub", nil },
 	}
 
-	builder := func(parent string, fetchResult any) string {
-		return parent + "_" + fetchResult.(string)
-	}
+	builder := func(parent string, fetched string) string { return parent + "_" + fetched }
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), "request")
 
 	var results []ExecutionResult[string]
 	for res := range ch {
@@ -275,26 +238,22 @@ func Test_SubPlan_EmptyParentResults(t *testing.T) {
 }
 
 func Test_SubPlan_WithMapResult(t *testing.T) {
-	rootFetcher := func(_ context.Context, params FetchParameters[string]) (FetchResult[map[string]string], error) {
+	rootFetcher := func(_ context.Context, params FetchParameters[map[string]string]) (FetchResult[map[string]string], error) {
 		return FetchResult[map[string]string]{Items: []map[string]string{{"parent": "a"}, {"parent": "b"}}, NextPageToken: nil}, nil
 	}
 
 	subFetcher := &MockFetcher[map[string]string, map[string]string]{
-		FetchFunc: func(parent map[string]string) (any, error) {
+		FetchFunc: func(parent map[string]string) (map[string]string, error) {
 			return map[string]string{"sub": parent["parent"] + "_sub"}, nil
 		},
 	}
 
-	builder := func(parent map[string]string, fetchResult any) map[string]string {
-		res := fetchResult.(map[string]string)
-		res["parent"] = parent["parent"]
-		return res
+	builder := func(parent map[string]string, fetched map[string]string) map[string]string {
+		fetched["parent"] = parent["parent"]
+		return fetched
 	}
 
-	rootPlan := NewRootPlan(rootFetcher)
-	subPlan := NewSubPlan(rootPlan, subFetcher, builder)
-
-	ch := subPlan.Execute(context.Background(), "request")
+	ch := Root(rootFetcher).Sub(subFetcher, builder).Execute(context.Background(), map[string]string{})
 
 	var results []ExecutionResult[map[string]string]
 	for res := range ch {
@@ -306,4 +265,21 @@ func Test_SubPlan_WithMapResult(t *testing.T) {
 	require.Equal(t, "a_sub", results[0].Items[0]["sub"])
 	require.Equal(t, "b", results[0].Items[1]["parent"])
 	require.Equal(t, "b_sub", results[0].Items[1]["sub"])
+}
+
+// Map may change the element type, not just rewrite items in place.
+func Test_MapPlan_ChangesElementType(t *testing.T) {
+	rootFetcher := func(_ context.Context, params FetchParameters[string]) (FetchResult[string], error) {
+		return FetchResult[string]{Items: []string{"a", "bb"}, NextPageToken: nil}, nil
+	}
+
+	ch := Root(rootFetcher).Map(func(s string) int { return len(s) }).Execute(context.Background(), "request")
+
+	var results []ExecutionResult[int]
+	for res := range ch {
+		results = append(results, res)
+	}
+
+	require.Equal(t, 1, len(results))
+	require.Equal(t, []int{1, 2}, results[0].Items)
 }

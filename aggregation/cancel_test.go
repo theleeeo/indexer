@@ -18,7 +18,7 @@ func Test_RootPlan_PropagatesContextToFetcher(t *testing.T) {
 	}
 
 	ctx := context.WithValue(context.Background(), ctxKey{}, "marker")
-	for range NewRootPlan(fetcher).Execute(ctx, "request") {
+	for range Root(fetcher).Execute(ctx, "request") {
 	}
 
 	require.Equal(t, "marker", got)
@@ -35,7 +35,7 @@ func Test_RootPlan_CancelledBeforeExecute_FetchesNothing(t *testing.T) {
 	cancel()
 
 	var results []ExecutionResult[string]
-	for res := range NewRootPlan(fetcher).Execute(ctx, "request") {
+	for res := range Root(fetcher).Execute(ctx, "request") {
 		results = append(results, res)
 	}
 
@@ -62,7 +62,7 @@ func Test_RootPlan_CancelledBetweenPages_SurfacesFetcherError(t *testing.T) {
 	defer cancel()
 
 	var results []ExecutionResult[string]
-	for res := range NewRootPlan(fetcher).Execute(ctx, "request") {
+	for res := range Root(fetcher).Execute(ctx, "request") {
 		results = append(results, res)
 		cancel()
 	}
@@ -79,7 +79,7 @@ func Test_RootPlan_AbandonedConsumer_UnblocksOnCancel(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	ch := NewRootPlan(fetcher).Execute(ctx, "request")
+	ch := Root(fetcher).Execute(ctx, "request")
 
 	// Take one page, then abandon the channel and cancel. The producer must
 	// give up its blocked send and close the channel rather than leak.
@@ -103,10 +103,10 @@ func Test_SubPlan_PropagatesContextToFetcher(t *testing.T) {
 
 	var got any
 	subFetcher := &ctxRecordingFetcher{onFetch: func(ctx context.Context) { got = ctx.Value(ctxKey{}) }}
-	builder := func(parent string, fetchResult any) string { return parent }
+	builder := func(parent string, _ string) string { return parent }
 
 	ctx := context.WithValue(context.Background(), ctxKey{}, "marker")
-	for range NewSubPlan(NewRootPlan(rootFetcher), subFetcher, builder).Execute(ctx, "request") {
+	for range Root(rootFetcher).Sub(subFetcher, builder).Execute(ctx, "request") {
 	}
 
 	require.Equal(t, "marker", got)
@@ -126,10 +126,10 @@ func Test_SubPlan_CancelledMidPage_StopsFetchingItems(t *testing.T) {
 		calls++
 		cancel()
 	}}
-	builder := func(parent string, fetchResult any) string { return parent }
+	builder := func(parent string, _ string) string { return parent }
 
 	var results []ExecutionResult[string]
-	for res := range NewSubPlan(NewRootPlan(rootFetcher), subFetcher, builder).Execute(ctx, "request") {
+	for res := range Root(rootFetcher).Sub(subFetcher, builder).Execute(ctx, "request") {
 		results = append(results, res)
 	}
 
@@ -147,7 +147,7 @@ func Test_MapPlan_CancelledBeforeExecute_ForwardsError(t *testing.T) {
 	cancel()
 
 	var results []ExecutionResult[string]
-	for res := range NewMapPlan(NewRootPlan(fetcher), func(s string) string { return s }).Execute(ctx, "request") {
+	for res := range Root(fetcher).Map(func(s string) string { return s }).Execute(ctx, "request") {
 		results = append(results, res)
 	}
 
@@ -159,7 +159,7 @@ type ctxRecordingFetcher struct {
 	onFetch func(ctx context.Context)
 }
 
-func (f *ctxRecordingFetcher) Fetch(ctx context.Context, parent string) (any, error) {
+func (f *ctxRecordingFetcher) Fetch(ctx context.Context, parent string) (string, error) {
 	f.onFetch(ctx)
 	return "sub", nil
 }
