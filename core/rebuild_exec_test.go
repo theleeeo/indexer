@@ -69,6 +69,9 @@ type captureBackend struct {
 	upserts        []string        // "index/id"
 	rejectIDs      map[string]bool // BulkUpsert reports these IDs as rejected
 	upsertConflict map[string]bool // Upsert returns ErrVersionConflict for "index/id"
+	// bulkErr fails the whole BulkUpsert request (no per-item failures) —
+	// the case where nothing can be assumed written.
+	bulkErr error
 }
 
 func (b *captureBackend) Upsert(_ context.Context, index, docID string, _ any, _ int64) error {
@@ -86,6 +89,9 @@ func (b *captureBackend) BulkUpsert(_ context.Context, items []BulkItem) ([]Bulk
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	b.bulkCalls = append(b.bulkCalls, append([]BulkItem(nil), items...))
+	if b.bulkErr != nil {
+		return nil, b.bulkErr
+	}
 	var failures []BulkFailure
 	for _, it := range items {
 		if b.rejectIDs[it.ID] {
@@ -582,8 +588,11 @@ func TestRebuildAll_CheckpointsFollowFlushedPageBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Flush 1 lands mid page 1 (no completed boundary yet — no checkpoint).
-	// Flush 2 lands mid page 2, after page 1 completed: checkpoint {1,"p2"}.
+	// Flush 1 fires on page 1's last document, before page 1's token is
+	// recorded — no completed boundary yet, so no checkpoint.
+	// Flush 2 fires on page 2's last document, by which time page 1 has
+	// completed: checkpoint {1,"p2"}. Page 2's own token is not recorded until
+	// its page loop ends, after that flush.
 	// finish() flushes doc 5: checkpoint {1,"p3"} (page 2's boundary).
 	// A checkpoint must never claim a position whose pages are not yet flushed.
 	want := []RebuildCursor{{PlanVersion: 1, PageToken: "p2"}, {PlanVersion: 1, PageToken: "p3"}}
@@ -592,7 +601,7 @@ func TestRebuildAll_CheckpointsFollowFlushedPageBoundaries(t *testing.T) {
 	}
 }
 
-func TestRebuildAll_PlanBoundaryCheckpoint(t *testing.T) {
+func TestRebuildAll_MultiPlanWalkNeverCheckpoints(t *testing.T) {
 	st := &rebuildRecordingStore{}
 	es := &captureBackend{}
 	plans := map[string][]projection.Plan{"product": {
@@ -610,20 +619,71 @@ func TestRebuildAll_PlanBoundaryCheckpoint(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(cps) == 0 {
-		t.Fatal("finishing a plan's walk must checkpoint the next plan's start")
-	}
-	for _, c := range cps {
-		if c != (RebuildCursor{PlanVersion: 2, PageToken: ""}) {
-			t.Fatalf("the only legal checkpoint here is v2's start (never past the last plan's pages), got %+v", c)
-		}
+	// A resource first seen by v1's plan stays unsettled until v2's document
+	// lands, so no mid-walk position is safe to resume from: an attempt
+	// resuming past it whose remaining listing omits it would leave it with
+	// wiped edges, a stale document and no stale mark.
+	if len(cps) != 0 {
+		t.Fatalf("a multi-plan walk has no settled mid-walk position and must never checkpoint, got %v", cps)
 	}
 	if !st.has("ClearStale:product/1") {
 		t.Fatal("the walk must still complete normally")
 	}
+	if !st.has("RemoveResource:product/1") {
+		t.Fatal("a full rebuild must still wipe-and-replace edges (ADR 0002)")
+	}
 }
 
-func TestRebuildAll_ResumeSkipsEarlierPlansAndSeedsToken_AndMergesEdges(t *testing.T) {
+func TestRebuild_TargetedVersionResume_SeedsToken(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{}
+	v1 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	v2 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: v1},
+		{Version: 2, Executer: v2},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 0)
+
+	// Selecting one version leaves the walk with exactly one active plan —
+	// the shape a cursor can address.
+	err := idx.RebuildNowResumable(context.Background(),
+		ResourceSelector{ResourceType: "product", Versions: []int{2}},
+		&RebuildCursor{PlanVersion: 2, PageToken: "p7"},
+		nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(v1.requests()) != 0 {
+		t.Fatal("a version-targeted walk must not run the versions it did not select")
+	}
+	reqs := v2.requests()
+	if len(reqs) != 1 || reqs[0].PageToken != "p7" {
+		t.Fatalf("the walk's only active plan must start at the cursor's page token, got %+v", reqs)
+	}
+	if st.has("RemoveResource:product/1") {
+		t.Fatal("a version-targeted rebuild merges edges, not wipes: the non-targeted versions' plans did not run, so wiping would drop the edges only they discover")
+	}
+	if !st.has("ClearStale:product/1") {
+		t.Fatal("a resource whose every selected plan flushed must settle")
+	}
+	items := es.allBulkItems()
+	if len(items) == 0 {
+		t.Fatal("expected a write to product_search_v2")
+	}
+	for _, it := range items {
+		if it.Index != "product_search_v2" {
+			t.Fatalf("a version-targeted walk must only write the selected version's index, wrote %s", it.Index)
+		}
+	}
+}
+
+func TestRebuildAll_MultiPlanCursorIgnored(t *testing.T) {
 	st := &rebuildRecordingStore{}
 	es := &captureBackend{}
 	v1 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
@@ -646,23 +706,16 @@ func TestRebuildAll_ResumeSkipsEarlierPlansAndSeedsToken_AndMergesEdges(t *testi
 		t.Fatal(err)
 	}
 
-	if len(v1.requests()) != 0 {
-		t.Fatal("a resumed walk must not re-run plans before the cursor's version")
-	}
-	reqs := v2.requests()
-	if len(reqs) != 1 || reqs[0].PageToken != "p7" {
-		t.Fatalf("the cursor's plan must start at the cursor's page token, got %+v", reqs)
-	}
-	if st.has("RemoveResource:product/1") {
-		t.Fatal("a resumed walk must merge edges, not wipe: the skipped plans' edges would be orphaned (ADR 0011)")
-	}
-	if !st.has("ClearStale:product/1") {
-		t.Fatal("a resource whose remaining plans all flushed must settle")
-	}
-	for _, it := range es.allBulkItems() {
-		if it.Index == "product_search_v1" {
-			t.Fatal("a resumed walk must not write indices of skipped plans")
+	// A multi-plan walk never checkpoints, so it can never be handed a cursor
+	// it produced: the only safe reading of one is to discard it.
+	for name, ex := range map[string]*cursorPagingExecuter{"v1": v1, "v2": v2} {
+		reqs := ex.requests()
+		if len(reqs) != 1 || reqs[0].PageToken != "" {
+			t.Fatalf("a multi-plan walk must ignore the cursor and walk %s from the start, got %+v", name, reqs)
 		}
+	}
+	if !st.has("RemoveResource:product/1") {
+		t.Fatal("a walk that ignored its cursor runs from scratch — full wipe-and-replace applies")
 	}
 }
 
@@ -672,12 +725,8 @@ func TestRebuildAll_ResumeWithUnknownVersionRestartsFromScratch(t *testing.T) {
 	v1 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
 		{Items: []projection.BuildDoc{productDoc("1")}},
 	}}
-	v2 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
-		{Items: []projection.BuildDoc{productDoc("1")}},
-	}}
 	plans := map[string][]projection.Plan{"product": {
 		{Version: 1, Executer: v1},
-		{Version: 2, Executer: v2},
 	}}
 	idx := newRebuildIndexer(st, es, plans, 0)
 
@@ -690,10 +739,43 @@ func TestRebuildAll_ResumeWithUnknownVersionRestartsFromScratch(t *testing.T) {
 	}
 
 	if len(v1.requests()) != 1 || v1.requests()[0].PageToken != "" {
-		t.Fatal("an unresolvable cursor must restart the walk from scratch")
+		t.Fatalf("a cursor naming a version this walk does not run must restart it from scratch, got %+v", v1.requests())
 	}
 	if !st.has("RemoveResource:product/1") {
 		t.Fatal("a from-scratch walk is not resumed — full wipe-and-replace applies")
+	}
+}
+
+func TestRebuildAll_FailedFlushDoesNotCheckpoint(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{bulkErr: errors.New("elasticsearch unreachable")}
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+			{Items: []projection.BuildDoc{productDoc("1"), productDoc("2")}, NextPageToken: "p2"},
+			{Items: []projection.BuildDoc{productDoc("3"), productDoc("4")}, NextPageToken: "p3"},
+		}}},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 2)
+
+	var cps []RebuildCursor
+	err := idx.RebuildNowResumable(context.Background(),
+		ResourceSelector{ResourceType: "product"},
+		nil,
+		func(c RebuildCursor) { cps = append(cps, c) })
+	if err == nil || !strings.Contains(err.Error(), "elasticsearch unreachable") {
+		t.Fatalf("a request-level write failure must abort the walk, got %v", err)
+	}
+
+	if len(cps) != 0 {
+		t.Fatalf("a failed flush wrote nothing; checkpointing past it would strand the resources it dropped, got %v", cps)
+	}
+	for _, id := range []string{"1", "2"} {
+		if !st.has("MarkStale:product/" + id) {
+			t.Fatalf("resource %s had its edges wiped but never landed — salvage must mark it stale", id)
+		}
+		if st.has("ClearStale:product/" + id) {
+			t.Fatalf("resource %s must not be cleared after a failed flush", id)
+		}
 	}
 }
 

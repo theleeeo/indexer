@@ -208,6 +208,11 @@ func (idx *Indexer) buildOne(ctx context.Context, plans []projection.Plan, resou
 
 func (idx *Indexer) rebuild(ctx context.Context, params RebuildArgs, resume rebuildResume) error {
 	if len(params.ResourceIDs) > 0 {
+		if resume.start != nil {
+			slog.Warn("rebuild cursor ignored for a targeted rebuild; its input is bounded, so restarting from scratch is the recovery",
+				slog.String("type", params.ResourceType),
+				slog.Int("plan_version", resume.start.PlanVersion))
+		}
 		return idx.rebuildByIDs(ctx, params)
 	}
 	return idx.rebuildAll(ctx, params, resume)
@@ -313,28 +318,6 @@ func (idx *Indexer) rebuildByIDs(ctx context.Context, params RebuildArgs) error 
 	return fl.errorIfFailed()
 }
 
-// planIndexForVersion returns the index of the plan with the given Schema
-// Version, or -1 when no plan has it (the config changed between attempts).
-func planIndexForVersion(plans []projection.Plan, version int) int {
-	for i, p := range plans {
-		if p.Version == version {
-			return i
-		}
-	}
-	return -1
-}
-
-// nextActivePlanVersion returns the Version of the first plan after planIdx
-// with an Executer, or -1 when planIdx is the last active plan.
-func nextActivePlanVersion(plans []projection.Plan, planIdx int) int {
-	for _, p := range plans[planIdx+1:] {
-		if p.Executer != nil {
-			return p.Version
-		}
-	}
-	return -1
-}
-
 func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume rebuildResume) error {
 	logger := slog.With(slog.String("type", params.ResourceType))
 
@@ -343,35 +326,60 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 		return err
 	}
 
-	// Resolve the resume cursor. A cursor naming a version with no plan (the
-	// config changed between attempts) is discarded: restarting from scratch
-	// is always safe, resuming from a wrong position is not.
-	startIdx, startToken, resuming := 0, "", false
-	if resume.start != nil {
-		if i := planIndexForVersion(plans, resume.start.PlanVersion); i >= 0 {
-			startIdx, startToken, resuming = i, resume.start.PageToken, true
-			logger.Info("resuming rebuild walk from cursor",
-				slog.Int("plan_version", resume.start.PlanVersion),
-				slog.String("page_token", startToken))
-		} else {
-			logger.Warn("rebuild cursor names a version with no plan; restarting walk from scratch",
-				slog.Int("plan_version", resume.start.PlanVersion))
+	// Only a walk with exactly one active plan has resumable positions. With
+	// several, a resource first seen by an early plan stays unsettled until
+	// the later plans' documents land, so every mid-walk position steps over
+	// begun-but-unsettled resources — and an attempt resuming past one whose
+	// remaining listing no longer emits it would leave it with wiped edges, an
+	// un-refreshed document and no stale mark. With one plan, a page boundary
+	// is reached only once its resources have settled or been marked stale.
+	activePlans, activeIdx := 0, -1
+	for i, p := range plans {
+		if p.Executer != nil {
+			activePlans++
+			activeIdx = i
 		}
 	}
-	// A resumed walk merges edges instead of the ADR 0002 wipe-and-replace:
-	// the pages it skips already persisted the edges their plans discovered,
-	// and wiping at this walk's first sighting would orphan them (ADR 0011).
-	// Extra stale edges cause only spurious rebuilds.
-	wipe := full && !resuming
+	resumable := activePlans == 1
+
+	// Resolve the resume cursor. Anything this walk cannot address — several
+	// active plans, or a version it does not run (the config or the selector
+	// changed between attempts) — restarts from scratch: that is always safe,
+	// resuming from a wrong position is not.
+	startToken := ""
+	switch {
+	case resume.start == nil:
+	case !resumable:
+		logger.Warn("rebuild cursor ignored; resumable walks have exactly one active plan; restarting walk from scratch",
+			slog.Int("plan_version", resume.start.PlanVersion),
+			slog.Int("active_plans", activePlans))
+	case resume.start.PlanVersion != plans[activeIdx].Version:
+		logger.Warn("rebuild cursor names a version this walk does not run; restarting walk from scratch",
+			slog.Int("plan_version", resume.start.PlanVersion),
+			slog.Int("walk_plan_version", plans[activeIdx].Version))
+	default:
+		startToken = resume.start.PageToken
+		logger.Info("resuming rebuild walk from cursor",
+			slog.Int("plan_version", resume.start.PlanVersion),
+			slog.String("page_token", startToken))
+	}
+
+	// ADR 0002 wipe-and-replace, resumed or not: a single-plan resume only
+	// re-enters the listing past pages whose resources already settled (their
+	// edges re-added after the wipe) or were never begun, so the walk's first
+	// sighting of a resource is still the right place to wipe.
+	wipe := full
 
 	fl := newRebuildFlusher(idx, params.ResourceType, params.Metadata)
 
 	// completed is the last fully consumed page boundary. The flusher's
 	// afterFlush hook checkpoints it: right after a flush, everything before
-	// that boundary is durably written. Mid-page flushes checkpoint the
-	// previous boundary — conservative, never ahead of what was flushed.
+	// that boundary is durably written and settled. Mid-page flushes
+	// checkpoint the previous boundary — conservative, never ahead of what was
+	// flushed.
+	checkpointing := resumable && resume.checkpoint != nil
 	var completed *RebuildCursor
-	if resume.checkpoint != nil {
+	if checkpointing {
 		fl.afterFlush = func() {
 			if completed != nil {
 				resume.checkpoint(*completed)
@@ -379,15 +387,13 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 		}
 	}
 
-	for planIdx := startIdx; planIdx < len(plans); planIdx++ {
-		plan := plans[planIdx]
+	for planIdx, plan := range plans {
 		if plan.Executer == nil {
 			continue
 		}
 		// Documents a resource first seen in this walk still expects: this
 		// plan plus the active plans after it — earlier walks can no longer
-		// emit it (and on a resumed walk, neither can this walk's skipped
-		// pages: their resources reappear in the remaining plans' walks).
+		// emit it.
 		expected := 0
 		for _, p := range plans[planIdx:] {
 			if p.Executer != nil {
@@ -395,15 +401,13 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 			}
 		}
 
-		pageToken := ""
-		if planIdx == startIdx {
-			pageToken = startToken
-		}
 		ch := plan.Execute(ctx, projection.BuildRequest{
 			ResourceType: params.ResourceType,
 			ResourceID:   "",
 			Metadata:     params.Metadata,
-			PageToken:    pageToken,
+			// Non-empty only on a resumable walk, whose sole active plan this
+			// is; every other walk starts its plans at the listing's head.
+			PageToken: startToken,
 		})
 
 		for page := range ch {
@@ -441,8 +445,8 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 
 				if !fl.tracked(id) {
 					if wipe {
-						// ADR 0002 wipe-and-replace; a targeted or resumed
-						// rebuild merges instead (see rebuildByIDs, ADR 0011).
+						// ADR 0002 wipe-and-replace; a targeted rebuild
+						// merges instead (see rebuildByIDs).
 						if err := idx.st.RemoveResource(ctx, doc.Root); err != nil {
 							logger.Warn("failed to remove relations", slog.String("id", id), slog.String("error", err.Error()))
 							fl.fail(ctx, id)
@@ -479,22 +483,9 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 			// boundary at the next flush. Non-string tokens (a hand-rolled
 			// executer) cannot be resumed from and are never checkpointed —
 			// the walk still runs, it just restarts this plan on retry.
-			if tok, ok := page.NextPageToken.(string); ok {
+			if tok, ok := page.NextPageToken.(string); ok && checkpointing {
 				completed = &RebuildCursor{PlanVersion: plan.Version, PageToken: tok}
 			}
-		}
-
-		// Plan walk complete: flush and checkpoint the next plan's start, so a
-		// retry never re-walks a finished plan. The last active plan gets no
-		// checkpoint past its pages — a crash before finish()'s bookkeeping
-		// must re-run the tail so incomplete resources still get marked stale.
-		if next := nextActivePlanVersion(plans, planIdx); next >= 0 && resume.checkpoint != nil {
-			if err := fl.flush(ctx); err != nil {
-				fl.salvage(ctx)
-				return err
-			}
-			completed = &RebuildCursor{PlanVersion: next, PageToken: ""}
-			resume.checkpoint(*completed)
 		}
 	}
 

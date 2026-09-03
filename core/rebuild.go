@@ -17,11 +17,12 @@ type ResourceSelector struct {
 	Metadata map[string]string
 }
 
-// RebuildCursor marks a durable position in a full rebuild walk: every plan
-// before PlanVersion's plan has been walked and flushed, and within
-// PlanVersion's walk every page before PageToken has been flushed. An empty
-// PageToken means the start of PlanVersion's walk. A walk resumed from a
-// cursor skips the work before it (ADR 0011).
+// RebuildCursor marks a settled position in a rebuild walk: the plan with
+// Schema Version PlanVersion has walked and flushed every page before
+// PageToken, and every resource those pages listed has settled — its documents
+// written and its stale mark cleared, or it is durably marked stale for the
+// sweep. An empty PageToken means the start of PlanVersion's walk. A walk
+// resumed from a cursor re-enters the listing at PageToken (ADR 0011).
 type RebuildCursor struct {
 	PlanVersion int    `json:"plan_version"`
 	PageToken   string `json:"page_token"`
@@ -56,17 +57,18 @@ func (idx *Indexer) RebuildNow(ctx context.Context, selectors []ResourceSelector
 
 // RebuildNowResumable is RebuildNow for a single selector with crash-resume
 // support: checkpoint (optional) receives a cursor whenever everything before
-// that position has durably flushed, and start (optional) resumes a walk from
+// that position has durably settled, and start (optional) resumes a walk from
 // such a cursor. The Temporal RunRebuild activity persists cursors as
 // heartbeat details, so a retried attempt continues where the dead one
 // stopped instead of restarting the walk.
 //
-// Only the all-of-type walk checkpoints and resumes. A targeted (by-ID)
-// rebuild ignores both: its input is bounded, so restart-from-scratch stays
-// the recovery. A resumed walk merges relation edges instead of the full
-// rebuild's wipe-and-replace — the skipped pages already persisted edges a
-// wipe would orphan; the cost is stale edges, which cause only spurious
-// rebuilds (ADR 0011).
+// Cursors apply only to an all-of-type walk with exactly one active plan — a
+// single-version resource, or a version-targeted backfill. A walk over several
+// versions has no settled mid-walk position: a resource first seen by an early
+// plan stays unsettled until the later plans' documents land, and an attempt
+// resuming past it whose remaining listing omits it would leave it with wiped
+// edges and no stale mark. Such walks, and targeted (by-ID) rebuilds, ignore
+// start and never checkpoint — they restart from scratch, as before (ADR 0011).
 func (idx *Indexer) RebuildNowResumable(ctx context.Context, sel ResourceSelector, start *RebuildCursor, checkpoint func(RebuildCursor)) error {
 	if err := idx.validateSelectors([]ResourceSelector{sel}); err != nil {
 		return err
