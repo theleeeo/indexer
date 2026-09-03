@@ -23,6 +23,7 @@ func main() {
 	apply := flag.String("apply", "", "Elasticsearch address to apply the mapping to (e.g. http://localhost:9200)")
 	esUser := flag.String("es-user", "", "Elasticsearch username")
 	esPass := flag.String("es-pass", "", "Elasticsearch password")
+	force := flag.Bool("force", false, "Move a read alias backwards or off a hand-built index (a stale -config file is the usual cause of needing this)")
 	flag.Parse()
 
 	resources, err := config.LoadConfig(*configPath)
@@ -57,7 +58,11 @@ func main() {
 			log.Printf("applied mapping to %s", indexName)
 		}
 
-		// Set up read aliases: point each alias to the readVersion index.
+		// Converge read aliases onto the readVersion index. The config owns the
+		// alias target (ADR 0009), but this tool runs against whatever -config
+		// file it is handed — so a move that would undo a cutover (backwards, or
+		// off a hand-built alias) is refused unless -force says the file is
+		// really the current truth.
 		targetResources := resources
 		if *index != "" {
 			targetResources = resource.Configs{resources.Get(*index)}
@@ -65,6 +70,22 @@ func main() {
 		for _, cfg := range targetResources {
 			aliasName := core.AliasName(cfg.Resource)
 			targetIndex := core.IndexName(cfg.Resource, cfg.ReadVersion)
+
+			current, err := getAliasTarget(addr, aliasName, *esUser, *esPass)
+			if err != nil {
+				log.Fatalf("read alias %s: %v", aliasName, err)
+			}
+
+			move := core.PlanAliasMove(cfg.Resource, current, cfg.ReadVersion)
+			applyMove, err := decideAliasApply(move, *force)
+			if err != nil {
+				log.Fatalf("alias %s: currently %s, config wants %s: %v", aliasName, current, targetIndex, err)
+			}
+			if !applyMove {
+				log.Printf("alias %s already points to %s", aliasName, targetIndex)
+				continue
+			}
+
 			if err := applyAlias(addr, aliasName, targetIndex, *esUser, *esPass); err != nil {
 				log.Fatalf("apply alias %s -> %s: %v", aliasName, targetIndex, err)
 			}
@@ -79,6 +100,55 @@ func main() {
 	if err := enc.Encode(mappings); err != nil {
 		log.Fatalf("encode mappings: %v", err)
 	}
+}
+
+// decideAliasApply is the write policy on top of core.PlanAliasMove: apply
+// creations and forward cutovers, skip an in-sync alias, and refuse a
+// backwards move or a hand-built target unless forced.
+func decideAliasApply(move core.AliasMove, force bool) (bool, error) {
+	switch move {
+	case core.AliasInSync:
+		return false, nil
+	case core.AliasCreate, core.AliasForward:
+		return true, nil
+	case core.AliasBackward:
+		if force {
+			return true, nil
+		}
+		return false, fmt.Errorf("refusing to move the read alias backwards; is this -config file stale? rerun with -force to roll back")
+	case core.AliasForeign:
+		if force {
+			return true, nil
+		}
+		return false, fmt.Errorf("refusing to move the read alias off an index this config does not own; rerun with -force to take it over")
+	default:
+		return false, fmt.Errorf("unknown alias move %d", move)
+	}
+}
+
+// getAliasTarget returns the concrete index the alias currently points to,
+// or "" if the alias does not exist.
+func getAliasTarget(addr, aliasName, user, pass string) (string, error) {
+	url := fmt.Sprintf("%s/_alias/%s", addr, aliasName)
+	statusCode, respBody, err := doRequest(http.MethodGet, url, nil, user, pass)
+	if err != nil {
+		return "", err
+	}
+	if statusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if statusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected response %d: %s", statusCode, string(respBody))
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(respBody, &decoded); err != nil {
+		return "", err
+	}
+	for indexName := range decoded {
+		return indexName, nil
+	}
+	return "", nil
 }
 
 // applyMapping PUTs the mapping body to ES. It first tries to create the index;

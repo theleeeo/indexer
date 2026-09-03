@@ -76,6 +76,15 @@ func main() {
 	}
 	core.InitTextLogging(os.Stderr, logLevel)
 
+	// The config's readVersion owns the read alias (ADR 0009): converge ES onto
+	// it before serving, so a cutover or rollback is just a config redeploy.
+	// Failure means the deployment is broken (indices not bootstrapped with
+	// gen-mapping, or ES unreachable) — refuse to start rather than serve a
+	// schema that disagrees with the alias.
+	if err := core.ConvergeReadAliases(context.Background(), esClientImpl, resources); err != nil {
+		log.Fatalf("converge read aliases: %v", err)
+	}
+
 	st := postgres.NewStore(dbpool)
 
 	sourceProvider, err := source.NewGRPCProvider(cfg.Provider.Addr)

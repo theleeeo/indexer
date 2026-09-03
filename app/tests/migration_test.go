@@ -3,6 +3,7 @@ package tests
 import (
 	"encoding/json"
 
+	"github.com/theleeeo/laika/backend/elasticsearch"
 	"github.com/theleeeo/laika/core"
 	"github.com/theleeeo/laika/core/resource"
 )
@@ -49,7 +50,9 @@ func (t *TestSuite) docFields(index, id string) (map[string]any, bool) {
 // Test_Migration_MultiVersionLifecycle walks the ADR 0004 rolling-migration
 // lifecycle against real infrastructure: live builds fan out to every Schema
 // Version, a targeted rebuild backfills only the new version's index, a full
-// rebuild resets every version, and a delete clears every version.
+// rebuild resets every version, the read alias converges onto the config's
+// readVersion in both directions (ADR 0009), and a delete clears every
+// version.
 func (t *TestSuite) Test_Migration_MultiVersionLifecycle() {
 	for _, c := range MigrationResourceConfig {
 		c.ApplyDefaults()
@@ -120,6 +123,43 @@ func (t *TestSuite) Test_Migration_MultiVersionLifecycle() {
 	t.Require().NoError(err)
 	t.Require().Len(resp.Hits, 1)
 	t.Require().Equal("1", resp.Hits[0].ID)
+
+	// --- Cutover is a readVersion change: the alias converges onto the config
+	// (ADR 0009), forward, idempotently, and back again on a rollback. ---
+	ctx := t.T().Context()
+	esBackend := elasticsearch.New(t.esClient, true)
+	aliasTarget := func() string {
+		target, err := esBackend.GetAlias(ctx, core.AliasName("m"))
+		t.Require().NoError(err)
+		return target
+	}
+
+	cut := *MigrationResourceConfig[0]
+	cut.ReadVersion = 2
+	cutCfg := resource.Configs{&cut}
+
+	t.Require().NoError(core.ConvergeReadAliases(ctx, esBackend, cutCfg))
+	t.Require().Equal(v2Index, aliasTarget(), "forward convergence must move the alias to the new readVersion")
+
+	t.Require().NoError(core.ConvergeReadAliases(ctx, esBackend, cutCfg))
+	t.Require().Equal(v2Index, aliasTarget(), "re-running convergence must be a no-op")
+
+	t.Require().NoError(core.ConvergeReadAliases(ctx, esBackend, MigrationResourceConfig))
+	t.Require().Equal(v1Index, aliasTarget(), "a readVersion rollback must converge the alias back")
+
+	// A missing alias is recreated from config — the bootstrap-completing case.
+	delRes, err := t.esClient.Indices.DeleteAlias([]string{v1Index}, []string{core.AliasName("m")})
+	t.Require().NoError(err)
+	delRes.Body.Close()
+	t.Require().NoError(core.ConvergeReadAliases(ctx, esBackend, MigrationResourceConfig))
+	t.Require().Equal(v1Index, aliasTarget(), "convergence must recreate a missing alias")
+
+	// A readVersion whose index was never bootstrapped must fail loudly and
+	// leave the alias where it was.
+	broken := *MigrationResourceConfig[0]
+	broken.ReadVersion = 3
+	t.Require().Error(core.ConvergeReadAliases(ctx, esBackend, resource.Configs{&broken}))
+	t.Require().Equal(v1Index, aliasTarget(), "a failed convergence must not move the alias")
 
 	// --- A delete clears every version's document. ---
 	t.fakeProvider.DeleteResource("m", "1")

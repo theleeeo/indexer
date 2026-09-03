@@ -171,6 +171,11 @@ resources:
     fields: { ... } # new shape — writes go here too, reads switch once ready
 ```
 
+The read alias always follows `readVersion`: the indexer converges it at startup
+and `gen-mapping -apply` applies it too, so a cutover (or rollback) is just a
+`readVersion` change plus a redeploy. `gen-mapping` refuses to move an alias
+backwards without `-force`, protecting a live cutover from a stale config file.
+
 ---
 
 ## gRPC API

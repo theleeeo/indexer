@@ -85,7 +85,7 @@ Both `Store` and `SearchBackend` have exactly one implementation each; the inter
 | `app/gen/` | Generated protobuf Go bindings — do not edit manually |
 | `app/config/` | YAML resource DSL parsing |
 | `app/dsl/` | Builds `projection.Plan` trees from resource config + Provider |
-| `app/cmd/` | Entry points (`indexer`, `gen-mapping`, `diff-mapping`, `cleanup`, `cutover`) |
+| `app/cmd/` | Entry points (`indexer`, `gen-mapping`, `diff-mapping`, `cleanup`) |
 
 ### Critical Invariants
 

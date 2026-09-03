@@ -6,7 +6,7 @@ The migration model this enables:
 
 1. Add a v2 Schema Version to the YAML alongside the existing v1. Both indices receive writes from then on.
 2. Run a `rebuild` for v2 to backfill historical resources into `a_search_v2`.
-3. Cut the read alias `a_search` from `a_search_v1` to `a_search_v2`. The cutover is instantaneous because v2 is already fully populated and warm.
+3. Cut the read alias `a_search` from `a_search_v1` to `a_search_v2` by bumping `readVersion` to 2 and redeploying — the config owns the alias and the indexer converges it at startup (see [ADR 0009](0009-read-version-owns-the-read-alias.md)). The cutover is instantaneous because v2 is already fully populated and warm.
 4. Drop v1 from the YAML once the cutover has been validated.
 
 The cost is steady-state write amplification (N writes per build during migrations). The benefit is that breaking changes to the index — added/removed fields, type changes, new or dropped relations — can be rolled out without downtime and without a long cutover window. Given the system's target of consistency-within-seconds, a lazy migration model that only populates v2 on cutover would not meet the cutover-latency expectation.
