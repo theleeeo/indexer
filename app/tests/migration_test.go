@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/theleeeo/laika/backend/elasticsearch"
@@ -283,4 +284,103 @@ func (t *TestSuite) Test_Migration_CutoverReadinessGates() {
 	r = check()
 	t.Require().True(r.Ready, "%+v", r.Checks)
 	t.Require().Equal(core.AliasInSync, r.Move)
+}
+
+// Test_Migration_ResumedRebuildWalk aborts a version-targeted v2 backfill at
+// its first mid-walk checkpoint and resumes from that cursor: pages before
+// the cursor keep the aborted attempt's settled output and are not re-walked,
+// the rest rebuilds from current source data, v1 is never touched, and no
+// stale backlog is left behind (ADR 0011).
+func (t *TestSuite) Test_Migration_ResumedRebuildWalk() {
+	for _, c := range MigrationResourceConfig {
+		c.ApplyDefaults()
+	}
+	t.Require().NoError(MigrationResourceConfig.Validate())
+	t.setResourceConfig(MigrationResourceConfig)
+
+	const v1Index, v2Index = "m_search_v1", "m_search_v2"
+	ids := []string{"1", "2", "3", "4", "5"}
+
+	for _, id := range ids {
+		t.fakeProvider.SetResource("m", id, map[string]any{
+			"id": id, "field1": "orig" + id, "field2": "x" + id,
+		})
+		t.Require().NoError(t.idx.RegisterChange(t.T().Context(), core.Notification{
+			ResourceType: "m", ResourceID: id, Kind: core.ChangeCreated,
+		}))
+	}
+	t.worker.Drain(t.T().Context())
+
+	// A paginated walk with a small chunk, so a checkpoint fires mid-walk:
+	// pages of 2 (ids sorted: [1,2] [3,4] [5]), flush every 2 documents.
+	// Checkpoints trail flushed page boundaries, so the first checkpoint is
+	// {2, "3"} — emitted by the flush that lands on page 2's last document.
+	t.fakeProvider.SetPageSize(2)
+	smallChunkIdx := t.newIndexer(MigrationResourceConfig, core.Config{RebuildChunkSize: 2})
+
+	// The walk must rebuild from this state, so the aborted attempt's output
+	// is distinguishable from the ingest above.
+	for _, id := range ids {
+		t.fakeProvider.SetResource("m", id, map[string]any{
+			"id": id, "field1": "walk" + id, "field2": "x" + id,
+		})
+	}
+
+	ctx, cancel := context.WithCancel(t.T().Context())
+	defer cancel()
+	var cur *core.RebuildCursor
+	err := smallChunkIdx.RebuildNowResumable(ctx,
+		core.ResourceSelector{ResourceType: "m", Versions: []int{2}}, nil,
+		func(c core.RebuildCursor) {
+			if cur == nil {
+				cc := c
+				cur = &cc
+				cancel()
+			}
+		})
+	t.Require().Error(err, "an aborted walk must not report success")
+	t.Require().NotNil(cur, "a mid-walk flush at a page boundary must checkpoint")
+	t.Require().Equal(2, cur.PlanVersion)
+	t.Require().Equal("3", cur.PageToken, "the checkpoint trails the last fully flushed page")
+
+	// The source moves on while the walk is down; the resumed walk picks up
+	// current data for the pages it re-walks.
+	for _, id := range ids {
+		t.fakeProvider.SetResource("m", id, map[string]any{
+			"id": id, "field1": "resumed" + id, "field2": "x" + id,
+		})
+	}
+	t.fakeProvider.ResetCallCounts()
+
+	t.Require().NoError(smallChunkIdx.RebuildNowResumable(t.T().Context(),
+		core.ResourceSelector{ResourceType: "m", Versions: []int{2}}, cur, nil))
+
+	_, listCalls := t.fakeProvider.CallCounts()
+	t.Require().Equal(2, listCalls,
+		"the resumed walk lists only the pages from the cursor on ([3,4] and [5]); from-scratch would be 3")
+
+	for _, id := range ids {
+		f1, ok := t.docFields(v1Index, id)
+		t.Require().True(ok, "v1 must still hold %s", id)
+		t.Require().Equal("orig"+id, f1["field1"],
+			"a targeted v2 walk must never touch v1")
+	}
+	for _, id := range []string{"1", "2"} {
+		f2, ok := t.docFields(v2Index, id)
+		t.Require().True(ok)
+		t.Require().Equal("walk"+id, f2["field1"],
+			"pages before the cursor keep the aborted attempt's settled output")
+	}
+	for _, id := range []string{"3", "4", "5"} {
+		f2, ok := t.docFields(v2Index, id)
+		t.Require().True(ok)
+		t.Require().Equal("resumed"+id, f2["field1"],
+			"pages from the cursor on rebuild from current source data")
+	}
+
+	// Everything the walks began must have settled (seq-guarded ClearStale).
+	// A non-zero sweep means a resource was left stale.
+	swept, err := t.idx.SweepStale(t.T().Context(), 0, 100)
+	t.Require().NoError(err)
+	t.Require().Zero(swept, "a completed resumed walk must leave no stale backlog")
 }

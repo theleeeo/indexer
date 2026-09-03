@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -40,6 +41,20 @@ type FakeProvider struct {
 
 	fetchResourceCount int
 	listResourcesCount int
+
+	// pageSize bounds how many resources one ListResources call returns.
+	// 0 — the default, restored by Clear — serves everything in a single page,
+	// so a test only sees pagination when it asks for it.
+	pageSize int
+}
+
+// SetPageSize makes ListResources paginate in windows of n resources
+// (0 = everything in one page). IDs are listed in ascending order and page
+// tokens are resource IDs, so a walk can be resumed from one.
+func (f *FakeProvider) SetPageSize(n int) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.pageSize = n
 }
 
 // SetError makes FetchResource fail for the given resource until cleared.
@@ -102,9 +117,37 @@ func (f *FakeProvider) ListResources(ctx context.Context, params source.ListReso
 		}
 	}
 
+	// Map iteration is random; a stable order is what makes a page token mean
+	// the same position on every call.
+	slices.SortFunc(resources, func(a, b source.ListedResource) int {
+		return strings.Compare(a.ID, b.ID)
+	})
+
+	if f.pageSize <= 0 {
+		return source.ListResourcesResult{Resources: resources}, nil
+	}
+
+	// Start-inclusive resource-ID tokens, the same semantics as app/dsl's
+	// mockProvider: the token names the first resource of the page, and an
+	// unknown one (its resource is gone) restarts from the head.
+	start := 0
+	if params.PageToken != "" {
+		for i, r := range resources {
+			if r.ID == params.PageToken {
+				start = i
+				break
+			}
+		}
+	}
+	end := min(start+f.pageSize, len(resources))
+
+	var next string
+	if end < len(resources) {
+		next = resources[end].ID
+	}
 	return source.ListResourcesResult{
-		Resources:     resources,
-		NextPageToken: "", // Pagination not implemented in this fake
+		Resources:     resources[start:end],
+		NextPageToken: next,
 	}, nil
 }
 
@@ -128,6 +171,7 @@ func (f *FakeProvider) Clear() {
 	f.errs = nil
 	f.fetchResourceCount = 0
 	f.listResourcesCount = 0
+	f.pageSize = 0
 }
 
 // SetFetchGate blocks matching FetchResource calls until ReleaseFetchGate is
@@ -581,6 +625,36 @@ func (t *TestSuite) setResourceConfig(resources resource.Configs) {
 		t.Require().NoError(err)
 		res.Body.Close()
 	}
+}
+
+// newIndexer builds a second Indexer over the suite's live Store and search
+// backend, for tests that need an indexer tuned differently from the suite's
+// own (a smaller RebuildChunkSize, say). It shares the suite's Postgres and
+// Elasticsearch state, and builds its plans from the given resource config the
+// same way SetupSuite does. Only the tuning knobs the caller sets are honoured;
+// the wiring is the suite's. The Temporal client is omitted — an indexer built
+// here must not reach the durable slow lane.
+func (t *TestSuite) newIndexer(resources resource.Configs, cfg core.Config) *core.Indexer {
+	cfg.Plans = dsl.BuildPlansFromConfig(t.fakeProvider, resources)
+	cfg.Resources = resources
+	cfg.ES = elasticsearch.New(t.esClient, true)
+	cfg.Store = t.st
+	if cfg.PoolSize == 0 {
+		cfg.PoolSize = 10
+	}
+	if cfg.QueueSize == 0 {
+		// Large enough that the suite never sheds a build to the sweep.
+		cfg.QueueSize = 1000
+	}
+
+	idx, err := core.New(cfg)
+	t.Require().NoError(err)
+	t.T().Cleanup(func() {
+		if err := idx.Shutdown(context.Background()); err != nil {
+			t.T().Logf("shutting down test indexer: %v", err)
+		}
+	})
+	return idx
 }
 
 func (t *TestSuite) BeforeTest(suiteName, testName string) {
