@@ -351,3 +351,59 @@ func TestListStale_CutoffOrderLimitAndDeletedFlag(t *testing.T) {
 		t.Fatalf("limit ignored: got %d entries", len(limited))
 	}
 }
+
+func TestCountStale_FiltersByTypeAndCutoff_ReportsOldest(t *testing.T) {
+	ctx := context.Background()
+	st := NewStore(testPool)
+
+	oldA := model.Resource{Type: "cs", Id: "old-a"}
+	oldB := model.Resource{Type: "cs", Id: "old-b"}
+	tomb := model.Resource{Type: "cs", Id: "del"}
+	fresh := model.Resource{Type: "cs", Id: "fresh"}
+	otherType := model.Resource{Type: "cs-other", Id: "old"}
+
+	_ = st.MarkStale(ctx, []model.Resource{oldA, oldB, otherType}, nil)
+	if _, err := st.MarkDeleted(ctx, tomb); err != nil {
+		t.Fatal(err)
+	}
+	backdate := func(r model.Resource, age string) {
+		if _, err := testPool.Exec(ctx,
+			`UPDATE resources SET stale_since = now() - $3::interval WHERE type=$1 AND id=$2`,
+			r.Type, r.Id, age); err != nil {
+			t.Fatal(err)
+		}
+	}
+	backdate(oldA, "10 minutes")
+	backdate(oldB, "5 minutes")
+	backdate(tomb, "15 minutes") // tombstones are unfinished work: they count
+	backdate(otherType, "10 minutes")
+	_ = st.MarkStale(ctx, []model.Resource{fresh}, nil) // inside cutoff: excluded
+
+	count, oldest, err := st.CountStale(ctx, "cs", time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 3 {
+		t.Fatalf("count: got %d want 3 (old-a, old-b, del)", count)
+	}
+	wantOldest := time.Now().Add(-15 * time.Minute)
+	if d := oldest.Sub(wantOldest); d < -30*time.Second || d > 30*time.Second {
+		t.Fatalf("oldest: got %v, want about %v", oldest, wantOldest)
+	}
+
+	count, _, err = st.CountStale(ctx, "cs-other", time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("other type must be counted separately: got %d want 1", count)
+	}
+
+	count, oldest, err = st.CountStale(ctx, "cs-none", time.Now().Add(-time.Minute))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 || !oldest.IsZero() {
+		t.Fatalf("type with no stale rows: got count %d oldest %v, want 0 and zero time", count, oldest)
+	}
+}

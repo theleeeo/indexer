@@ -40,6 +40,29 @@ const (
 	AliasForeign
 )
 
+// String returns the move as a short word, stable for scripts and logs.
+func (m AliasMove) String() string {
+	switch m {
+	case AliasInSync:
+		return "in-sync"
+	case AliasCreate:
+		return "create"
+	case AliasForward:
+		return "forward"
+	case AliasBackward:
+		return "backward"
+	case AliasForeign:
+		return "foreign"
+	default:
+		return fmt.Sprintf("unknown(%d)", int(m))
+	}
+}
+
+// MarshalText makes AliasMove serialize as its String form in JSON reports.
+func (m AliasMove) MarshalText() ([]byte, error) {
+	return []byte(m.String()), nil
+}
+
 // PlanAliasMove classifies the move that would bring resourceType's read alias
 // from its current target (empty = alias missing) to the readVersion index.
 func PlanAliasMove(resourceType, currentTarget string, readVersion int) AliasMove {

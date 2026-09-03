@@ -6,6 +6,7 @@ import (
 	"github.com/theleeeo/laika/backend/elasticsearch"
 	"github.com/theleeeo/laika/core"
 	"github.com/theleeeo/laika/core/resource"
+	"github.com/theleeeo/laika/model"
 )
 
 // MigrationResourceConfig is the ADR 0004 shape mid-migration: resource "m"
@@ -175,4 +176,111 @@ func (t *TestSuite) Test_Migration_MultiVersionLifecycle() {
 		t.T().Fatal("delete must remove the v2 document")
 	}
 	t.Require().False(t.resourceTracked("m", "1"), "the tombstone must be hard-deleted after ES cleanup")
+}
+
+// Test_Migration_CutoverReadinessGates walks the pre-cutover readiness check
+// through the migration it is meant to gate: a proposed readVersion bump is
+// refused while the target index is missing, refused while the backfill has
+// not reached doc-count parity, refused while a stale backlog lingers, and
+// admitted once all three hold — then reports in-sync after the cutover.
+func (t *TestSuite) Test_Migration_CutoverReadinessGates() {
+	for _, c := range MigrationResourceConfig {
+		c.ApplyDefaults()
+	}
+	t.Require().NoError(MigrationResourceConfig.Validate())
+
+	ctx := t.T().Context()
+	esBackend := elasticsearch.New(t.esClient, true)
+
+	// Pre-migration world: only v1 is configured, bootstrapped, and serving.
+	v1Only := resource.Configs{{
+		Resource:    "m",
+		Versions:    []resource.VersionConfig{MigrationResourceConfig[0].Versions[0]},
+		ReadVersion: 1,
+	}}
+	for _, c := range v1Only {
+		c.ApplyDefaults()
+	}
+	t.Require().NoError(v1Only.Validate())
+	t.setResourceConfig(v1Only)
+
+	for _, id := range []string{"1", "2", "3"} {
+		t.fakeProvider.SetResource("m", id, map[string]any{
+			"id": id, "field1": "orig" + id, "field2": "extra" + id,
+		})
+		t.Require().NoError(t.idx.RegisterChange(ctx, core.Notification{
+			ResourceType: "m", ResourceID: id, Kind: core.ChangeCreated,
+		}))
+	}
+	t.worker.Drain(ctx)
+
+	// The proposed change: v2 added and readVersion bumped to 2.
+	proposed := *MigrationResourceConfig[0]
+	proposed.ReadVersion = 2
+	proposedCfg := resource.Configs{&proposed}
+	t.Require().NoError(proposedCfg.Validate())
+
+	check := func() core.ResourceReadiness {
+		results := core.CheckCutoverReadiness(ctx, esBackend, t.st, proposedCfg, core.ReadinessOptions{})
+		t.Require().Len(results, 1)
+		return results[0]
+	}
+	gate := func(r core.ResourceReadiness, name string) core.ReadinessCheck {
+		for _, c := range r.Checks {
+			if c.Name == name {
+				return c
+			}
+		}
+		t.T().Fatalf("readiness has no %q check: %+v", name, r.Checks)
+		return core.ReadinessCheck{}
+	}
+
+	// v2 was never bootstrapped: the target-index gate refuses the cutover.
+	r := check()
+	t.Require().False(r.Ready)
+	t.Require().Equal(core.AliasForward, r.Move)
+	t.Require().False(gate(r, core.CheckTargetIndex).OK)
+
+	// gen-mapping equivalent: create the v2 index and start fanning writes to
+	// it (readVersion still 1, so the alias stays on v1).
+	t.setResourceConfig(MigrationResourceConfig)
+
+	// v2 exists but holds none of the pre-migration documents: the parity
+	// gate refuses until the backfill has run.
+	r = check()
+	t.Require().False(r.Ready)
+	parity := gate(r, core.CheckDocParity)
+	t.Require().False(parity.OK)
+	t.Require().Contains(parity.Detail, "3", "the operator must see the doc counts")
+
+	// Backfill v2 (ADR 0004 step 2).
+	t.Require().NoError(t.idx.RebuildNow(ctx, []core.ResourceSelector{
+		{ResourceType: "m", Versions: []int{2}},
+	}))
+	t.worker.Drain(ctx)
+
+	// Parity holds now, but an aged stale mark still blocks the cutover.
+	t.Require().NoError(t.st.MarkStale(ctx, []model.Resource{{Type: "m", Id: "2"}}, nil))
+	_, err := t.pool.Exec(ctx,
+		`UPDATE resources SET stale_since = now() - interval '1 hour' WHERE type='m' AND id='2'`)
+	t.Require().NoError(err)
+
+	r = check()
+	t.Require().False(r.Ready)
+	t.Require().False(gate(r, core.CheckStaleBacklog).OK)
+
+	_, err = t.pool.Exec(ctx,
+		`UPDATE resources SET stale_since = NULL WHERE type='m' AND id='2'`)
+	t.Require().NoError(err)
+
+	// All gates hold: the readVersion bump may deploy.
+	r = check()
+	t.Require().True(r.Ready, "%+v", r.Checks)
+
+	// Deploying the bumped config converges the alias (ADR 0009); the same
+	// check then doubles as the post-cutover soak verdict.
+	t.Require().NoError(core.ConvergeReadAliases(ctx, esBackend, proposedCfg))
+	r = check()
+	t.Require().True(r.Ready, "%+v", r.Checks)
+	t.Require().Equal(core.AliasInSync, r.Move)
 }

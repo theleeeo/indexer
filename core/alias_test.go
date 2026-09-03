@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json/v2"
 	"errors"
 	"testing"
 
@@ -31,6 +32,16 @@ func TestPlanAliasMove(t *testing.T) {
 			require.Equal(t, tc.want, PlanAliasMove("m", tc.current, tc.readVersion))
 		})
 	}
+}
+
+func TestAliasMove_TextForm(t *testing.T) {
+	// The readiness report is consumed by scripts (-json); moves must
+	// serialize as words, not iota values.
+	require.Equal(t, "forward", AliasForward.String())
+
+	got, err := json.Marshal(map[string]AliasMove{"move": AliasBackward})
+	require.NoError(t, err)
+	require.JSONEq(t, `{"move":"backward"}`, string(got))
 }
 
 // fakeAliasBackend is an in-memory AliasBackend recording CreateAlias calls.

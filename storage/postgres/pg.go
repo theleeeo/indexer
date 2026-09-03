@@ -290,3 +290,24 @@ func (s *Store) ListStale(ctx context.Context, before time.Time, limit int) ([]c
 	}
 	return out, rows.Err()
 }
+
+// CountStale returns how many resources of the type (tombstones included)
+// have a stale mark older than before, and the oldest such mark — zero when
+// the count is zero. This is core.StaleCounter, the cutover readiness gate's
+// view of the backlog.
+func (s *Store) CountStale(ctx context.Context, resourceType string, before time.Time) (int, time.Time, error) {
+	var count int
+	var oldest *time.Time
+	err := s.pool.QueryRow(ctx,
+		`SELECT count(*), min(stale_since) FROM resources
+		 WHERE type=$1 AND stale_since IS NOT NULL AND stale_since < $2`,
+		resourceType, before,
+	).Scan(&count, &oldest)
+	if err != nil {
+		return 0, time.Time{}, err
+	}
+	if oldest == nil {
+		return count, time.Time{}, nil
+	}
+	return count, *oldest, nil
+}

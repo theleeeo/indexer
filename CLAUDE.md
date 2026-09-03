@@ -27,6 +27,10 @@ go run ./app/cmd/gen-mapping -config resources.yml
 # (exits non-zero on actionable drift: added/changed fields or a missing index)
 go run ./app/cmd/diff-mapping -config resources.yml -es-addr http://localhost:9200
 
+# Pre-cutover readiness gates for a readVersion bump (ADR 0010): target index
+# exists, doc-count parity, stale-backlog age. Exits non-zero when not ready.
+go run ./app/cmd/cutover-check -config resources.yml -es-addr http://localhost:9200 -pg-addr postgres://user:pass@localhost/indexer
+
 # Regenerate protobuf bindings (outputs to app/gen/)
 buf generate
 ```
@@ -85,7 +89,7 @@ Both `Store` and `SearchBackend` have exactly one implementation each; the inter
 | `app/gen/` | Generated protobuf Go bindings — do not edit manually |
 | `app/config/` | YAML resource DSL parsing |
 | `app/dsl/` | Builds `projection.Plan` trees from resource config + Provider |
-| `app/cmd/` | Entry points (`indexer`, `gen-mapping`, `diff-mapping`, `cleanup`) |
+| `app/cmd/` | Entry points (`indexer`, `gen-mapping`, `diff-mapping`, `cutover-check`, `cleanup`) |
 
 ### Critical Invariants
 
