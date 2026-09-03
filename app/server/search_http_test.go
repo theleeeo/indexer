@@ -30,7 +30,7 @@ func (b *fakeBackend) Upsert(context.Context, string, string, any, int64) error 
 func (b *fakeBackend) BulkUpsert(context.Context, []core.BulkItem) ([]core.BulkFailure, error) {
 	return nil, nil
 }
-func (b *fakeBackend) Delete(context.Context, string, string) error             { return nil }
+func (b *fakeBackend) Delete(context.Context, string, string) error { return nil }
 func (b *fakeBackend) FederatedSearch(_ context.Context, p core.FederatedSearchParams) (core.FederatedSearchResult, error) {
 	b.fedParams = p
 	return b.fedResponse, nil
@@ -51,7 +51,7 @@ func (b *fakeBackend) Search(_ context.Context, req core.SearchRequest, alias st
 // plain HTTP POST with a JSON body to the Connect route, and a JSON response.
 func TestSearch_ConnectJSONContract(t *testing.T) {
 	backend := &fakeBackend{}
-	idx := core.New(core.Config{
+	idx := mustCore(core.Config{
 		ES: backend,
 		Resources: resource.Configs{
 			{

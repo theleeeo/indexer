@@ -50,7 +50,7 @@ func newSearchIndexer(backend SearchBackend, mws ...SearchMiddleware) *Indexer {
 		},
 	}
 	cfg.ApplyDefaults()
-	return New(Config{
+	return mustNew(Config{
 		Resources:         resource.Configs{cfg},
 		ES:                backend,
 		SearchMiddlewares: mws,

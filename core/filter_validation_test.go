@@ -47,10 +47,15 @@ func newTypedIndexer(backend SearchBackend) *Indexer {
 			Fields:  []resource.FieldConfig{{Name: "state"}},
 		}},
 	}
-	docCfg.ApplyDefaults()
-	childCfg.ApplyDefaults()
-	return New(Config{
-		Resources: resource.Configs{docCfg, childCfg},
+	tagCfg := &resource.Config{
+		Resource: "tag",
+		Versions: []resource.VersionConfig{{
+			Version: 1,
+			Fields:  []resource.FieldConfig{{Name: "label"}, {Name: "doc_id"}},
+		}},
+	}
+	return mustNew(Config{
+		Resources: resource.Configs{docCfg, childCfg, tagCfg},
 		ES:        backend,
 	})
 }
@@ -138,7 +143,7 @@ func TestValidateFilters_MiddlewareFiltersExempt(t *testing.T) {
 			return next(ctx, req)
 		}
 	}
-	idx2 := New(Config{
+	idx2 := mustNew(Config{
 		Resources:         idx.resources,
 		ES:                backend,
 		SearchMiddlewares: []SearchMiddleware{mw},

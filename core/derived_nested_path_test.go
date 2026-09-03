@@ -37,8 +37,21 @@ func newNestedPathIndexer(backend SearchBackend) *Indexer {
 			},
 		},
 	}
-	cfg.ApplyDefaults()
-	return New(Config{Resources: resource.Configs{cfg}, ES: backend})
+	c := &resource.Config{
+		Resource: "c",
+		Versions: []resource.VersionConfig{{
+			Version: 1,
+			Fields:  []resource.FieldConfig{{Name: "number", Type: "integer"}, {Name: "a_id"}},
+		}},
+	}
+	b := &resource.Config{
+		Resource: "b",
+		Versions: []resource.VersionConfig{{
+			Version: 1,
+			Fields:  []resource.FieldConfig{{Name: "name"}},
+		}},
+	}
+	return mustNew(Config{Resources: resource.Configs{cfg, c, b}, ES: backend})
 }
 
 // nestedPathOf returns the NestedPath the backend received for the filter on

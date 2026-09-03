@@ -224,7 +224,7 @@ func (s *rebuildRecordingStore) UpsertResource(_ context.Context, r model.Resour
 }
 
 func newRebuildIndexer(st Store, es SearchBackend, plans map[string][]projection.Plan, chunkSize int) *Indexer {
-	return New(Config{
+	return mustNew(Config{
 		Resources:        twoVersionResources(),
 		Plans:            plans,
 		ES:               es,

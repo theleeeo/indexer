@@ -511,15 +511,19 @@ func (t *TestSuite) SetupSuite() {
 
 	plans := dsl.BuildPlansFromConfig(t.fakeProvider, DefaultResourceConfig)
 
-	t.idx = core.New(core.Config{
-		Plans:      plans,
-		Resources:  DefaultResourceConfig,
-		ES:         elasticsearch.New(esClient, true),
-		Store:      t.st,
-		PoolSize: 10,
+	idx, err := core.New(core.Config{
+		Plans:     plans,
+		Resources: DefaultResourceConfig,
+		ES:        elasticsearch.New(esClient, true),
+		Store:     t.st,
+		PoolSize:  10,
 		// Large enough that the suite never sheds a build to the sweep.
 		QueueSize: 1000,
 	})
+	if err != nil {
+		t.T().Fatalf("construct indexer: %v", err)
+	}
+	t.idx = idx
 
 	t.worker = &drainer{idx: t.idx}
 }
@@ -542,7 +546,7 @@ func (t *TestSuite) TearDownSuite() {
 // It also creates the versioned ES indices and read aliases.
 func (t *TestSuite) setResourceConfig(resources resource.Configs) {
 	plans := dsl.BuildPlansFromConfig(t.fakeProvider, resources)
-	t.idx.SetPlans(plans, resources)
+	t.Require().NoError(t.idx.SetPlans(plans, resources))
 
 	// Create versioned indexes and aliases for each resource.
 	for _, cfg := range resources {

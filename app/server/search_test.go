@@ -16,7 +16,17 @@ import (
 // in the Connect handler: searchBase rejects an unknown resource before it
 // touches the (nil) search backend.
 func newSearcher() *SearcherServer {
-	return NewSearcher(core.New(core.Config{}))
+	return NewSearcher(mustCore(core.Config{}))
+}
+
+// mustCore constructs the embedded Indexer, panicking if core.New rejects the
+// config — in tests that means the fixture violates the config invariants.
+func mustCore(cfg core.Config) *core.Indexer {
+	idx, err := core.New(cfg)
+	if err != nil {
+		panic(err)
+	}
+	return idx
 }
 
 func TestSearch_UnknownResourceMapsToFailedPrecondition(t *testing.T) {
@@ -58,9 +68,7 @@ func federatedSearcher(backend core.SearchBackend) *SearcherServer {
 			{Version: 1, Fields: []resource.FieldConfig{{Name: "name"}}},
 		},
 	}
-	cfgA.ApplyDefaults()
-	cfgB.ApplyDefaults()
-	return NewSearcher(core.New(core.Config{
+	return NewSearcher(mustCore(core.Config{
 		ES:        backend,
 		Resources: resource.Configs{cfgA, cfgB},
 	}))
@@ -167,7 +175,7 @@ func TestGetCapabilities_ExposesAllActiveVersions(t *testing.T) {
 			{Version: 2, Fields: []resource.FieldConfig{{Name: "x"}, {Name: "y"}}},
 		},
 	}
-	srv := NewSearcher(core.New(core.Config{Resources: resource.Configs{cfg}}))
+	srv := NewSearcher(mustCore(core.Config{Resources: resource.Configs{cfg}}))
 
 	resp, err := srv.GetCapabilities(context.Background(), connect.NewRequest(&search.GetCapabilitiesRequest{}))
 	require.NoError(t, err)

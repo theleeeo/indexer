@@ -197,3 +197,10 @@ func TestValidate_EmptyVersions_Error(t *testing.T) {
 	cfg := Configs{{Resource: "a"}}
 	require.ErrorContains(t, cfg.Validate(), "at least one version required")
 }
+
+// An empty set is trivially valid: core.New accepts a resource-less Indexer.
+// Requiring at least one resource is the app loader's concern, not the
+// library's.
+func TestValidate_EmptyConfigsAllowed(t *testing.T) {
+	require.NoError(t, Configs{}.Validate())
+}

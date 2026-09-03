@@ -37,7 +37,7 @@ func TestReferenceExecuteFoldsTermsFilter(t *testing.T) {
 	be := &fakeBackend{childHits: map[string][]SearchHit{
 		AliasName("b"): {{ID: "b1"}, {ID: "b2"}},
 	}}
-	idx := New(Config{Resources: refResources(), ES: be})
+	idx := mustNew(Config{Resources: refResources(), ES: be})
 
 	resp, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c",
@@ -66,7 +66,7 @@ func TestReferenceExecuteFoldsTermsFilter(t *testing.T) {
 
 func TestReferenceExecuteShortCircuitsOnNoMatch(t *testing.T) {
 	be := &fakeBackend{childHits: map[string][]SearchHit{AliasName("b"): {}}}
-	idx := New(Config{Resources: refResources(), ES: be})
+	idx := mustNew(Config{Resources: refResources(), ES: be})
 
 	resp, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c",
@@ -96,7 +96,7 @@ func TestReferenceExecuteMultiTargetShortCircuit(t *testing.T) {
 		AliasName("b"): {}, // first target: no matches → short-circuit
 		AliasName("d"): {{ID: "d1"}},
 	}}
-	idx := New(Config{Resources: resources, ES: be})
+	idx := mustNew(Config{Resources: resources, ES: be})
 
 	resp, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "e",
@@ -130,7 +130,7 @@ func TestRootFilterScopesPrimaryOnly(t *testing.T) {
 			return next(ctx, req)
 		}
 	}
-	idx := New(Config{Resources: refResources(), ES: be2, SearchMiddlewares: []SearchMiddleware{tenant}})
+	idx := mustNew(Config{Resources: refResources(), ES: be2, SearchMiddlewares: []SearchMiddleware{tenant}})
 
 	_, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c", Filters: []Filter{{Field: "b.name", Op: FilterOpEq, Value: "acme"}},
@@ -160,7 +160,7 @@ func TestReferenceFieldFilterScopesChildOnly(t *testing.T) {
 			return next(ctx, req)
 		}
 	}
-	idx := New(Config{Resources: refResources(), ES: be2, SearchMiddlewares: []SearchMiddleware{tenant}})
+	idx := mustNew(Config{Resources: refResources(), ES: be2, SearchMiddlewares: []SearchMiddleware{tenant}})
 
 	_, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c", Filters: []Filter{{Field: "b.name", Op: FilterOpEq, Value: "acme"}},
@@ -188,7 +188,7 @@ func TestReferenceFieldFilterThreadsScopeIntoChild(t *testing.T) {
 	be := &fakeBackend{childHits: map[string][]SearchHit{AliasName("b"): {{ID: "b1"}}}}
 	var childReq SearchRequest
 	be2 := &captureChild{fakeBackend: be, onChild: func(r SearchRequest) { childReq = r }}
-	idx := New(Config{Resources: scopedRefResources(), ES: be2})
+	idx := mustNew(Config{Resources: scopedRefResources(), ES: be2})
 
 	_, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c",
@@ -305,7 +305,7 @@ func TestReferenceResolveEmitsTrace(t *testing.T) {
 	be := &fakeBackend{childHits: map[string][]SearchHit{
 		AliasName("b"): {{ID: "b1"}, {ID: "b2"}},
 	}}
-	idx := New(Config{Resources: refResources(), ES: be})
+	idx := mustNew(Config{Resources: refResources(), ES: be})
 
 	ctx := WithLogger(context.Background(), logger)
 	_, err := idx.Search(ctx, SearchRequest{
@@ -338,7 +338,7 @@ func TestReferenceFilterRouting(t *testing.T) {
 	be := &fakeBackend{childHits: map[string][]SearchHit{AliasName("b"): {{ID: "b1"}}}}
 	var childReq SearchRequest
 	be2 := &captureChild{fakeBackend: be, onChild: func(r SearchRequest) { childReq = r }}
-	idx := New(Config{Resources: refResources(), ES: be2})
+	idx := mustNew(Config{Resources: refResources(), ES: be2})
 
 	_, err := idx.Search(context.Background(), SearchRequest{
 		Resource: "c",

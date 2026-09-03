@@ -148,11 +148,13 @@ func (t *TestSuite) Test_FederatedSearch_ResolvesReferenceRelationFilter() {
 				return next(ctx, req)
 			}
 		}
-		return core.New(core.Config{
+		idx, err := core.New(core.Config{
 			Resources:                  referenceScopeConfig,
 			ES:                         elasticsearch.New(t.esClient, true),
 			FederatedSearchMiddlewares: []core.FederatedSearchMiddleware{mw},
 		})
+		t.Require().NoError(err)
+		return idx
 	}
 
 	resp, err := scopeFor("op-A").FederatedSearch(t.T().Context(), core.FederatedSearchRequest{
@@ -191,11 +193,12 @@ func (t *TestSuite) Test_FederatedSearch_ResolvesReferenceRelationFilter() {
 				return next(ctx, req)
 			}
 		}
-		idx := core.New(core.Config{
+		idx, err := core.New(core.Config{
 			Resources:                  referenceScopeConfig,
 			ES:                         elasticsearch.New(t.esClient, true),
 			FederatedSearchMiddlewares: []core.FederatedSearchMiddleware{mw},
 		})
+		t.Require().NoError(err)
 		resp, err := idx.FederatedSearch(t.T().Context(), core.FederatedSearchRequest{
 			Query:     "fiber",
 			Resources: []string{"pop", "ap"},
@@ -238,11 +241,12 @@ func (t *TestSuite) Test_FederatedSearch_SecondaryScopeCorrelation() {
 			return next(ctx, req)
 		}
 	}
-	scopedIdx := core.New(core.Config{
+	scopedIdx, err := core.New(core.Config{
 		Resources:                  DefaultResourceConfig,
 		ES:                         elasticsearch.New(t.esClient, true),
 		FederatedSearchMiddlewares: []core.FederatedSearchMiddleware{scopeMW},
 	})
+	t.Require().NoError(err)
 
 	search := func(query, tenant string) core.FederatedSearchResponse {
 		ctx := context.WithValue(t.T().Context(), scopeCtxKey{}, tenant)

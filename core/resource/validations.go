@@ -5,11 +5,10 @@ import (
 	"strings"
 )
 
+// Validate checks every config in the set and their cross-references. An
+// empty set is valid — whether "no resources at all" is acceptable is the
+// caller's policy (the app's YAML loader rejects it; core.New permits it).
 func (c Configs) Validate() error {
-	if len(c) == 0 {
-		return fmt.Errorf("at least one resource config required")
-	}
-
 	// Verify that every individual config is valid
 	for i, rc := range c {
 		if err := rc.Validate(); err != nil {

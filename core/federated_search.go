@@ -143,11 +143,9 @@ func (idx *Indexer) federatedSearchBase(ctx context.Context, req FederatedSearch
 		// A global filter must be valid on every requested Type (spec:
 		// Request validation): unknown-anywhere or op-mismatch-anywhere is a
 		// loud InvalidArgument naming the offending Type.
-		if vc := r.ReadVersionConfig(); vc != nil {
-			if err := validateRequestFilters(vc, req.Filters); err != nil {
-				return FederatedSearchResponse{}, &InvalidArgumentError{
-					Msg: fmt.Sprintf("resource %q: %v", name, err)}
-			}
+		if err := validateRequestFilters(r.ReadVersionConfig(), req.Filters); err != nil {
+			return FederatedSearchResponse{}, &InvalidArgumentError{
+				Msg: fmt.Sprintf("resource %q: %v", name, err)}
 		}
 		for _, v := range r.SortedVersions() {
 			indexToResource[IndexName(name, v)] = name
@@ -262,20 +260,18 @@ func (idx *Indexer) buildIndexFilterGroups(ctx context.Context, resources []stri
 		group.Filters = resolved
 
 		// Multi-tenant Types enforce the caller scope on their nested block(s).
-		if vc := r.ReadVersionConfig(); vc != nil {
-			for _, b := range vc.ScopedNestedBlocks() {
-				if scope == "" {
-					group.MatchNothing = true
-					group.Filters = nil
-					break
-				}
-				group.Filters = append(group.Filters, Filter{
-					Field:      b.Name + "." + b.ScopeKey,
-					Op:         FilterOpEq,
-					Value:      scope,
-					NestedPath: b.Name,
-				})
+		for _, b := range r.ReadVersionConfig().ScopedNestedBlocks() {
+			if scope == "" {
+				group.MatchNothing = true
+				group.Filters = nil
+				break
 			}
+			group.Filters = append(group.Filters, Filter{
+				Field:      b.Name + "." + b.ScopeKey,
+				Op:         FilterOpEq,
+				Value:      scope,
+				NestedPath: b.Name,
+			})
 		}
 		groups = append(groups, group)
 	}

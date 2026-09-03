@@ -112,16 +112,19 @@ func main() {
 	}
 	defer temporalClient.Close()
 
-	idx := core.New(core.Config{
-		Plans:      plans,
-		Resources:  resources,
-		ES:         esClientImpl,
-		Store:      st,
-		Temporal:   temporalClient,
-		TaskQueue:  cfg.Temporal.TaskQueue,
-		PoolSize:   cfg.Pool.Size,
-		QueueSize:  cfg.Pool.QueueSize,
+	idx, err := core.New(core.Config{
+		Plans:     plans,
+		Resources: resources,
+		ES:        esClientImpl,
+		Store:     st,
+		Temporal:  temporalClient,
+		TaskQueue: cfg.Temporal.TaskQueue,
+		PoolSize:  cfg.Pool.Size,
+		QueueSize: cfg.Pool.QueueSize,
 	})
+	if err != nil {
+		log.Fatalf("construct indexer: %v", err)
+	}
 
 	w := idx.NewWorker()
 	if err := w.Start(); err != nil {

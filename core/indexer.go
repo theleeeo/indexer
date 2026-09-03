@@ -114,7 +114,18 @@ const (
 )
 
 // New creates a new Indexer with the given configuration.
-func New(cfg Config) *Indexer {
+//
+// New is the validation boundary for resource configs: it applies defaults
+// and validates the set, and returns an error rather than construct an
+// Indexer over an invalid one. All code past this point assumes the config
+// invariants hold (every resource has at least one version, ReadVersion
+// resolves, relations are consistent). The caller must not mutate the
+// resource configs after passing them in — that would bypass this boundary.
+func New(cfg Config) (*Indexer, error) {
+	if err := finalizeResourceConfigs(cfg.Resources); err != nil {
+		return nil, err
+	}
+
 	idx := &Indexer{
 		st:        cfg.Store,
 		es:        cfg.ES,
@@ -151,7 +162,20 @@ func New(cfg Config) *Indexer {
 
 	idx.searchChain = chain(idx.searchBase, mws)
 	idx.federatedSearchChain = chain(idx.federatedSearchBase, cfg.FederatedSearchMiddlewares)
-	return idx
+	return idx, nil
+}
+
+// finalizeResourceConfigs applies defaults and validates a resource config
+// set at the library boundary (New, SetPlans). An empty set is allowed: an
+// Indexer with nothing configured is legal, and rejecting it is app policy.
+func finalizeResourceConfigs(resources resource.Configs) error {
+	for _, rc := range resources {
+		rc.ApplyDefaults()
+	}
+	if err := resources.Validate(); err != nil {
+		return fmt.Errorf("invalid resource config: %w", err)
+	}
+	return nil
 }
 
 // Shutdown stops accepting inline work and waits for in-flight builds until
@@ -170,10 +194,17 @@ func (idx *Indexer) WaitForIdle(ctx context.Context) error {
 // SetPlans replaces the aggregation plans and resource configuration.
 // This is primarily used by the standalone application with YAML DSL;
 // library users typically set these once at construction via Config.
-func (idx *Indexer) SetPlans(plans map[string][]projection.Plan, resources resource.Configs) {
+//
+// Like New, SetPlans is a validation boundary: an invalid resource config
+// set is rejected without being applied, and the caller must not mutate the
+// configs after passing them in.
+func (idx *Indexer) SetPlans(plans map[string][]projection.Plan, resources resource.Configs) error {
+	if err := finalizeResourceConfigs(resources); err != nil {
+		return err
+	}
 	idx.plans = plans
 	idx.resources = resources
-
+	return nil
 }
 
 func (idx *Indexer) verifyResourceConfig(n Notification) error {

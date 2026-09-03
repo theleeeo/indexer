@@ -154,7 +154,7 @@ func newFederatedIndexerMW(backend SearchBackend, resources []string, mws ...Fed
 		cfg.ApplyDefaults()
 		cfgs = append(cfgs, cfg)
 	}
-	return New(Config{
+	return mustNew(Config{
 		Resources:                  cfgs,
 		ES:                         backend,
 		FederatedSearchMiddlewares: mws,
@@ -367,7 +367,7 @@ func newReferenceIndexerMW(backend SearchBackend, mws ...FederatedSearchMiddlewa
 	}
 	pop.ApplyDefaults()
 	ap.ApplyDefaults()
-	return New(Config{
+	return mustNew(Config{
 		Resources:                  resource.Configs{pop, ap},
 		ES:                         backend,
 		FederatedSearchMiddlewares: mws,

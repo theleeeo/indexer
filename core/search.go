@@ -24,10 +24,8 @@ func (idx *Indexer) Search(ctx context.Context, req SearchRequest) (SearchRespon
 	// exempt. An unknown resource falls through: searchBase reports it as
 	// ErrUnknownResource, keeping that error's precedence.
 	if cfg := idx.resources.Get(req.Resource); cfg != nil {
-		if vc := cfg.ReadVersionConfig(); vc != nil {
-			if err := validateRequestFilters(vc, req.Filters); err != nil {
-				return SearchResponse{}, err
-			}
+		if err := validateRequestFilters(cfg.ReadVersionConfig(), req.Filters); err != nil {
+			return SearchResponse{}, err
 		}
 	}
 	return idx.searchChain(ctx, req)

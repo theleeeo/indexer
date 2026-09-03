@@ -91,12 +91,12 @@ func newHotPathIndexer(st Store, poolSize, queueSize int) *Indexer {
 		Root: model.Resource{Type: "product", Id: "1"},
 		Doc:  map[string]any{"fields": map[string]any{"title": "t"}},
 	}
-	return New(Config{
+	return mustNew(Config{
 		Resources: testResources(),
 		Plans: map[string][]projection.Plan{
 			"product": {{Version: 1, Executer: &staticExecuter{docs: []projection.BuildDoc{doc}}}},
 		},
-		ES:         &fakeBackend{},
+		ES:        &fakeBackend{},
 		Store:     st,
 		PoolSize:  poolSize,
 		QueueSize: queueSize,

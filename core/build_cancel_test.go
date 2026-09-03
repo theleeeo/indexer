@@ -84,7 +84,7 @@ func TestRebuildAll_CancelledContext_AbortsDocLoop(t *testing.T) {
 		}
 	}
 
-	idx := New(Config{
+	idx := mustNew(Config{
 		Resources: testResources(),
 		Plans: map[string][]projection.Plan{
 			"product": {{Version: 1, Executer: &staticExecuter{docs: docs}}},

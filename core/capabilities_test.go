@@ -20,7 +20,7 @@ var (
 )
 
 func TestGetCapabilities_Empty(t *testing.T) {
-	idx := New(Config{})
+	idx := mustNew(Config{})
 	resp := idx.GetCapabilities()
 
 	if len(resp.Resources) != 0 {
@@ -42,7 +42,7 @@ func TestGetCapabilities_SingleResource(t *testing.T) {
 		},
 	}
 	cfg.ApplyDefaults()
-	idx := New(Config{
+	idx := mustNew(Config{
 		Resources: resource.Configs{cfg},
 	})
 
@@ -78,6 +78,7 @@ func TestGetCapabilities_WithRelations(t *testing.T) {
 				Relations: []resource.RelationConfig{
 					{
 						Resource: "customer",
+						Join:     resource.JoinConfig{Local: "customer_id", Foreign: "id"},
 						Fields: []resource.FieldConfig{
 							{Name: "name", Type: "text", Query: resource.QueryConfig{Search: resource.SearchTierPrimary}},
 							{Name: "tier", Query: resource.QueryConfig{Search: resource.SearchTierPrimary}},
@@ -87,9 +88,18 @@ func TestGetCapabilities_WithRelations(t *testing.T) {
 			},
 		},
 	}
-	cfg.ApplyDefaults()
-	idx := New(Config{
-		Resources: resource.Configs{cfg},
+	customer := &resource.Config{
+		Resource: "customer",
+		Versions: []resource.VersionConfig{{
+			Version: 1,
+			Fields: []resource.FieldConfig{
+				{Name: "name", Type: "text"},
+				{Name: "tier"},
+			},
+		}},
+	}
+	idx := mustNew(Config{
+		Resources: resource.Configs{cfg, customer},
 	})
 
 	resp := idx.GetCapabilities()
@@ -116,7 +126,7 @@ func TestGetCapabilities_SearchDisabled(t *testing.T) {
 		},
 	}
 	cfg.ApplyDefaults()
-	idx := New(Config{
+	idx := mustNew(Config{
 		Resources: resource.Configs{cfg},
 	})
 
@@ -130,7 +140,7 @@ func TestGetCapabilities_MultipleResources(t *testing.T) {
 	cfgB := &resource.Config{Resource: "b", Versions: []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "y", Type: "integer", Query: resource.QueryConfig{Search: resource.SearchTierPrimary}}}}}}
 	cfgA.ApplyDefaults()
 	cfgB.ApplyDefaults()
-	idx := New(Config{
+	idx := mustNew(Config{
 		Resources: resource.Configs{cfgA, cfgB},
 	})
 
@@ -163,9 +173,15 @@ func TestReferenceFieldsAreFilterOnly(t *testing.T) {
 			},
 		}},
 	}
-	cfg.ApplyDefaults()
-	idx := New(Config{
-		Resources: resource.Configs{cfg},
+	b := &resource.Config{
+		Resource: "b",
+		Versions: []resource.VersionConfig{{
+			Version: 1,
+			Fields:  []resource.FieldConfig{{Name: "name"}},
+		}},
+	}
+	idx := mustNew(Config{
+		Resources: resource.Configs{cfg, b},
 	})
 
 	caps := idx.GetCapabilities()
@@ -240,26 +256,12 @@ func TestGetCapabilities_ScopedNestedBlockFields(t *testing.T) {
 	require.NotContains(t, paths, "operator_data.fiber_operator_id")
 }
 
-// A config whose ReadVersion has no matching VersionConfig (library misuse
-// that skipped Validate, or an empty Versions list) must not panic — the
-// resource is still listed, with no read-version fields to advertise.
-func TestGetCapabilities_MissingReadVersion_NoPanic(t *testing.T) {
-	idx := New(Config{Resources: resource.Configs{{
-		Resource:    "a",
-		ReadVersion: 2,
-		Versions:    []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}}},
-	}}})
-	caps := idx.GetCapabilities()
-	require.Len(t, caps.Resources, 1)
-	require.Empty(t, caps.Resources[0].Fields)
-}
-
 // Every active schema version's capabilities are advertised (ascending), with
 // ReadVersion marking the active one, so clients — aisearch derives its filter
 // vocabulary from capabilities — can pre-adopt vNext fields before cutover.
 // The top-level Fields stay the read version's view for existing clients.
 func TestGetCapabilities_AllActiveVersions(t *testing.T) {
-	idx := New(Config{Resources: resource.Configs{{
+	idx := mustNew(Config{Resources: resource.Configs{{
 		Resource:    "a",
 		ReadVersion: 1,
 		Versions: []resource.VersionConfig{
@@ -285,19 +287,4 @@ func TestGetCapabilities_AllActiveVersions(t *testing.T) {
 
 	// Back-compat: top-level Fields mirror the read version.
 	require.Equal(t, rc.Versions[0].Fields, rc.Fields)
-}
-
-// Even when the read version is missing its VersionConfig, the versions that
-// do exist are still advertised.
-func TestGetCapabilities_MissingReadVersion_VersionsStillListed(t *testing.T) {
-	idx := New(Config{Resources: resource.Configs{{
-		Resource:    "a",
-		ReadVersion: 2,
-		Versions:    []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}}},
-	}}})
-	caps := idx.GetCapabilities()
-	rc := caps.Resources[0]
-	require.Empty(t, rc.Fields)
-	require.Len(t, rc.Versions, 1)
-	require.Equal(t, 1, rc.Versions[0].Version)
 }

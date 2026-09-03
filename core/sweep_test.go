@@ -79,7 +79,7 @@ func TestSweepStale_ReplaysStoredMetadataPerEntry(t *testing.T) {
 		},
 	}
 	exec := &requestExecuter{}
-	idx := New(Config{
+	idx := mustNew(Config{
 		Resources: testResources(),
 		Plans:     map[string][]projection.Plan{"product": {{Version: 1, Executer: exec}}},
 		ES:        &fakeBackend{},

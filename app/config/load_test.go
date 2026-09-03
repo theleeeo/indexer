@@ -236,3 +236,11 @@ resources:
 	_, err := ParseConfig([]byte(yaml))
 	require.ErrorContains(t, err, "both")
 }
+
+// TestParseConfig_NoResourcesRejected: an indexer app with zero resources is
+// a deployment mistake — the loader refuses it (the core library itself
+// permits an empty set).
+func TestParseConfig_NoResourcesRejected(t *testing.T) {
+	_, err := ParseConfig([]byte("resources: []"))
+	require.ErrorContains(t, err, "at least one resource")
+}

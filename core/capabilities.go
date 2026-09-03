@@ -23,11 +23,11 @@ func (idx *Indexer) GetCapabilities() CapabilitiesResponse {
 				Fields:  versionFieldCapabilities(vc),
 			})
 			if v == rc.ReadVersion {
+				// Guaranteed to hit for one version: New validated that
+				// ReadVersion is in Versions.
 				cap.Fields = cap.Versions[len(cap.Versions)-1].Fields
 			}
 		}
-		// A ReadVersion with no matching VersionConfig (validation rejects
-		// this; guard against library misuse) leaves Fields empty.
 
 		resp.Resources = append(resp.Resources, cap)
 	}

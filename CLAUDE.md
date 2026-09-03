@@ -103,6 +103,7 @@ Both `Store` and `SearchBackend` have exactly one implementation each; the inter
 - **Cross-version existence agreement**: a build executes every Schema Version's plan before writing anything, and only unanimity decides existence — all plans nil deletes everywhere, disagreement fails the build and leaves the stale mark for retry. One version's nil must never delete another version's freshly written document. Relations and ADR 0006 Parents are unioned across all plans, never taken from the last one.
 - **All-of-Type Rebuild path**: `BuildRequest.ResourceID == ""` triggers `ListResources` pagination — the Rebuild path that walks every Resource of a Type.
 - **Plans encapsulate data fetching**: `core.Indexer` only executes Plans; it never calls `source.Provider` directly. Library users supply their own Plans.
+- **Resource configs are validated at the boundary**: `core.New` and `SetPlans` apply defaults and validate the resource config set, refusing an invalid one (an empty set is legal — rejecting it is app policy, enforced by the YAML loader). Everything past that boundary *assumes* the invariants hold — every resource has ≥1 version, `ReadVersionConfig()` never returns nil, relations are consistent — so do not add defensive nil guards for them. Callers must not mutate the configs after handing them over.
 
 ### Configuration
 

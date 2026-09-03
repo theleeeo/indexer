@@ -38,7 +38,7 @@ func TestRebuild_StartsOneWorkflowPerSelector(t *testing.T) {
 	mockClient.On("ExecuteWorkflow", mock.Anything, mock.Anything, "RebuildWalk", mock.Anything).
 		Return(mockRun, nil).Once()
 
-	idx := New(Config{Resources: testResources(), Temporal: mockClient})
+	idx := mustNew(Config{Resources: testResources(), Temporal: mockClient})
 
 	ids, err := idx.Rebuild(context.Background(), []ResourceSelector{{ResourceType: "product"}})
 	require.NoError(t, err)
@@ -48,7 +48,7 @@ func TestRebuild_StartsOneWorkflowPerSelector(t *testing.T) {
 
 func TestRebuild_ValidationFailure_StartsNoWorkflow(t *testing.T) {
 	mockClient := &mocks.Client{} // no expectations: any ExecuteWorkflow call fails the test
-	idx := New(Config{Resources: testResources(), Temporal: mockClient})
+	idx := mustNew(Config{Resources: testResources(), Temporal: mockClient})
 
 	_, err := idx.Rebuild(context.Background(), nil)
 	invalidArg, ok := errors.AsType[*InvalidArgumentError](err)
@@ -58,7 +58,7 @@ func TestRebuild_ValidationFailure_StartsNoWorkflow(t *testing.T) {
 }
 
 func TestRebuild_EmptySelectors(t *testing.T) {
-	idx := New(Config{Resources: testResources()})
+	idx := mustNew(Config{Resources: testResources()})
 
 	err := idx.RebuildNow(context.Background(), nil)
 
@@ -72,7 +72,7 @@ func TestRebuild_EmptySelectors(t *testing.T) {
 }
 
 func TestRebuild_UnknownResourceType(t *testing.T) {
-	idx := New(Config{Resources: testResources()})
+	idx := mustNew(Config{Resources: testResources()})
 
 	err := idx.RebuildNow(context.Background(), []ResourceSelector{
 		{ResourceType: "nonexistent"},
@@ -83,7 +83,7 @@ func TestRebuild_UnknownResourceType(t *testing.T) {
 }
 
 func TestRebuild_InvalidVersion(t *testing.T) {
-	idx := New(Config{Resources: testResources()})
+	idx := mustNew(Config{Resources: testResources()})
 
 	err := idx.RebuildNow(context.Background(), []ResourceSelector{
 		{ResourceType: "product", Versions: []int{99}},
@@ -108,7 +108,7 @@ func TestRebuild_MultiVersionValidation(t *testing.T) {
 			ReadVersion: 1,
 		},
 	}
-	idx := New(Config{Resources: cfgs})
+	idx := mustNew(Config{Resources: cfgs})
 
 	// Version 3 does not exist.
 	err := idx.RebuildNow(context.Background(), []ResourceSelector{
@@ -143,7 +143,7 @@ func TestRebuild_MultipleSelectorsValidation(t *testing.T) {
 	for _, c := range cfgs {
 		c.ApplyDefaults()
 	}
-	idx := New(Config{Resources: cfgs})
+	idx := mustNew(Config{Resources: cfgs})
 
 	// First selector valid, second invalid.
 	err := idx.RebuildNow(context.Background(), []ResourceSelector{

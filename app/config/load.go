@@ -43,6 +43,9 @@ func ParseConfig(data []byte) (resource.Configs, error) {
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return nil, fmt.Errorf("unmarshal yaml: %w", err)
 	}
+	if len(raw.Resources) == 0 {
+		return nil, fmt.Errorf("at least one resource required")
+	}
 
 	configMap := make(map[string]*resource.Config)
 	var configOrder []string
