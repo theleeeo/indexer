@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/theleeeo/laika/aggregation"
+	"github.com/theleeeo/laika/projection"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/testsuite"
@@ -46,6 +48,75 @@ func TestRebuildWalkWorkflow_RunsSelectorActivity(t *testing.T) {
 	require.True(t, env.IsWorkflowCompleted())
 	require.NoError(t, env.GetWorkflowError())
 	require.Equal(t, sel, got)
+}
+
+func TestRunRebuild_ResumesFromHeartbeatCursor(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{}
+	v1 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	v2 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: v1},
+		{Version: 2, Executer: v2},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 0)
+
+	var ts testsuite.WorkflowTestSuite
+	env := ts.NewTestActivityEnvironment()
+	a := &temporalActivities{idx: idx}
+	env.RegisterActivityWithOptions(a.RunRebuild, activity.RegisterOptions{Name: rebuildActivityName})
+	env.SetHeartbeatDetails(RebuildCursor{PlanVersion: 2, PageToken: "p3"})
+
+	// A version-targeted backfill: the single-active-plan shape that resumes.
+	_, err := env.ExecuteActivity(rebuildActivityName, ResourceSelector{ResourceType: "product", Versions: []int{2}})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(v1.requests()) != 0 {
+		t.Fatal("the unselected version's plan must not run")
+	}
+	reqs := v2.requests()
+	if len(reqs) != 1 || reqs[0].PageToken != "p3" {
+		t.Fatalf("a retried activity must resume its walk from the heartbeat cursor's page token, got %+v", reqs)
+	}
+}
+
+func TestRunRebuild_FreshAttemptWalksFromScratch(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{}
+	v1 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	v2 := &cursorPagingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+		{Items: []projection.BuildDoc{productDoc("1")}},
+	}}
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: v1},
+		{Version: 2, Executer: v2},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 0)
+
+	var ts testsuite.WorkflowTestSuite
+	env := ts.NewTestActivityEnvironment()
+	a := &temporalActivities{idx: idx}
+	env.RegisterActivityWithOptions(a.RunRebuild, activity.RegisterOptions{Name: rebuildActivityName})
+
+	_, err := env.ExecuteActivity(rebuildActivityName, ResourceSelector{ResourceType: "product"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(v1.requests()) != 1 || v1.requests()[0].PageToken != "" {
+		t.Fatalf("a fresh attempt must walk every plan from the start, v1 saw %+v", v1.requests())
+	}
+	if len(v2.requests()) != 1 || v2.requests()[0].PageToken != "" {
+		t.Fatalf("a fresh attempt must walk every plan from the start, v2 saw %+v", v2.requests())
+	}
 }
 
 // fakeScheduleCreator captures EnsureSweepSchedule's create-if-absent behavior.

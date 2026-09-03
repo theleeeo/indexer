@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	enumspb "go.temporal.io/api/enums/v1"
@@ -44,9 +45,24 @@ func (a *temporalActivities) SweepStale(ctx context.Context, p SweepParams) (int
 }
 
 // RunRebuild executes one rebuild selector synchronously, heartbeating so a
-// dead worker is detected and the activity retried on another instance.
-// Restart-from-scratch is correct: rebuilds are idempotent.
+// dead worker is detected and the activity retried on another instance. The
+// walk's cursor rides the heartbeat details: a retried attempt resumes where
+// the dead one durably stopped instead of restarting from scratch (ADR 0011).
 func (a *temporalActivities) RunRebuild(ctx context.Context, sel ResourceSelector) error {
+	var start *RebuildCursor
+	if activity.HasHeartbeatDetails(ctx) {
+		var c RebuildCursor
+		if err := activity.GetHeartbeatDetails(ctx, &c); err != nil {
+			activity.GetLogger(ctx).Warn("unreadable rebuild heartbeat cursor; restarting walk from scratch",
+				"error", err)
+		} else {
+			start = &c
+		}
+	}
+
+	var mu sync.Mutex
+	var latest *RebuildCursor
+
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
@@ -57,11 +73,27 @@ func (a *temporalActivities) RunRebuild(ctx context.Context, sel ResourceSelecto
 			case <-done:
 				return
 			case <-t.C:
-				activity.RecordHeartbeat(ctx)
+				mu.Lock()
+				cur := latest
+				mu.Unlock()
+				// Heartbeat details replace each other wholesale, so a bare
+				// liveness beat after a cursor exists would erase it — always
+				// re-record the latest cursor once there is one.
+				if cur != nil {
+					activity.RecordHeartbeat(ctx, *cur)
+				} else {
+					activity.RecordHeartbeat(ctx)
+				}
 			}
 		}
 	}()
-	return a.idx.RebuildNow(ctx, []ResourceSelector{sel})
+
+	return a.idx.RebuildNowResumable(ctx, sel, start, func(c RebuildCursor) {
+		mu.Lock()
+		latest = &c
+		mu.Unlock()
+		activity.RecordHeartbeat(ctx, c)
+	})
 }
 
 // StaleSweepWorkflow drains the stale backlog in batches until a pass returns
