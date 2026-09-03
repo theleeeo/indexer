@@ -283,3 +283,49 @@ func Test_MapPlan_ChangesElementType(t *testing.T) {
 	require.Equal(t, 1, len(results))
 	require.Equal(t, []int{1, 2}, results[0].Items)
 }
+
+// pagedTokenFetch serves two pages: ["a","b"] with token "t2", then ["c"]
+// with no token — the shape of a paginated ListResources walk.
+func pagedTokenFetch(_ context.Context, params FetchParameters[string]) (FetchResult[string], error) {
+	if params.NextPageToken == nil {
+		return FetchResult[string]{Items: []string{"a", "b"}, NextPageToken: "t2"}, nil
+	}
+	return FetchResult[string]{Items: []string{"c"}}, nil
+}
+
+func Test_RootPlan_PageTokensRideEachPage(t *testing.T) {
+	plan := Root(pagedTokenFetch)
+
+	var tokens []any
+	for res := range plan.Execute(context.Background(), "req") {
+		if res.Err != nil {
+			t.Fatal(res.Err)
+		}
+		tokens = append(tokens, res.NextPageToken)
+	}
+
+	if len(tokens) != 2 || tokens[0] != "t2" || tokens[1] != nil {
+		t.Fatalf("each page must carry the token that fetches the next one (nil on the last), got %v", tokens)
+	}
+}
+
+func Test_SubAndMapStages_ForwardPageTokens(t *testing.T) {
+	plan := Root(pagedTokenFetch).
+		Sub(
+			SubFetcherFunc[string, string](func(context.Context, string) (string, error) { return "x", nil }),
+			func(p, _ string) string { return p },
+		).
+		Map(func(s string) string { return s })
+
+	var tokens []any
+	for res := range plan.Execute(context.Background(), "req") {
+		if res.Err != nil {
+			t.Fatal(res.Err)
+		}
+		tokens = append(tokens, res.NextPageToken)
+	}
+
+	if len(tokens) != 2 || tokens[0] != "t2" || tokens[1] != nil {
+		t.Fatalf("stages that map pages 1:1 must forward the page token unchanged, got %v", tokens)
+	}
+}

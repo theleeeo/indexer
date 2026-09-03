@@ -17,6 +17,11 @@ type FetchResult[P any] struct {
 type ExecutionResult[P any] struct {
 	Items []P
 	Err   error
+	// NextPageToken is the token that fetches the page after this one, as the
+	// root fetch reported it; nil on the final page. Stages map pages 1:1 and
+	// forward it unchanged, so a consumer can checkpoint a paginated walk at
+	// page granularity (core's resumable rebuild cursor).
+	NextPageToken any
 }
 
 // Executer is the contract a plan is consumed through: a caller that only runs
@@ -127,7 +132,7 @@ func (s rootStage[Req, P]) Execute(ctx context.Context, params Req) <-chan Execu
 				return
 			}
 
-			if !send(ctx, ch, ExecutionResult[P]{Items: result.Items}) {
+			if !send(ctx, ch, ExecutionResult[P]{Items: result.Items, NextPageToken: result.NextPageToken}) {
 				return
 			}
 
@@ -173,7 +178,7 @@ func (s subStage[Req, P, F, Q]) Execute(ctx context.Context, params Req) <-chan 
 				rowResult[i] = s.build(parentItem, fetched)
 			}
 
-			if !send(ctx, ch, ExecutionResult[Q]{Items: rowResult}) {
+			if !send(ctx, ch, ExecutionResult[Q]{Items: rowResult, NextPageToken: parentItems.NextPageToken}) {
 				return
 			}
 		}
@@ -201,7 +206,7 @@ func (s mapStage[Req, P, Q]) Execute(ctx context.Context, params Req) <-chan Exe
 			for i := range res.Items {
 				items[i] = s.f(res.Items[i])
 			}
-			if !send(ctx, ch, ExecutionResult[Q]{Items: items}) {
+			if !send(ctx, ch, ExecutionResult[Q]{Items: items, NextPageToken: res.NextPageToken}) {
 				return
 			}
 		}
