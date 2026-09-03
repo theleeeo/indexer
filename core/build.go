@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -116,7 +117,15 @@ func (idx *Indexer) buildOne(ctx context.Context, plans []projection.Plan, resou
 
 		indexName := IndexName(resourceType, plan.Version)
 		if err := idx.es.Upsert(ctx, indexName, resourceID, result.Doc, occVersion); err != nil {
-			return fmt.Errorf("upsert %s/%s to %s: %w", resourceType, resourceID, indexName, err)
+			// An OCC loss is benign: a concurrent build with a newer Build
+			// Sequence already wrote fresher data to this index. The
+			// seq-guarded ClearStale keeps recovery correct if the winner
+			// served a different change.
+			if !errors.Is(err, ErrVersionConflict) {
+				return fmt.Errorf("upsert %s/%s to %s: %w", resourceType, resourceID, indexName, err)
+			}
+			slog.Debug("build superseded by newer write",
+				slog.String("type", resourceType), slog.String("id", resourceID), slog.String("index", indexName))
 		}
 	}
 
@@ -174,139 +183,121 @@ func (idx *Indexer) rebuild(ctx context.Context, params RebuildArgs) error {
 func (idx *Indexer) rebuildByIDs(ctx context.Context, params RebuildArgs) error {
 	logger := slog.With(slog.String("type", params.ResourceType))
 
-	plans := idx.plans[params.ResourceType]
-	if len(plans) == 0 {
-		return fmt.Errorf("no plans for resource type %q", params.ResourceType)
+	plans, full, err := idx.plansForRebuild(params)
+	if err != nil {
+		return err
+	}
+	expected := 0
+	for _, p := range plans {
+		if p.Executer != nil {
+			expected++
+		}
 	}
 
-	resourceRelations := make(map[string][]model.VersionedResource)
-	staleSeqs := make(map[string]int64)
-	var items []BulkItem
-	var failed int
+	fl := newRebuildFlusher(idx, params.ResourceType, params.Metadata)
 
 	for _, id := range params.ResourceIDs {
 		if ctx.Err() != nil {
+			fl.salvage(ctx)
 			return ctx.Err()
 		}
 
 		root := model.Resource{Type: params.ResourceType, Id: id}
 
-		if err := idx.st.RemoveResource(ctx, root); err != nil {
-			logger.Warn("failed to remove relations", slog.String("id", id), slog.String("error", err.Error()))
-			failed++
-			continue
+		if full {
+			// ADR 0002 wipe-and-replace: the Plans, not stored history, are
+			// the source of truth for the resource's edges. Only a full
+			// rebuild may wipe — a targeted one merges, because the
+			// non-targeted versions' plans do not run here and wiping would
+			// drop the edges only they discover.
+			if err := idx.st.RemoveResource(ctx, root); err != nil {
+				logger.Warn("failed to remove relations", slog.String("id", id), slog.String("error", err.Error()))
+				fl.fail(ctx, id)
+				continue
+			}
 		}
 
 		occVersion, staleSeq, err := idx.st.BeginBuild(ctx, root)
 		if err != nil {
 			logger.Warn("failed to begin build", slog.String("id", id), slog.String("error", err.Error()))
-			failed++
+			fl.fail(ctx, id)
 			continue
 		}
-		staleSeqs[id] = staleSeq
+		fl.begin(id, occVersion, staleSeq, expected)
 
-		skipRelations := false
 		for _, plan := range plans {
 			if plan.Executer == nil {
 				continue
 			}
-			ch := plan.Execute(ctx, projection.BuildRequest{
+			result, planErr := executePlan(ctx, plan, projection.BuildRequest{
 				ResourceType: params.ResourceType,
 				ResourceID:   id,
 				Metadata:     params.Metadata,
 			})
-
-			var result projection.BuildDoc
-			var planErr error
-			for r := range ch {
-				if r.Err != nil {
-					planErr = r.Err
-					break
-				}
-				if len(r.Items) > 0 {
-					result = r.Items[0]
-					break
-				}
-			}
 			if planErr != nil {
 				logger.Warn("plan execution failed", slog.String("id", id), slog.Int("plan_version", plan.Version), slog.String("error", planErr.Error()))
-				failed++
-				skipRelations = true
+				fl.fail(ctx, id)
 				break
 			}
 
 			// Source returned no data — delete from all versions and stop processing this ID.
 			if result.Doc == nil {
+				fl.discard(id)
 				if err := idx.handleDelete(ctx, RebuildPayload{
 					ResourceType: params.ResourceType,
 					ResourceID:   id,
 				}); err != nil {
 					logger.Warn("delete missing resource", slog.String("id", id), slog.String("error", err.Error()))
-					failed++
+					fl.fail(ctx, id)
 				}
-				skipRelations = true
 				break
 			}
 
-			resourceRelations[id] = append(resourceRelations[id], result.Relations...)
-			items = append(items, BulkItem{
+			if err := fl.add(ctx, BulkItem{
 				Index:   IndexName(params.ResourceType, plan.Version),
 				ID:      id,
 				Doc:     result.Doc,
 				Version: occVersion,
-			})
-		}
-
-		if skipRelations {
-			delete(resourceRelations, id)
-		}
-	}
-
-	if len(items) > 0 {
-		if err := idx.es.BulkUpsert(ctx, items); err != nil {
-			return fmt.Errorf("bulk upsert: %w", err)
+			}, result.Relations); err != nil {
+				fl.salvage(ctx)
+				return err
+			}
 		}
 	}
 
-	for id, rels := range resourceRelations {
-		plain := make([]model.Resource, len(rels))
-		for i, r := range rels {
-			plain[i] = r.Resource
-		}
-		if err := idx.st.AddChildResources(ctx, model.Resource{Type: params.ResourceType, Id: id}, plain); err != nil {
-			logger.Warn("failed to persist relations", slog.String("id", id), slog.String("error", err.Error()))
-			failed++
-			continue
-		}
-		if err := idx.st.ClearStale(ctx, model.Resource{Type: params.ResourceType, Id: id}, staleSeqs[id]); err != nil {
-			logger.Warn("clear stale failed", slog.String("id", id), slog.String("error", err.Error()))
-		}
+	if err := fl.finish(ctx); err != nil {
+		fl.salvage(ctx)
+		return err
 	}
 
-	logger.Info("targeted rebuild complete", slog.Int("total", len(params.ResourceIDs)), slog.Int("failed", failed))
-	return nil
+	logger.Info("targeted rebuild complete", slog.Int("total", len(params.ResourceIDs)), slog.Int("failed", fl.failed))
+	return fl.errorIfFailed()
 }
 
 func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs) error {
 	logger := slog.With(slog.String("type", params.ResourceType))
 
-	plans := idx.plans[params.ResourceType]
-	if len(plans) == 0 {
-		return fmt.Errorf("no plans for resource type %q", params.ResourceType)
+	plans, full, err := idx.plansForRebuild(params)
+	if err != nil {
+		return err
 	}
 
-	resourceRelations := make(map[string][]model.VersionedResource)
-	cleaned := make(map[string]bool)
-	occVersions := make(map[string]int64)
-	staleSeqs := make(map[string]int64)
+	fl := newRebuildFlusher(idx, params.ResourceType, params.Metadata)
 
-	var items []BulkItem
-	var failed int
-
-	for _, plan := range plans {
+	for planIdx, plan := range plans {
 		if plan.Executer == nil {
 			continue
 		}
+		// Documents a resource first seen in this walk still expects: this
+		// plan plus the active plans after it — earlier walks can no longer
+		// emit it.
+		expected := 0
+		for _, p := range plans[planIdx:] {
+			if p.Executer != nil {
+				expected++
+			}
+		}
+
 		ch := plan.Execute(ctx, projection.BuildRequest{
 			ResourceType: params.ResourceType,
 			ResourceID:   "",
@@ -315,67 +306,80 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs) error {
 
 		for page := range ch {
 			if page.Err != nil {
+				fl.salvage(ctx)
 				return fmt.Errorf("plan execution for %s v%d: %w", params.ResourceType, plan.Version, page.Err)
 			}
 
 			for _, doc := range page.Items {
 				if err := ctx.Err(); err != nil {
+					fl.salvage(ctx)
 					return err
 				}
 
 				id := doc.Root.Id
+				if id == "" {
+					logger.Warn("plan emitted a document without a root id; skipping",
+						slog.Int("plan_version", plan.Version))
+					continue
+				}
 
-				if !cleaned[id] {
-					if err := idx.st.RemoveResource(ctx, doc.Root); err != nil {
-						logger.Warn("failed to remove relations", slog.String("id", id), slog.String("error", err.Error()))
-						failed++
-						continue
+				// Source listed the resource but returned no data — hand it
+				// to the delete path, which removes every version's document.
+				if doc.Doc == nil {
+					fl.discard(id)
+					if err := idx.handleDelete(ctx, RebuildPayload{
+						ResourceType: params.ResourceType,
+						ResourceID:   id,
+					}); err != nil {
+						logger.Warn("delete missing resource", slog.String("id", id), slog.String("error", err.Error()))
+						fl.fail(ctx, id)
+					}
+					continue
+				}
+
+				if !fl.tracked(id) {
+					if full {
+						// ADR 0002 wipe-and-replace; a targeted rebuild
+						// merges instead (see rebuildByIDs).
+						if err := idx.st.RemoveResource(ctx, doc.Root); err != nil {
+							logger.Warn("failed to remove relations", slog.String("id", id), slog.String("error", err.Error()))
+							fl.fail(ctx, id)
+							continue
+						}
 					}
 
 					occVersion, staleSeq, err := idx.st.BeginBuild(ctx, doc.Root)
 					if err != nil {
 						logger.Warn("failed to begin build", slog.String("id", id), slog.String("error", err.Error()))
-						failed++
+						fl.fail(ctx, id)
 						continue
 					}
-
-					occVersions[id] = occVersion
-					staleSeqs[id] = staleSeq
-					cleaned[id] = true
+					fl.begin(id, occVersion, staleSeq, expected)
 				}
 
-				resourceRelations[id] = append(resourceRelations[id], doc.Relations...)
-				occVersion := occVersions[id]
+				occVersion, ok := fl.occ(id)
+				if !ok {
+					continue
+				}
 
-				items = append(items, BulkItem{
+				if err := fl.add(ctx, BulkItem{
 					Index:   IndexName(params.ResourceType, plan.Version),
 					ID:      id,
 					Doc:     doc.Doc,
 					Version: occVersion,
-				})
+				}, doc.Relations); err != nil {
+					fl.salvage(ctx)
+					return err
+				}
 			}
 		}
 	}
 
-	if err := idx.es.BulkUpsert(ctx, items); err != nil {
-		return fmt.Errorf("bulk upsert: %w", err)
+	if err := fl.finish(ctx); err != nil {
+		fl.salvage(ctx)
+		return err
 	}
 
-	for id, rels := range resourceRelations {
-		plain := make([]model.Resource, len(rels))
-		for i, r := range rels {
-			plain[i] = r.Resource
-		}
-		if err := idx.st.AddChildResources(ctx, model.Resource{Type: params.ResourceType, Id: id}, plain); err != nil {
-			logger.Warn("failed to persist relations", slog.String("id", id), slog.String("error", err.Error()))
-			failed++
-			continue
-		}
-		if err := idx.st.ClearStale(ctx, model.Resource{Type: params.ResourceType, Id: id}, staleSeqs[id]); err != nil {
-			logger.Warn("clear stale failed", slog.String("id", id), slog.String("error", err.Error()))
-		}
-	}
-
-	logger.Info("build complete", slog.Int("total", len(cleaned)), slog.Int("failed", failed))
-	return nil
+	logger.Info("rebuild complete", slog.Int("failed", fl.failed))
+	return fl.errorIfFailed()
 }

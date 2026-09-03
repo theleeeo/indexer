@@ -2,6 +2,7 @@ package elasticsearch
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -110,7 +111,7 @@ func TestBulkUpsert_UsesExternalVersionPerItem(t *testing.T) {
 	}
 
 	c := New(esClient, false)
-	err = c.BulkUpsert(context.Background(), []core.BulkItem{{
+	failures, err := c.BulkUpsert(context.Background(), []core.BulkItem{{
 		Index:   "idx",
 		ID:      "1",
 		Doc:     map[string]any{"id": "1"},
@@ -118,5 +119,111 @@ func TestBulkUpsert_UsesExternalVersionPerItem(t *testing.T) {
 	}})
 	if err != nil {
 		t.Fatalf("bulk upsert failed: %v", err)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("expected no failures, got %v", failures)
+	}
+}
+
+func TestUpsert_VersionConflict_ReturnsSentinel(t *testing.T) {
+	rt := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		headers := make(http.Header)
+		headers.Set("X-Elastic-Product", "Elasticsearch")
+		return &http.Response{
+			StatusCode: http.StatusConflict,
+			Body: io.NopCloser(strings.NewReader(
+				`{"error":{"type":"version_conflict_engine_exception","reason":"[1]: version conflict"},"status":409}`)),
+			Header: headers,
+		}, nil
+	})
+	esClient, err := esv8.NewClient(esv8.Config{
+		Addresses: []string{"http://example.invalid"},
+		Transport: rt,
+	})
+	if err != nil {
+		t.Fatalf("new es client: %v", err)
+	}
+
+	c := New(esClient, false)
+	err = c.Upsert(context.Background(), "idx", "1", map[string]any{"id": "1"}, 3)
+	if !errors.Is(err, core.ErrVersionConflict) {
+		t.Fatalf("a 409 must surface as core.ErrVersionConflict so callers can treat OCC losses as benign, got: %v", err)
+	}
+}
+
+// bulkClient builds a Client whose transport serves the given bulk response
+// body with HTTP 200 — the status ES uses even when individual items fail.
+func bulkClient(t *testing.T, responseBody string) *Client {
+	t.Helper()
+	rt := roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		headers := make(http.Header)
+		headers.Set("X-Elastic-Product", "Elasticsearch")
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body:       io.NopCloser(strings.NewReader(responseBody)),
+			Header:     headers,
+		}, nil
+	})
+	esClient, err := esv8.NewClient(esv8.Config{
+		Addresses: []string{"http://example.invalid"},
+		Transport: rt,
+	})
+	if err != nil {
+		t.Fatalf("new es client: %v", err)
+	}
+	return New(esClient, false)
+}
+
+func TestBulkUpsert_VersionConflictIsNotAFailure(t *testing.T) {
+	c := bulkClient(t, `{
+		"took": 1,
+		"errors": true,
+		"items": [
+			{"index": {"_index": "a_search_v1", "_id": "1", "status": 409,
+				"error": {"type": "version_conflict_engine_exception",
+					"reason": "[1]: version conflict, current version [5] is higher or equal to the one provided [3]"}}},
+			{"index": {"_index": "a_search_v2", "_id": "1", "status": 200, "result": "updated"}}
+		]
+	}`)
+
+	failures, err := c.BulkUpsert(context.Background(), []core.BulkItem{
+		{Index: "a_search_v1", ID: "1", Doc: map[string]any{"title": "t"}, Version: 3},
+		{Index: "a_search_v2", ID: "1", Doc: map[string]any{"title": "t"}, Version: 3},
+	})
+	if err != nil {
+		t.Fatalf("an OCC loss must not be a request-level error: %v", err)
+	}
+	if len(failures) != 0 {
+		t.Fatalf("an OCC loss means a newer build already wrote fresher data — not a failure: %v", failures)
+	}
+}
+
+func TestBulkUpsert_ReturnsPerItemFailures(t *testing.T) {
+	c := bulkClient(t, `{
+		"took": 1,
+		"errors": true,
+		"items": [
+			{"index": {"_index": "a_search_v1", "_id": "1", "status": 201, "result": "created"}},
+			{"index": {"_index": "a_search_v2", "_id": "1", "status": 400,
+				"error": {"type": "document_parsing_exception", "reason": "failed to parse field [price]"}}}
+		]
+	}`)
+
+	failures, err := c.BulkUpsert(context.Background(), []core.BulkItem{
+		{Index: "a_search_v1", ID: "1", Doc: map[string]any{"title": "t"}, Version: 3},
+		{Index: "a_search_v2", ID: "1", Doc: map[string]any{"price": "not-a-number"}, Version: 3},
+	})
+	if err != nil {
+		t.Fatalf("item-level rejections must not be a request-level error: %v", err)
+	}
+	if len(failures) != 1 {
+		t.Fatalf("expected exactly the rejected item as failure, got %v", failures)
+	}
+	f := failures[0]
+	if f.Index != "a_search_v2" || f.ID != "1" || f.Status != 400 {
+		t.Fatalf("failure must identify the rejected doc: %+v", f)
+	}
+	if !strings.Contains(f.Reason, "failed to parse field") {
+		t.Fatalf("failure must carry the ES reason: %+v", f)
 	}
 }

@@ -47,6 +47,11 @@ type Config struct {
 	// leaving the resource stale for the sweep. Default 10 × PoolSize.
 	QueueSize int
 
+	// RebuildChunkSize bounds the number of documents per bulk write during
+	// rebuilds, so an all-of-type walk streams to Elasticsearch in bounded
+	// requests instead of one unbounded payload. Default 500.
+	RebuildChunkSize int
+
 	// SearchMiddlewares wrap the search path. They run outermost-first in
 	// registration order: []{A, B} executes A → B → the Indexer's own
 	// validate/normalize/backend call. A middleware may authorize the request,
@@ -85,6 +90,8 @@ type Indexer struct {
 
 	pool *buildPool
 
+	rebuildChunkSize int
+
 	temporal  client.Client
 	taskQueue string
 
@@ -99,10 +106,12 @@ type Indexer struct {
 	// registered FederatedSearchMiddlewares wrapped around federatedSearchBase.
 	// When no middlewares are registered it equals federatedSearchBase.
 	federatedSearchChain FederatedSearchHandler
-
 }
 
-const defaultPoolSize = 10
+const (
+	defaultPoolSize         = 10
+	defaultRebuildChunkSize = 500
+)
 
 // New creates a new Indexer with the given configuration.
 func New(cfg Config) *Indexer {
@@ -122,6 +131,11 @@ func New(cfg Config) *Indexer {
 		queueSize = poolSize * 10
 	}
 	idx.pool = newBuildPool(poolSize, queueSize)
+
+	idx.rebuildChunkSize = cfg.RebuildChunkSize
+	if idx.rebuildChunkSize <= 0 {
+		idx.rebuildChunkSize = defaultRebuildChunkSize
+	}
 
 	taskQueue := cfg.TaskQueue
 	if taskQueue == "" {

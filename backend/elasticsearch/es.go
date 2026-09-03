@@ -75,6 +75,9 @@ func (c *Client) Upsert(ctx context.Context, indexAlias, docID string, doc any, 
 	}
 	defer res.Body.Close()
 
+	if res.StatusCode == 409 {
+		return fmt.Errorf("upsert %s/%s at version %d: %w", indexAlias, docID, version, core.ErrVersionConflict)
+	}
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
 		return fmt.Errorf("es error: %s %s", res.Status(), string(b))
@@ -110,9 +113,9 @@ func (c *Client) Delete(ctx context.Context, indexAlias, docID string) error {
 	return nil
 }
 
-func (c *Client) BulkUpsert(ctx context.Context, items []core.BulkItem) error {
+func (c *Client) BulkUpsert(ctx context.Context, items []core.BulkItem) ([]core.BulkFailure, error) {
 	if len(items) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	var buf bytes.Buffer
@@ -120,7 +123,7 @@ func (c *Client) BulkUpsert(ctx context.Context, items []core.BulkItem) error {
 
 	for _, it := range items {
 		if it.Version <= 0 {
-			return fmt.Errorf("invalid external version %d for %s/%s", it.Version, it.Index, it.ID)
+			return nil, fmt.Errorf("invalid external version %d for %s/%s", it.Version, it.Index, it.ID)
 		}
 
 		meta := map[string]any{"index": map[string]any{
@@ -130,15 +133,17 @@ func (c *Client) BulkUpsert(ctx context.Context, items []core.BulkItem) error {
 			"version_type": "external_gte",
 		}}
 		if err := json.MarshalEncode(enc, meta); err != nil {
-			return fmt.Errorf("marshal index meta: %w", err)
+			return nil, fmt.Errorf("marshal index meta: %w", err)
 		}
 
 		if err := json.MarshalEncode(enc, it.Doc); err != nil {
-			return fmt.Errorf("marshal doc: %w", err)
+			return nil, fmt.Errorf("marshal doc: %w", err)
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	// Callers bound the request size (the rebuild paths flush in chunks), so
+	// this guards against a hung cluster, not against oversized payloads.
+	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
 	refresh := "false"
@@ -152,14 +157,68 @@ func (c *Client) BulkUpsert(ctx context.Context, items []core.BulkItem) error {
 		c.es.Bulk.WithRefresh(refresh),
 	)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer res.Body.Close()
 
 	if res.IsError() {
 		b, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("es bulk error: %s %s", res.Status(), string(b))
+		return nil, fmt.Errorf("es bulk error: %s %s", res.Status(), string(b))
 	}
-	slog.Info("bulk upserted docs", "count", len(items))
-	return nil
+
+	failures, err := parseBulkResponse(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("parse bulk response: %w", err)
+	}
+	slog.Info("bulk upserted docs", "count", len(items), "rejected", len(failures))
+	return failures, nil
+}
+
+// bulkResponse is the subset of the ES _bulk response needed to surface
+// per-item outcomes: a 2xx request-level status still carries item-level
+// rejections under "errors": true.
+type bulkResponse struct {
+	Errors bool `json:"errors"`
+	Items  []map[string]struct {
+		Index  string `json:"_index"`
+		ID     string `json:"_id"`
+		Status int    `json:"status"`
+		Error  struct {
+			Type   string `json:"type"`
+			Reason string `json:"reason"`
+		} `json:"error"`
+	} `json:"items"`
+}
+
+// parseBulkResponse extracts the items ES rejected.
+func parseBulkResponse(body io.Reader) ([]core.BulkFailure, error) {
+	var resp bulkResponse
+	if err := json.UnmarshalRead(body, &resp); err != nil {
+		return nil, err
+	}
+	if !resp.Errors {
+		return nil, nil
+	}
+
+	var failures []core.BulkFailure
+	for _, item := range resp.Items {
+		// Each item is keyed by its action; BulkUpsert only issues "index".
+		for _, r := range item {
+			if r.Status >= 200 && r.Status < 300 {
+				continue
+			}
+			// An OCC loss: a concurrent build with a higher Build Sequence
+			// already wrote fresher data, so this write is a benign no-op.
+			if r.Status == 409 {
+				continue
+			}
+			failures = append(failures, core.BulkFailure{
+				Index:  r.Index,
+				ID:     r.ID,
+				Status: r.Status,
+				Reason: fmt.Sprintf("%s: %s", r.Error.Type, r.Error.Reason),
+			})
+		}
+	}
+	return failures, nil
 }
