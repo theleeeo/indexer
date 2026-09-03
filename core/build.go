@@ -487,6 +487,18 @@ func (idx *Indexer) rebuildAll(ctx context.Context, params RebuildArgs, resume r
 				completed = &RebuildCursor{PlanVersion: plan.Version, PageToken: tok}
 			}
 		}
+
+		// The page channel closed. That means the listing was exhausted — or
+		// the context ended and the pipeline stopped: a cancelled producer
+		// abandons its terminal error when no receiver is parked on the
+		// channel, which is exactly where this loop is while it flushes. An
+		// ended context here therefore means an unwalked remainder, and
+		// reporting success would let a caller (the RunRebuild activity) record
+		// a half-done backfill as finished.
+		if err := ctx.Err(); err != nil {
+			fl.salvage(ctx)
+			return err
+		}
 	}
 
 	if err := fl.finish(ctx); err != nil {

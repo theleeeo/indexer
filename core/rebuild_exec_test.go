@@ -806,3 +806,64 @@ func TestRebuildAll_NonStringTokenNeverCheckpointsMidPlan(t *testing.T) {
 		t.Fatal("the walk itself must still complete")
 	}
 }
+
+// cancelStoppingExecuter models what the real aggregation pipeline does under
+// cancellation: it stops producing and closes its channel *without* a terminal
+// error, because a cancelled producer abandons its send when no receiver is
+// parked — and the walk is not parked while it flushes to Elasticsearch.
+type cancelStoppingExecuter struct {
+	pages []aggregation.ExecutionResult[projection.BuildDoc]
+}
+
+func (e *cancelStoppingExecuter) Execute(ctx context.Context, _ projection.BuildRequest) <-chan aggregation.ExecutionResult[projection.BuildDoc] {
+	ch := make(chan aggregation.ExecutionResult[projection.BuildDoc])
+	go func() {
+		defer close(ch)
+		for _, p := range e.pages {
+			select {
+			case ch <- p:
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return ch
+}
+
+func TestRebuildAll_CancelledWalkNeverReportsSuccess(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{}
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: &cancelStoppingExecuter{pages: []aggregation.ExecutionResult[projection.BuildDoc]{
+			{Items: []projection.BuildDoc{productDoc("1"), productDoc("2")}, NextPageToken: "p2"},
+			{Items: []projection.BuildDoc{productDoc("3"), productDoc("4")}, NextPageToken: "p3"},
+			{Items: []projection.BuildDoc{productDoc("5")}},
+		}}},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 2)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var cps []RebuildCursor
+	err := idx.RebuildNowResumable(ctx,
+		ResourceSelector{ResourceType: "product", Versions: []int{1}},
+		nil,
+		func(c RebuildCursor) {
+			cps = append(cps, c)
+			cancel()
+		})
+
+	// The walk was cut short at its first checkpoint, leaving page 3 unwalked.
+	// Reporting success would let the caller — the RunRebuild activity — record
+	// a half-done backfill as a finished one.
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("a cancelled walk left its listing unfinished and must say so, got %v", err)
+	}
+	if len(cps) == 0 {
+		t.Fatal("the walk must still checkpoint the boundary it did reach")
+	}
+	if st.has("BeginBuild:product/5") {
+		t.Fatal("the walk stopped before page 3; product 5 must never have been begun")
+	}
+}
