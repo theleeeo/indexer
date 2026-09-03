@@ -35,9 +35,16 @@ type SweepParams struct {
 	BatchSize int
 }
 
+// rebuildHeartbeatInterval is how often a running rebuild walk emits a liveness
+// heartbeat, well inside RebuildWalkWorkflow's one-minute HeartbeatTimeout.
+const rebuildHeartbeatInterval = 10 * time.Second
+
 // temporalActivities hosts the Indexer-backed activity implementations.
 type temporalActivities struct {
 	idx *Indexer
+	// heartbeatInterval overrides rebuildHeartbeatInterval. Zero means the
+	// default; tests shorten it to observe a liveness beat without waiting.
+	heartbeatInterval time.Duration
 }
 
 func (a *temporalActivities) SweepStale(ctx context.Context, p SweepParams) (int, error) {
@@ -61,12 +68,19 @@ func (a *temporalActivities) RunRebuild(ctx context.Context, sel ResourceSelecto
 	}
 
 	var mu sync.Mutex
-	var latest *RebuildCursor
+	// The inherited cursor seeds the beat: until this attempt checkpoints past
+	// it, every liveness beat must re-record the position it resumed from.
+	latest := start
+
+	interval := a.heartbeatInterval
+	if interval <= 0 {
+		interval = rebuildHeartbeatInterval
+	}
 
 	done := make(chan struct{})
 	defer close(done)
 	go func() {
-		t := time.NewTicker(10 * time.Second)
+		t := time.NewTicker(interval)
 		defer t.Stop()
 		for {
 			select {
@@ -77,8 +91,9 @@ func (a *temporalActivities) RunRebuild(ctx context.Context, sel ResourceSelecto
 				cur := latest
 				mu.Unlock()
 				// Heartbeat details replace each other wholesale, so a bare
-				// liveness beat after a cursor exists would erase it — always
-				// re-record the latest cursor once there is one.
+				// liveness beat once a cursor exists would erase it — the
+				// inherited one included, costing the next attempt the whole
+				// walk. Always re-record the latest cursor there is.
 				if cur != nil {
 					activity.RecordHeartbeat(ctx, *cur)
 				} else {

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/theleeeo/laika/projection"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/testsuite"
 )
 
@@ -116,6 +118,69 @@ func TestRunRebuild_FreshAttemptWalksFromScratch(t *testing.T) {
 	}
 	if len(v2.requests()) != 1 || v2.requests()[0].PageToken != "" {
 		t.Fatalf("a fresh attempt must walk every plan from the start, v2 saw %+v", v2.requests())
+	}
+}
+
+// blockingExecuter holds the walk open until release is closed, so a test can
+// let the activity's liveness ticker fire mid-walk, then emits one tokenless
+// page — a walk that never checkpoints.
+type blockingExecuter struct {
+	release <-chan struct{}
+	docs    []projection.BuildDoc
+}
+
+func (e *blockingExecuter) Execute(_ context.Context, _ projection.BuildRequest) <-chan aggregation.ExecutionResult[projection.BuildDoc] {
+	select {
+	case <-e.release:
+	case <-time.After(2 * time.Second): // never block the suite if no beat lands
+	}
+	ch := make(chan aggregation.ExecutionResult[projection.BuildDoc], 1)
+	ch <- aggregation.ExecutionResult[projection.BuildDoc]{Items: e.docs}
+	close(ch)
+	return ch
+}
+
+func TestRunRebuild_ResumedLivenessBeatPreservesInheritedCursor(t *testing.T) {
+	st := &rebuildRecordingStore{}
+	es := &captureBackend{}
+	beat := make(chan struct{}) // closed once a heartbeat has reached the server
+	plans := map[string][]projection.Plan{"product": {
+		{Version: 1, Executer: &cursorPagingExecuter{}}, // not selected; never runs
+		{Version: 2, Executer: &blockingExecuter{release: beat, docs: []projection.BuildDoc{productDoc("1")}}},
+	}}
+	idx := newRebuildIndexer(st, es, plans, 0)
+
+	var ts testsuite.WorkflowTestSuite
+	env := ts.NewTestActivityEnvironment()
+	// Drive the liveness ticker rather than waiting out the production interval.
+	a := &temporalActivities{idx: idx, heartbeatInterval: time.Millisecond}
+	env.RegisterActivityWithOptions(a.RunRebuild, activity.RegisterOptions{Name: rebuildActivityName})
+	env.SetHeartbeatDetails(RebuildCursor{PlanVersion: 2, PageToken: "p3"})
+
+	var mu sync.Mutex
+	var beats []converter.EncodedValues
+	var once sync.Once
+	env.SetOnActivityHeartbeatListener(func(_ *activity.Info, details converter.EncodedValues) {
+		mu.Lock()
+		beats = append(beats, details)
+		mu.Unlock()
+		once.Do(func() { close(beat) })
+	})
+
+	_, err := env.ExecuteActivity(rebuildActivityName, ResourceSelector{ResourceType: "product", Versions: []int{2}})
+	require.NoError(t, err)
+
+	mu.Lock()
+	defer mu.Unlock()
+	require.NotEmpty(t, beats, "the liveness ticker must have beaten during the walk")
+	// This walk emits a single tokenless page, so it never checkpoints: every
+	// beat it makes carries the cursor the attempt inherited — or erases it,
+	// stranding the next attempt at the start of the walk.
+	for i, d := range beats {
+		var got RebuildCursor
+		require.NoError(t, d.Get(&got),
+			"beat %d recorded no cursor: a bare liveness beat erases the position this attempt resumed from", i)
+		require.Equal(t, RebuildCursor{PlanVersion: 2, PageToken: "p3"}, got, "beat %d", i)
 	}
 }
 
