@@ -19,11 +19,19 @@ type RebuildPayload struct {
 func (idx *Indexer) handleDelete(ctx context.Context, p RebuildPayload) error {
 	logger := slog.With(slog.String("jobType", "delete"), slog.String("type", p.ResourceType), slog.String("id", p.ResourceID))
 
+	// A type dropped from config has an unknowable version set: its ES
+	// documents live in de-configured indices, which are cleanup's territory.
+	// The relation edges and the tombstone must still be finished — the sweep
+	// serves oldest-first, so refusing here would wedge it forever.
 	cfg := idx.resources.Get(p.ResourceType)
-	for _, v := range cfg.SortedVersions() {
-		indexName := IndexName(p.ResourceType, v)
-		if err := idx.es.Delete(ctx, indexName, p.ResourceID); err != nil {
-			return fmt.Errorf("delete %s/%s from %s: %w", p.ResourceType, p.ResourceID, indexName, err)
+	if cfg == nil {
+		logger.Warn("deleting resource of a type no longer in config; leaving its de-configured indices to cleanup")
+	} else {
+		for _, v := range cfg.SortedVersions() {
+			indexName := IndexName(p.ResourceType, v)
+			if err := idx.es.Delete(ctx, indexName, p.ResourceID); err != nil {
+				return fmt.Errorf("delete %s/%s from %s: %w", p.ResourceType, p.ResourceID, indexName, err)
+			}
 		}
 	}
 

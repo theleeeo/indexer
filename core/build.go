@@ -71,9 +71,62 @@ func (idx *Indexer) Build(ctx context.Context, params BuildArgs) error {
 	return nil
 }
 
+// versionedDoc pairs a plan's Schema Version with the document it built.
+type versionedDoc struct {
+	version int
+	doc     projection.BuildDoc
+}
+
+// executeAllPlans runs every active plan for one resource and splits the
+// outcomes into built documents and the versions whose plan returned no data.
+func executeAllPlans(ctx context.Context, plans []projection.Plan, req projection.BuildRequest) (docs []versionedDoc, missing []int, err error) {
+	for _, plan := range plans {
+		if plan.Executer == nil {
+			continue
+		}
+		result, err := executePlan(ctx, plan, req)
+		if err != nil {
+			return nil, nil, err
+		}
+		if result.Doc == nil {
+			missing = append(missing, plan.Version)
+			continue
+		}
+		docs = append(docs, versionedDoc{version: plan.Version, doc: result})
+	}
+	return docs, missing, nil
+}
+
 func (idx *Indexer) buildOne(ctx context.Context, plans []projection.Plan, resourceType, resourceID string, metadata map[string]string, occVersion int64) error {
 	if occVersion <= 0 {
 		return fmt.Errorf("invalid occ version %d for %s/%s", occVersion, resourceType, resourceID)
+	}
+
+	// Execute every version's plan before deciding anything: existence is a
+	// property of the resource, not of one Schema Version, so one plan's nil
+	// must never delete what another plan just wrote — and relations and
+	// Parents are collected from every plan, not just the last.
+	docs, missing, err := executeAllPlans(ctx, plans, projection.BuildRequest{
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		Metadata:     metadata,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Every plan agrees the resource is gone at source — delete everywhere.
+	if len(docs) == 0 && len(missing) > 0 {
+		return idx.handleDelete(ctx, RebuildPayload{
+			ResourceType: resourceType,
+			ResourceID:   resourceID,
+		})
+	}
+	// Plans disagree on existence: a transient source inconsistency or a
+	// broken plan. Fail the build without writing — the stale mark survives
+	// and the retry converges on the source's real state.
+	if len(missing) > 0 {
+		return fmt.Errorf("plans for %s/%s disagree on existence: version(s) %v returned no data; leaving stale for retry", resourceType, resourceID, missing)
 	}
 
 	if err := idx.st.RemoveResource(ctx, model.Resource{Type: resourceType, Id: resourceID}); err != nil {
@@ -81,42 +134,21 @@ func (idx *Indexer) buildOne(ctx context.Context, plans []projection.Plan, resou
 	}
 
 	var allRelations []model.VersionedResource
-	var builtDoc projection.BuildDoc
-
-	for _, plan := range plans {
-		if plan.Executer == nil {
-			continue
-		}
-		ch := plan.Execute(ctx, projection.BuildRequest{
-			ResourceType: resourceType,
-			ResourceID:   resourceID,
-			Metadata:     metadata,
-		})
-
-		var result projection.BuildDoc
-		for r := range ch {
-			if r.Err != nil {
-				return r.Err
-			}
-			if len(r.Items) > 0 {
-				result = r.Items[0]
-				break
+	var parents []model.Resource
+	seenParents := make(map[model.Resource]bool)
+	for _, vd := range docs {
+		allRelations = append(allRelations, vd.doc.Relations...)
+		for _, p := range vd.doc.Parents {
+			if !seenParents[p] {
+				seenParents[p] = true
+				parents = append(parents, p)
 			}
 		}
+	}
 
-		// Resource no longer exists at source — delete from all versions.
-		if result.Doc == nil {
-			return idx.handleDelete(ctx, RebuildPayload{
-				ResourceType: resourceType,
-				ResourceID:   resourceID,
-			})
-		}
-
-		allRelations = append(allRelations, result.Relations...)
-		builtDoc = result
-
-		indexName := IndexName(resourceType, plan.Version)
-		if err := idx.es.Upsert(ctx, indexName, resourceID, result.Doc, occVersion); err != nil {
+	for _, vd := range docs {
+		indexName := IndexName(resourceType, vd.version)
+		if err := idx.es.Upsert(ctx, indexName, resourceID, vd.doc.Doc, occVersion); err != nil {
 			// An OCC loss is benign: a concurrent build with a newer Build
 			// Sequence already wrote fresher data to this index. The
 			// seq-guarded ClearStale keeps recovery correct if the winner
@@ -142,8 +174,9 @@ func (idx *Indexer) buildOne(ctx context.Context, plans []projection.Plan, resou
 	}
 
 	// Reverse-relation discovery (ADR 0006): mark-first schedule of the
-	// Parents the Plan derived from the Child's own data.
-	if err := idx.scheduleBuild(ctx, builtDoc.Parents, metadata); err != nil {
+	// Parents the Plans derived from the Child's own data, unioned across
+	// every Schema Version's plan.
+	if err := idx.scheduleBuild(ctx, parents, metadata); err != nil {
 		return err
 	}
 
@@ -225,40 +258,46 @@ func (idx *Indexer) rebuildByIDs(ctx context.Context, params RebuildArgs) error 
 		}
 		fl.begin(id, occVersion, staleSeq, expected)
 
-		for _, plan := range plans {
-			if plan.Executer == nil {
-				continue
-			}
-			result, planErr := executePlan(ctx, plan, projection.BuildRequest{
+		// Same existence rule as the live path (buildOne): all selected plans
+		// run first, and only unanimity decides — a nil from one version must
+		// not delete what another version's plan just built.
+		docs, missing, planErr := executeAllPlans(ctx, plans, projection.BuildRequest{
+			ResourceType: params.ResourceType,
+			ResourceID:   id,
+			Metadata:     params.Metadata,
+		})
+		if planErr != nil {
+			logger.Warn("plan execution failed", slog.String("id", id), slog.String("error", planErr.Error()))
+			fl.fail(ctx, id)
+			continue
+		}
+
+		// Every selected plan agrees: gone at source — delete from all versions.
+		if len(docs) == 0 && len(missing) > 0 {
+			fl.discard(id)
+			if err := idx.handleDelete(ctx, RebuildPayload{
 				ResourceType: params.ResourceType,
 				ResourceID:   id,
-				Metadata:     params.Metadata,
-			})
-			if planErr != nil {
-				logger.Warn("plan execution failed", slog.String("id", id), slog.Int("plan_version", plan.Version), slog.String("error", planErr.Error()))
+			}); err != nil {
+				logger.Warn("delete missing resource", slog.String("id", id), slog.String("error", err.Error()))
 				fl.fail(ctx, id)
-				break
 			}
+			continue
+		}
+		if len(missing) > 0 {
+			logger.Warn("plans disagree on existence; leaving resource stale for retry",
+				slog.String("id", id), slog.Any("versions_without_data", missing))
+			fl.fail(ctx, id)
+			continue
+		}
 
-			// Source returned no data — delete from all versions and stop processing this ID.
-			if result.Doc == nil {
-				fl.discard(id)
-				if err := idx.handleDelete(ctx, RebuildPayload{
-					ResourceType: params.ResourceType,
-					ResourceID:   id,
-				}); err != nil {
-					logger.Warn("delete missing resource", slog.String("id", id), slog.String("error", err.Error()))
-					fl.fail(ctx, id)
-				}
-				break
-			}
-
+		for _, vd := range docs {
 			if err := fl.add(ctx, BulkItem{
-				Index:   IndexName(params.ResourceType, plan.Version),
+				Index:   IndexName(params.ResourceType, vd.version),
 				ID:      id,
-				Doc:     result.Doc,
+				Doc:     vd.doc.Doc,
 				Version: occVersion,
-			}, result.Relations); err != nil {
+			}, vd.doc.Relations); err != nil {
 				fl.salvage(ctx)
 				return err
 			}

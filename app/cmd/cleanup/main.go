@@ -1,7 +1,15 @@
+// Command cleanup deletes a resource's de-configured versioned indices —
+// the ones the given config no longer declares (ADR 0004 step 4, and the
+// leftovers of a type dropped from config entirely).
+//
+// It is a dry run by default: pass -apply to actually delete. Every candidate
+// is attempted — a failure is reported and does not stop the rest — and the
+// exit code is non-zero when anything was refused or failed. An index still
+// targeted by the read alias is always refused: a config that drops the
+// version being served is stale or ahead of the deployment; cut over first.
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -15,12 +23,37 @@ import (
 	"github.com/theleeeo/laika/core"
 )
 
+// cleanupAction classifies one versioned index against the config.
+type cleanupAction int
+
+const (
+	// keepActive: the index belongs to a configured Schema Version.
+	keepActive cleanupAction = iota
+	// refuseAliasTarget: de-configured, but still the read alias target —
+	// deleting it would break every reader. Never removed by this tool.
+	refuseAliasTarget
+	// removeIndex: de-configured and safe to delete.
+	removeIndex
+)
+
+// classifyIndex decides what cleanup may do with one index.
+func classifyIndex(index string, active map[string]bool, aliasTarget string) cleanupAction {
+	if active[index] {
+		return keepActive
+	}
+	if index == aliasTarget {
+		return refuseAliasTarget
+	}
+	return removeIndex
+}
+
 func main() {
 	configPath := flag.String("config", "resources.yml", "Path to resource config file")
-	resourceName := flag.String("resource", "", "Resource name to clean up old indexes for (required)")
+	resourceName := flag.String("resource", "", "Resource name to clean up old indexes for (required; may be a type dropped from config)")
 	esAddr := flag.String("es-addr", "http://localhost:9200", "Elasticsearch address")
 	esUser := flag.String("es-user", "", "Elasticsearch username")
 	esPass := flag.String("es-pass", "", "Elasticsearch password")
+	apply := flag.Bool("apply", false, "Actually delete the candidate indices; without it this is a dry run")
 	flag.Parse()
 
 	if *resourceName == "" {
@@ -33,52 +66,62 @@ func main() {
 		log.Fatalf("load resource config: %v", err)
 	}
 
-	cfg := resources.Get(*resourceName)
-	if cfg == nil {
-		log.Fatalf("unknown resource %q", *resourceName)
+	// A type dropped from config entirely has no active versions: every one
+	// of its remaining indices is a candidate. The sweep leaves such indices
+	// to this tool (it cannot know their version set).
+	activeIndexes := map[string]bool{}
+	if cfg := resources.Get(*resourceName); cfg != nil {
+		for _, v := range cfg.SortedVersions() {
+			activeIndexes[core.IndexName(cfg.Resource, v)] = true
+		}
+	} else {
+		log.Printf("resource %q is not in the config; all of its versioned indices are candidates", *resourceName)
 	}
 
 	addr := strings.TrimRight(*esAddr, "/")
-	aliasName := core.AliasName(cfg.Resource)
+	aliasName := core.AliasName(*resourceName)
 
 	aliasTarget, err := getAliasTarget(addr, aliasName, *esUser, *esPass)
 	if err != nil {
 		log.Fatalf("get alias target: %v", err)
 	}
 
-	versions := cfg.SortedVersions()
-	activeIndexes := make(map[string]bool, len(versions))
-	for _, v := range versions {
-		activeIndexes[core.IndexName(cfg.Resource, v)] = true
-	}
-
-	prefix := cfg.Resource + "_search_v"
-	indexes, err := listIndexes(addr, prefix, *esUser, *esPass)
+	indexes, err := listIndexes(addr, *resourceName+"_search_v", *esUser, *esPass)
 	if err != nil {
 		log.Fatalf("list indexes: %v", err)
 	}
 
-	deleted := 0
+	var deleted, refused, failed int
 	for _, idx := range indexes {
-		if activeIndexes[idx] {
+		switch classifyIndex(idx, activeIndexes, aliasTarget) {
+		case keepActive:
 			continue
+		case refuseAliasTarget:
+			log.Printf("REFUSING to delete %s: it is the current target of read alias %s — this config drops the version being served; cut over first", idx, aliasName)
+			refused++
+		case removeIndex:
+			if !*apply {
+				log.Printf("would delete %s (dry run; pass -apply to delete)", idx)
+				deleted++
+				continue
+			}
+			if err := deleteIndex(addr, idx, *esUser, *esPass); err != nil {
+				log.Printf("delete %s failed: %v", idx, err)
+				failed++
+				continue
+			}
+			log.Printf("deleted %s", idx)
+			deleted++
 		}
-		if idx == aliasTarget {
-			log.Printf("skipping %s (currently pointed to by alias %s)", idx, aliasName)
-			continue
-		}
-
-		log.Printf("deleting old index %s", idx)
-		if err := deleteIndex(addr, idx, *esUser, *esPass); err != nil {
-			log.Fatalf("delete index %s: %v", idx, err)
-		}
-		deleted++
 	}
 
-	if deleted == 0 {
-		log.Printf("no old indexes to clean up for resource %q", *resourceName)
-	} else {
-		log.Printf("deleted %d old index(es)", deleted)
+	verb := "deleted"
+	if !*apply {
+		verb = "would delete"
+	}
+	log.Printf("%s %d index(es); %d refused, %d failed", verb, deleted, refused, failed)
+	if refused > 0 || failed > 0 {
+		os.Exit(1)
 	}
 }
 
@@ -144,7 +187,7 @@ func deleteIndex(addr, indexName, user, pass string) error {
 func doRequest(method, url string, body []byte, user, pass string) (int, []byte, error) {
 	var bodyReader io.Reader
 	if body != nil {
-		bodyReader = bytes.NewReader(body)
+		bodyReader = strings.NewReader(string(body))
 	}
 	req, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {

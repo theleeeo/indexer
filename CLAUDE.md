@@ -100,6 +100,7 @@ Both `Store` and `SearchBackend` have exactly one implementation each; the inter
 - **Build Sequence drives OCC**: every ES write carries the Resource's Build Sequence (stored in `resources.build_idx`) sent as the `external_gte` version, so concurrent Builds and Rebuilds of the same Document land in counter order.
 - **Stale Version rejection**: a Notification with `Version > 0` enables drop-on-stale; `0` means always accept.
 - **Relation graph drives fanout**: affected Parent Resources are found by querying the Postgres Relation graph, not static config.
+- **Cross-version existence agreement**: a build executes every Schema Version's plan before writing anything, and only unanimity decides existence — all plans nil deletes everywhere, disagreement fails the build and leaves the stale mark for retry. One version's nil must never delete another version's freshly written document. Relations and ADR 0006 Parents are unioned across all plans, never taken from the last one.
 - **All-of-Type Rebuild path**: `BuildRequest.ResourceID == ""` triggers `ListResources` pagination — the Rebuild path that walks every Resource of a Type.
 - **Plans encapsulate data fetching**: `core.Indexer` only executes Plans; it never calls `source.Provider` directly. Library users supply their own Plans.
 

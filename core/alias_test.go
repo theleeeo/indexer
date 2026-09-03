@@ -148,6 +148,42 @@ func TestConvergeReadAliases_AggregatesErrorsAcrossResources(t *testing.T) {
 	require.Equal(t, "b_search_v2", es.createdArg["b_search"], "the healthy resource must still converge")
 }
 
+func TestVerifyIndicesExist_AllPresent(t *testing.T) {
+	es := newFakeCutoverES()
+	es.indices["m_search_v1"] = true
+	es.indices["m_search_v2"] = true
+	es.indices["m_search_v3"] = true
+
+	require.NoError(t, VerifyIndicesExist(context.Background(), es, aliasConfigs(map[string]int{"m": 2})))
+}
+
+func TestVerifyIndicesExist_MissingWriteIndexFailsStartup(t *testing.T) {
+	// The read-version index exists — it is a non-read version that was never
+	// bootstrapped. Its first write would auto-create a dynamically-mapped
+	// index, so startup must refuse instead.
+	es := newFakeCutoverES()
+	es.indices["m_search_v1"] = true
+	es.indices["m_search_v3"] = true
+
+	err := VerifyIndicesExist(context.Background(), es, aliasConfigs(map[string]int{"m": 1}))
+	require.Error(t, err)
+	require.ErrorContains(t, err, "m_search_v2")
+	require.ErrorContains(t, err, "gen-mapping")
+}
+
+func TestVerifyIndicesExist_AggregatesAcrossResources(t *testing.T) {
+	sentinel := errors.New("es exploded")
+	es := newFakeCutoverES()
+	es.existsErr["a_search_v1"] = sentinel
+	for _, idx := range []string{"a_search_v2", "a_search_v3", "b_search_v1", "b_search_v2", "b_search_v3"} {
+		es.indices[idx] = true
+	}
+
+	err := VerifyIndicesExist(context.Background(), es, aliasConfigs(map[string]int{"a": 1, "b": 1}))
+	require.ErrorIs(t, err, sentinel)
+	require.NotContains(t, err.Error(), "b_search", "the healthy resource must not be blamed")
+}
+
 func TestConvergeReadAliases_CreateErrorPropagates(t *testing.T) {
 	// A missing target index surfaces here as a CreateAlias failure: the
 	// deployment is broken (gen-mapping never ran) and startup must say so.

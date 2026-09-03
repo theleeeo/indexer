@@ -87,6 +87,35 @@ func PlanAliasMove(resourceType, currentTarget string, readVersion int) AliasMov
 	}
 }
 
+// IndexChecker is the narrow index-existence surface that startup bootstrap
+// verification needs. *elasticsearch.Client implements it.
+type IndexChecker interface {
+	IndexExists(ctx context.Context, indexName string) (bool, error)
+}
+
+// VerifyIndicesExist confirms every configured Schema Version's index exists.
+// The indexer never creates indices — gen-mapping is the only bootstrap tool
+// (ADR 0009) — so without this check a config deploy that skipped gen-mapping
+// would limp along until the first write auto-creates a dynamically-mapped
+// index. Every resource is checked; failures are aggregated.
+func VerifyIndicesExist(ctx context.Context, es IndexChecker, resources resource.Configs) error {
+	var errs []error
+	for _, cfg := range resources {
+		for _, v := range cfg.SortedVersions() {
+			name := IndexName(cfg.Resource, v)
+			exists, err := es.IndexExists(ctx, name)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("resource %q: check index %s: %w", cfg.Resource, name, err))
+				continue
+			}
+			if !exists {
+				errs = append(errs, fmt.Errorf("resource %q: index %s does not exist — bootstrap it with gen-mapping", cfg.Resource, name))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
 // ConvergeReadAliases points every resource's read alias at its config
 // ReadVersion index. The config is the single owner of the alias target
 // (see ADR 0009): a cutover or rollback is a readVersion change, and this is

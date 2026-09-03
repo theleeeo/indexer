@@ -76,6 +76,14 @@ func main() {
 	}
 	core.InitTextLogging(os.Stderr, logLevel)
 
+	// Every configured Schema Version's index must already exist — the indexer
+	// never creates indices (gen-mapping is the only bootstrap tool). Without
+	// this, a config deploy that skipped gen-mapping would limp along until
+	// the first write auto-creates a dynamically-mapped index.
+	if err := core.VerifyIndicesExist(context.Background(), esClientImpl, resources); err != nil {
+		log.Fatalf("verify indices: %v", err)
+	}
+
 	// The config's readVersion owns the read alias (ADR 0009): converge ES onto
 	// it before serving, so a cutover or rollback is just a config redeploy.
 	// Failure means the deployment is broken (indices not bootstrapped with

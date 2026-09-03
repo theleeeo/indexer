@@ -112,3 +112,35 @@ func TestSweepStale_EmptyBacklog(t *testing.T) {
 		t.Fatalf("got n=%d err=%v", n, err)
 	}
 }
+
+// A tombstone whose type was dropped from config must not wedge the sweep:
+// ListStale serves oldest-first, so a panic (or a permanent skip) on that
+// entry would starve everything behind it. The ES documents live in
+// de-configured indices — cleanup's territory — but the relation edges and
+// the tombstone row must still be finished.
+func TestSweepStale_TombstoneOfDeconfiguredType_DoesNotWedgeSweep(t *testing.T) {
+	st := &staleListingStore{
+		entries: []StaleResource{
+			{Resource: model.Resource{Type: "ghost", Id: "g1"}, StaleSeq: 9, Deleted: true},
+			{Resource: model.Resource{Type: "product", Id: "1"}, StaleSeq: 4},
+		},
+	}
+	idx := newHotPathIndexer(st, 2, 4)
+
+	n, err := idx.SweepStale(context.Background(), 5*time.Minute, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Fatalf("swept count: got %d want 2", n)
+	}
+	if st.indexOf("RemoveResource:ghost/g1") == -1 {
+		t.Fatalf("the de-configured tombstone's relation edges must still be cleaned: %v", st.callsSnapshot())
+	}
+	if st.indexOf("DeleteResourceIfSeq:ghost/g1:9") == -1 {
+		t.Fatalf("the de-configured tombstone must be finished, or the oldest-first backlog never advances: %v", st.callsSnapshot())
+	}
+	if st.indexOf("BeginBuild:product/1") == -1 {
+		t.Fatalf("entries behind the tombstone must still be served: %v", st.callsSnapshot())
+	}
+}
