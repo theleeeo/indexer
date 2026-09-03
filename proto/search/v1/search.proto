@@ -137,6 +137,18 @@ message GetCapabilitiesResponse { repeated ResourceCapability resources = 1; }
 
 message ResourceCapability {
   string resource = 1;
+  // Fields of the active read version — the view for clients that don't care
+  // about schema versions.
+  repeated FieldCapability fields = 2;
+  // The active read schema version (the one `fields` describes).
+  int32 read_version = 3;
+  // Every active schema version, ascending. A version that is written but not
+  // yet read (pre-cutover) appears here, so clients can adopt its fields early.
+  repeated VersionCapability versions = 4;
+}
+
+message VersionCapability {
+  int32 version = 1;
   repeated FieldCapability fields = 2;
 }
 

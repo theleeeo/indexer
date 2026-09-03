@@ -808,9 +808,16 @@ func (x *GetCapabilitiesResponse) GetResources() []*ResourceCapability {
 }
 
 type ResourceCapability struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Resource      string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
-	Fields        []*FieldCapability     `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Resource string                 `protobuf:"bytes,1,opt,name=resource,proto3" json:"resource,omitempty"`
+	// Fields of the active read version — the view for clients that don't care
+	// about schema versions.
+	Fields []*FieldCapability `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	// The active read schema version (the one `fields` describes).
+	ReadVersion int32 `protobuf:"varint,3,opt,name=read_version,json=readVersion,proto3" json:"read_version,omitempty"`
+	// Every active schema version, ascending. A version that is written but not
+	// yet read (pre-cutover) appears here, so clients can adopt its fields early.
+	Versions      []*VersionCapability `protobuf:"bytes,4,rep,name=versions,proto3" json:"versions,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -859,6 +866,72 @@ func (x *ResourceCapability) GetFields() []*FieldCapability {
 	return nil
 }
 
+func (x *ResourceCapability) GetReadVersion() int32 {
+	if x != nil {
+		return x.ReadVersion
+	}
+	return 0
+}
+
+func (x *ResourceCapability) GetVersions() []*VersionCapability {
+	if x != nil {
+		return x.Versions
+	}
+	return nil
+}
+
+type VersionCapability struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Version       int32                  `protobuf:"varint,1,opt,name=version,proto3" json:"version,omitempty"`
+	Fields        []*FieldCapability     `protobuf:"bytes,2,rep,name=fields,proto3" json:"fields,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VersionCapability) Reset() {
+	*x = VersionCapability{}
+	mi := &file_search_v1_search_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VersionCapability) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VersionCapability) ProtoMessage() {}
+
+func (x *VersionCapability) ProtoReflect() protoreflect.Message {
+	mi := &file_search_v1_search_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VersionCapability.ProtoReflect.Descriptor instead.
+func (*VersionCapability) Descriptor() ([]byte, []int) {
+	return file_search_v1_search_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *VersionCapability) GetVersion() int32 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
+}
+
+func (x *VersionCapability) GetFields() []*FieldCapability {
+	if x != nil {
+		return x.Fields
+	}
+	return nil
+}
+
 type FieldCapability struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The full path used in filters/sort, e.g. "fields.access_id" or "b.name"
@@ -877,7 +950,7 @@ type FieldCapability struct {
 
 func (x *FieldCapability) Reset() {
 	*x = FieldCapability{}
-	mi := &file_search_v1_search_proto_msgTypes[12]
+	mi := &file_search_v1_search_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -889,7 +962,7 @@ func (x *FieldCapability) String() string {
 func (*FieldCapability) ProtoMessage() {}
 
 func (x *FieldCapability) ProtoReflect() protoreflect.Message {
-	mi := &file_search_v1_search_proto_msgTypes[12]
+	mi := &file_search_v1_search_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -902,7 +975,7 @@ func (x *FieldCapability) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FieldCapability.ProtoReflect.Descriptor instead.
 func (*FieldCapability) Descriptor() ([]byte, []int) {
-	return file_search_v1_search_proto_rawDescGZIP(), []int{12}
+	return file_search_v1_search_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *FieldCapability) GetField() string {
@@ -991,9 +1064,14 @@ const file_search_v1_search_proto_rawDesc = "" +
 	"\x04desc\x18\x02 \x01(\bR\x04desc\"\x18\n" +
 	"\x16GetCapabilitiesRequest\"V\n" +
 	"\x17GetCapabilitiesResponse\x12;\n" +
-	"\tresources\x18\x01 \x03(\v2\x1d.search.v1.ResourceCapabilityR\tresources\"d\n" +
+	"\tresources\x18\x01 \x03(\v2\x1d.search.v1.ResourceCapabilityR\tresources\"\xc1\x01\n" +
 	"\x12ResourceCapability\x12\x1a\n" +
 	"\bresource\x18\x01 \x01(\tR\bresource\x122\n" +
+	"\x06fields\x18\x02 \x03(\v2\x1a.search.v1.FieldCapabilityR\x06fields\x12!\n" +
+	"\fread_version\x18\x03 \x01(\x05R\vreadVersion\x128\n" +
+	"\bversions\x18\x04 \x03(\v2\x1c.search.v1.VersionCapabilityR\bversions\"a\n" +
+	"\x11VersionCapability\x12\x18\n" +
+	"\aversion\x18\x01 \x01(\x05R\aversion\x122\n" +
 	"\x06fields\x18\x02 \x03(\v2\x1a.search.v1.FieldCapabilityR\x06fields\"\xab\x01\n" +
 	"\x0fFieldCapability\x12\x14\n" +
 	"\x05field\x18\x01 \x01(\tR\x05field\x12\x12\n" +
@@ -1040,7 +1118,7 @@ func file_search_v1_search_proto_rawDescGZIP() []byte {
 }
 
 var file_search_v1_search_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_search_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_search_v1_search_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_search_v1_search_proto_goTypes = []any{
 	(FilterOp)(0),                   // 0: search.v1.FilterOp
 	(*SearchRequest)(nil),           // 1: search.v1.SearchRequest
@@ -1055,33 +1133,36 @@ var file_search_v1_search_proto_goTypes = []any{
 	(*GetCapabilitiesRequest)(nil),  // 10: search.v1.GetCapabilitiesRequest
 	(*GetCapabilitiesResponse)(nil), // 11: search.v1.GetCapabilitiesResponse
 	(*ResourceCapability)(nil),      // 12: search.v1.ResourceCapability
-	(*FieldCapability)(nil),         // 13: search.v1.FieldCapability
-	(*structpb.Struct)(nil),         // 14: google.protobuf.Struct
+	(*VersionCapability)(nil),       // 13: search.v1.VersionCapability
+	(*FieldCapability)(nil),         // 14: search.v1.FieldCapability
+	(*structpb.Struct)(nil),         // 15: google.protobuf.Struct
 }
 var file_search_v1_search_proto_depIdxs = []int32{
 	8,  // 0: search.v1.SearchRequest.filters:type_name -> search.v1.Filter
 	9,  // 1: search.v1.SearchRequest.sort:type_name -> search.v1.Sort
-	14, // 2: search.v1.SearchHit.source:type_name -> google.protobuf.Struct
+	15, // 2: search.v1.SearchHit.source:type_name -> google.protobuf.Struct
 	2,  // 3: search.v1.SearchResponse.hits:type_name -> search.v1.SearchHit
 	8,  // 4: search.v1.FederatedSearchRequest.filters:type_name -> search.v1.Filter
-	14, // 5: search.v1.FederatedHit.source:type_name -> google.protobuf.Struct
+	15, // 5: search.v1.FederatedHit.source:type_name -> google.protobuf.Struct
 	5,  // 6: search.v1.FederatedSearchResponse.hits:type_name -> search.v1.FederatedHit
 	6,  // 7: search.v1.FederatedSearchResponse.counts:type_name -> search.v1.ResourceCount
 	0,  // 8: search.v1.Filter.op:type_name -> search.v1.FilterOp
 	12, // 9: search.v1.GetCapabilitiesResponse.resources:type_name -> search.v1.ResourceCapability
-	13, // 10: search.v1.ResourceCapability.fields:type_name -> search.v1.FieldCapability
-	0,  // 11: search.v1.FieldCapability.filter_ops:type_name -> search.v1.FilterOp
-	1,  // 12: search.v1.SearchService.Search:input_type -> search.v1.SearchRequest
-	4,  // 13: search.v1.SearchService.FederatedSearch:input_type -> search.v1.FederatedSearchRequest
-	10, // 14: search.v1.SearchService.GetCapabilities:input_type -> search.v1.GetCapabilitiesRequest
-	3,  // 15: search.v1.SearchService.Search:output_type -> search.v1.SearchResponse
-	7,  // 16: search.v1.SearchService.FederatedSearch:output_type -> search.v1.FederatedSearchResponse
-	11, // 17: search.v1.SearchService.GetCapabilities:output_type -> search.v1.GetCapabilitiesResponse
-	15, // [15:18] is the sub-list for method output_type
-	12, // [12:15] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	14, // 10: search.v1.ResourceCapability.fields:type_name -> search.v1.FieldCapability
+	13, // 11: search.v1.ResourceCapability.versions:type_name -> search.v1.VersionCapability
+	14, // 12: search.v1.VersionCapability.fields:type_name -> search.v1.FieldCapability
+	0,  // 13: search.v1.FieldCapability.filter_ops:type_name -> search.v1.FilterOp
+	1,  // 14: search.v1.SearchService.Search:input_type -> search.v1.SearchRequest
+	4,  // 15: search.v1.SearchService.FederatedSearch:input_type -> search.v1.FederatedSearchRequest
+	10, // 16: search.v1.SearchService.GetCapabilities:input_type -> search.v1.GetCapabilitiesRequest
+	3,  // 17: search.v1.SearchService.Search:output_type -> search.v1.SearchResponse
+	7,  // 18: search.v1.SearchService.FederatedSearch:output_type -> search.v1.FederatedSearchResponse
+	11, // 19: search.v1.SearchService.GetCapabilities:output_type -> search.v1.GetCapabilitiesResponse
+	17, // [17:20] is the sub-list for method output_type
+	14, // [14:17] is the sub-list for method input_type
+	14, // [14:14] is the sub-list for extension type_name
+	14, // [14:14] is the sub-list for extension extendee
+	0,  // [0:14] is the sub-list for field type_name
 }
 
 func init() { file_search_v1_search_proto_init() }
@@ -1095,7 +1176,7 @@ func file_search_v1_search_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_search_v1_search_proto_rawDesc), len(file_search_v1_search_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   13,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

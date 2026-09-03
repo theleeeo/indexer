@@ -73,3 +73,19 @@ func TestNestedBlockHelpers(t *testing.T) {
 		t.Fatalf("scoped blocks should contain 'scoped', got %q", scoped[0].Name)
 	}
 }
+
+func TestApplyDefaults_ReadVersionDefaultsToLowest(t *testing.T) {
+	c := &Config{Resource: "a", Versions: []VersionConfig{{Version: 3}, {Version: 1}, {Version: 2}}}
+	c.ApplyDefaults()
+	if c.ReadVersion != 1 {
+		t.Fatalf("expected readVersion 1, got %d", c.ReadVersion)
+	}
+}
+
+func TestApplyDefaults_EmptyVersions_NoPanic(t *testing.T) {
+	c := &Config{Resource: "a"}
+	c.ApplyDefaults()
+	if c.ReadVersion != 0 {
+		t.Fatalf("expected readVersion to stay 0, got %d", c.ReadVersion)
+	}
+}

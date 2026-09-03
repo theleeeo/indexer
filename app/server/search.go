@@ -246,22 +246,37 @@ func searchResponseToProto(resp core.SearchResponse) *search.SearchResponse {
 func capabilitiesToProto(caps core.CapabilitiesResponse) *search.GetCapabilitiesResponse {
 	resp := &search.GetCapabilitiesResponse{}
 	for _, rc := range caps.Resources {
-		cap := &search.ResourceCapability{Resource: rc.Resource}
-		for _, f := range rc.Fields {
-			pf := &search.FieldCapability{
-				Field:      f.Field,
-				Type:       f.Type,
-				Searchable: f.Searchable,
-				Sortable:   f.Sortable,
-			}
-			for _, op := range f.FilterOps {
-				if p, ok := opToProto[op]; ok {
-					pf.FilterOps = append(pf.FilterOps, p)
-				}
-			}
-			cap.Fields = append(cap.Fields, pf)
+		cap := &search.ResourceCapability{
+			Resource:    rc.Resource,
+			Fields:      fieldCapabilitiesToProto(rc.Fields),
+			ReadVersion: int32(rc.ReadVersion),
+		}
+		for _, vc := range rc.Versions {
+			cap.Versions = append(cap.Versions, &search.VersionCapability{
+				Version: int32(vc.Version),
+				Fields:  fieldCapabilitiesToProto(vc.Fields),
+			})
 		}
 		resp.Resources = append(resp.Resources, cap)
 	}
 	return resp
+}
+
+func fieldCapabilitiesToProto(fields []core.FieldCapability) []*search.FieldCapability {
+	var out []*search.FieldCapability
+	for _, f := range fields {
+		pf := &search.FieldCapability{
+			Field:      f.Field,
+			Type:       f.Type,
+			Searchable: f.Searchable,
+			Sortable:   f.Sortable,
+		}
+		for _, op := range f.FilterOps {
+			if p, ok := opToProto[op]; ok {
+				pf.FilterOps = append(pf.FilterOps, p)
+			}
+		}
+		out = append(out, pf)
+	}
+	return out
 }

@@ -24,15 +24,17 @@ type rawFile struct {
 }
 
 // rawEntry represents a single entry in the resources list.
-// For versioned entries (version > 0), Fields is a VersionConfig object
-// containing {fields, relations}. For unversioned entries, Fields is
-// a []FieldConfig list and Relations is a sibling key.
+// The canonical shape is flat, identical with and without a version key:
+// Fields is a []FieldConfig list, Relations and NestedBlocks are sibling keys.
+// Versioned entries may instead use the legacy nested shape, where Fields is
+// a VersionConfig object containing {fields, relations, nestedBlocks}.
 type rawEntry struct {
-	Type        string                    `yaml:"type"`
-	Version     int                       `yaml:"version,omitempty"`
-	ReadVersion int                       `yaml:"readVersion,omitempty"`
-	Fields      any                       `yaml:"fields"`
-	Relations   []resource.RelationConfig `yaml:"relations,omitempty"`
+	Type         string                       `yaml:"type"`
+	Version      int                          `yaml:"version,omitempty"`
+	ReadVersion  int                          `yaml:"readVersion,omitempty"`
+	Fields       any                          `yaml:"fields"`
+	Relations    []resource.RelationConfig    `yaml:"relations,omitempty"`
+	NestedBlocks []resource.NestedBlockConfig `yaml:"nestedBlocks,omitempty"`
 }
 
 // ParseConfig parses resource config YAML bytes into Configs.
@@ -95,14 +97,15 @@ func ParseConfig(data []byte) (resource.Configs, error) {
 
 // parseEntrySchema extracts a VersionConfig from a raw YAML entry.
 //
-// For versioned entries (entry.Version > 0), the "fields" YAML key is an
-// object with {fields, relations} sub-keys (i.e. a VersionConfig).
-//
-// For unversioned entries, "fields" is a direct []FieldConfig list and
-// "relations" is a sibling key on the entry.
+// The canonical flat shape — "fields" is a []FieldConfig list, "relations"
+// and "nestedBlocks" are sibling keys — works with and without a version key,
+// so adding `version:` never restructures the entry. A "fields" key holding a
+// mapping instead of a list selects the legacy nested shape, an object with
+// {fields, relations, nestedBlocks} sub-keys (i.e. a VersionConfig); there the
+// sibling keys would be silently shadowed, so combining the two is an error.
 func parseEntrySchema(entry rawEntry) (*resource.VersionConfig, error) {
 	if entry.Fields == nil {
-		return &resource.VersionConfig{Relations: entry.Relations}, nil
+		return &resource.VersionConfig{Relations: entry.Relations, NestedBlocks: entry.NestedBlocks}, nil
 	}
 
 	b, err := yaml.Marshal(entry.Fields)
@@ -110,8 +113,10 @@ func parseEntrySchema(entry rawEntry) (*resource.VersionConfig, error) {
 		return nil, fmt.Errorf("re-marshal fields: %w", err)
 	}
 
-	if entry.Version > 0 {
-		// Versioned: fields is {fields: [...], relations: [...]}
+	if _, nested := entry.Fields.(map[string]any); nested {
+		if len(entry.Relations) > 0 || len(entry.NestedBlocks) > 0 {
+			return nil, fmt.Errorf("entry uses both the nested fields shape ({fields, relations, nestedBlocks} under \"fields\") and sibling relations/nestedBlocks keys; use one shape")
+		}
 		var vc resource.VersionConfig
 		if err := yaml.Unmarshal(b, &vc); err != nil {
 			return nil, fmt.Errorf("parse version schema: %w", err)
@@ -119,13 +124,13 @@ func parseEntrySchema(entry rawEntry) (*resource.VersionConfig, error) {
 		return &vc, nil
 	}
 
-	// Unversioned: fields is a direct [...] list
 	var fields []resource.FieldConfig
 	if err := yaml.Unmarshal(b, &fields); err != nil {
 		return nil, fmt.Errorf("parse fields: %w", err)
 	}
 	return &resource.VersionConfig{
-		Fields:    fields,
-		Relations: entry.Relations,
+		Fields:       fields,
+		Relations:    entry.Relations,
+		NestedBlocks: entry.NestedBlocks,
 	}, nil
 }

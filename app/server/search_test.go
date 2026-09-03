@@ -157,3 +157,32 @@ func TestSearch_InvalidFilterMapsToInvalidArgument(t *testing.T) {
 	require.Error(t, err)
 	require.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))
 }
+
+func TestGetCapabilities_ExposesAllActiveVersions(t *testing.T) {
+	cfg := &resource.Config{
+		Resource:    "a",
+		ReadVersion: 1,
+		Versions: []resource.VersionConfig{
+			{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}},
+			{Version: 2, Fields: []resource.FieldConfig{{Name: "x"}, {Name: "y"}}},
+		},
+	}
+	srv := NewSearcher(core.New(core.Config{Resources: resource.Configs{cfg}}))
+
+	resp, err := srv.GetCapabilities(context.Background(), connect.NewRequest(&search.GetCapabilitiesRequest{}))
+	require.NoError(t, err)
+	require.Len(t, resp.Msg.Resources, 1)
+
+	rc := resp.Msg.Resources[0]
+	require.EqualValues(t, 1, rc.ReadVersion)
+	require.Len(t, rc.Versions, 2)
+	require.EqualValues(t, 1, rc.Versions[0].Version)
+	require.Len(t, rc.Versions[0].Fields, 1)
+	require.EqualValues(t, 2, rc.Versions[1].Version)
+	require.Len(t, rc.Versions[1].Fields, 2)
+	require.Equal(t, "fields.y", rc.Versions[1].Fields[1].Field)
+
+	// Back-compat: top-level fields mirror the read version.
+	require.Len(t, rc.Fields, 1)
+	require.Equal(t, "fields.x", rc.Fields[0].Field)
+}

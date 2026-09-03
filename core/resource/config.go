@@ -128,7 +128,7 @@ func (c *Config) HasRelationTo(resourceType string) bool {
 // ApplyDefaults fills in zero-value fields with sensible defaults.
 // Call this after unmarshalling config from YAML.
 func (c *Config) ApplyDefaults() {
-	if c.ReadVersion == 0 {
+	if c.ReadVersion == 0 && len(c.Versions) > 0 {
 		c.ReadVersion = c.SortedVersions()[0]
 	}
 }

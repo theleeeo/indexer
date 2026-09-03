@@ -143,6 +143,9 @@ func (c Config) Validate() error {
 	if c.Resource == "" {
 		return fmt.Errorf("resource required")
 	}
+	if len(c.Versions) == 0 {
+		return fmt.Errorf("at least one version required")
+	}
 
 	// Validate version configuration.
 	for _, vc := range c.Versions {

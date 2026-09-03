@@ -192,3 +192,8 @@ func TestNestedBlockValidation(t *testing.T) {
 		t.Error("block name colliding with a root field key must be rejected")
 	}
 }
+
+func TestValidate_EmptyVersions_Error(t *testing.T) {
+	cfg := Configs{{Resource: "a"}}
+	require.ErrorContains(t, cfg.Validate(), "at least one version required")
+}

@@ -60,12 +60,3 @@ func IndexName(resource string, version int) string {
 func AliasName(resource string) string {
 	return resource + "_search"
 }
-
-// IndexNames returns the versioned index names for all given versions.
-func IndexNames(resource string, versions []int) []string {
-	names := make([]string, len(versions))
-	for i, v := range versions {
-		names[i] = IndexName(resource, v)
-	}
-	return names
-}

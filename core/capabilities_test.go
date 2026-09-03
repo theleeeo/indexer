@@ -239,3 +239,65 @@ func TestGetCapabilities_ScopedNestedBlockFields(t *testing.T) {
 	require.Contains(t, paths, "operator_data.custom_fields")
 	require.NotContains(t, paths, "operator_data.fiber_operator_id")
 }
+
+// A config whose ReadVersion has no matching VersionConfig (library misuse
+// that skipped Validate, or an empty Versions list) must not panic — the
+// resource is still listed, with no read-version fields to advertise.
+func TestGetCapabilities_MissingReadVersion_NoPanic(t *testing.T) {
+	idx := New(Config{Resources: resource.Configs{{
+		Resource:    "a",
+		ReadVersion: 2,
+		Versions:    []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}}},
+	}}})
+	caps := idx.GetCapabilities()
+	require.Len(t, caps.Resources, 1)
+	require.Empty(t, caps.Resources[0].Fields)
+}
+
+// Every active schema version's capabilities are advertised (ascending), with
+// ReadVersion marking the active one, so clients — aisearch derives its filter
+// vocabulary from capabilities — can pre-adopt vNext fields before cutover.
+// The top-level Fields stay the read version's view for existing clients.
+func TestGetCapabilities_AllActiveVersions(t *testing.T) {
+	idx := New(Config{Resources: resource.Configs{{
+		Resource:    "a",
+		ReadVersion: 1,
+		Versions: []resource.VersionConfig{
+			{Version: 2, Fields: []resource.FieldConfig{{Name: "x"}, {Name: "y", Type: "integer"}}},
+			{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}},
+		},
+	}}})
+
+	caps := idx.GetCapabilities()
+	require.Len(t, caps.Resources, 1)
+	rc := caps.Resources[0]
+
+	require.Equal(t, 1, rc.ReadVersion)
+	require.Len(t, rc.Versions, 2)
+
+	require.Equal(t, 1, rc.Versions[0].Version)
+	require.Len(t, rc.Versions[0].Fields, 1)
+	assertField(t, rc.Versions[0].Fields[0], "fields.x", "keyword", false, true, stringOps)
+
+	require.Equal(t, 2, rc.Versions[1].Version)
+	require.Len(t, rc.Versions[1].Fields, 2)
+	assertField(t, rc.Versions[1].Fields[1], "fields.y", "integer", false, true, numericOps)
+
+	// Back-compat: top-level Fields mirror the read version.
+	require.Equal(t, rc.Versions[0].Fields, rc.Fields)
+}
+
+// Even when the read version is missing its VersionConfig, the versions that
+// do exist are still advertised.
+func TestGetCapabilities_MissingReadVersion_VersionsStillListed(t *testing.T) {
+	idx := New(Config{Resources: resource.Configs{{
+		Resource:    "a",
+		ReadVersion: 2,
+		Versions:    []resource.VersionConfig{{Version: 1, Fields: []resource.FieldConfig{{Name: "x"}}}},
+	}}})
+	caps := idx.GetCapabilities()
+	rc := caps.Resources[0]
+	require.Empty(t, rc.Fields)
+	require.Len(t, rc.Versions, 1)
+	require.Equal(t, 1, rc.Versions[0].Version)
+}

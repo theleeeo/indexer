@@ -92,9 +92,20 @@ type CapabilitiesResponse struct {
 }
 
 // ResourceCapability describes the fields available for a single resource type.
+// Fields is the active read version's view; Versions additionally carries every
+// active schema version (ascending) so clients can pre-adopt a version that is
+// written but not yet read (ADR 0004).
 type ResourceCapability struct {
-	Resource string
-	Fields   []FieldCapability
+	Resource    string
+	Fields      []FieldCapability
+	ReadVersion int
+	Versions    []VersionCapability
+}
+
+// VersionCapability describes the fields of one active schema version.
+type VersionCapability struct {
+	Version int
+	Fields  []FieldCapability
 }
 
 // FieldCapability describes a single searchable field and its supported operations.

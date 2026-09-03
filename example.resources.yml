@@ -1,54 +1,56 @@
 resources:
+  # A versioned entry uses the same flat shape as an unversioned one: fields
+  # is a list, relations/nestedBlocks are sibling keys. Adding `version:` to
+  # an entry never restructures it. (The legacy nested shape — a {fields,
+  # relations} object under `fields:` — still parses.)
   - type: a
     version: 1
     fields:
-      fields:
-        - name: searchField
-          # search selects the full-text searchable tier this field feeds:
-          #   primary   — the document's own high-signal text (search surface)
-          #   secondary — lower-signal / denormalized-child text (search_scoped)
-          #   none      — not full-text searchable (still filterable)
-          # Omitted means none.
-          query:
-            search: primary
-        - name: secondaryField
-          type: text
-          query:
-            search: secondary
-      relations:
-        - resource: c
-          join: { local: id, foreign: a_id }
-          cardinality: many
-          fields:
-            - name: number
-              type: integer
+      - name: searchField
+        # search selects the full-text searchable tier this field feeds:
+        #   primary   — the document's own high-signal text (search surface)
+        #   secondary — lower-signal / denormalized-child text (search_scoped)
+        #   none      — not full-text searchable (still filterable)
+        # Omitted means none.
+        query:
+          search: primary
+      - name: secondaryField
+        type: text
+        query:
+          search: secondary
+    relations:
+      - resource: c
+        join: { local: id, foreign: a_id }
+        cardinality: many
+        fields:
+          - name: number
+            type: integer
 
   - type: a
     version: 2
     fields:
-      fields:
-        - name: searchField
-          query:
-            search: primary
-        - name: secondaryField
-          type: text
-          query:
-            search: secondary
-        - name: b_id
-      relations:
-        - resource: b
-          join: { local: b_id, foreign: id }
-          cardinality: one
-          fields:
-            - name: name
-              query:
-                search: primary
-        - resource: c
-          join: { local: id, foreign: a_id }
-          cardinality: many
-          fields:
-            - name: number
-              type: integer
+      - name: searchField
+        query:
+          search: primary
+      - name: secondaryField
+        type: text
+        query:
+          search: secondary
+      - name: b_id
+    relations:
+      - resource: b
+        join: { local: b_id, foreign: id }
+        cardinality: one
+        fields:
+          - name: name
+            query:
+              search: primary
+      - resource: c
+        join: { local: id, foreign: a_id }
+        cardinality: many
+        fields:
+          - name: number
+            type: integer
 
   - type: b
     fields:

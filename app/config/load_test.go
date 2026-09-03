@@ -109,3 +109,130 @@ func TestExampleResourcesConfig_Valid(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, cfgs.Validate())
 }
+
+// TestParseConfig_VersionedFlatShape verifies a versioned entry parses the
+// same flat shape as an unversioned one — fields as a list, relations and
+// nestedBlocks as sibling keys — so adding `version:` to an entry does not
+// restructure it.
+func TestParseConfig_VersionedFlatShape(t *testing.T) {
+	yaml := `
+resources:
+  - type: a
+    version: 1
+    fields:
+      - name: searchField
+        query:
+          search: primary
+    relations:
+      - resource: c
+        join: { local: id, foreign: a_id }
+        fields:
+          - name: number
+  - type: a
+    version: 2
+    readVersion: 1
+    fields:
+      - name: searchField
+    nestedBlocks:
+      - name: operator_data
+        scopeKey: fiber_operator_id
+        fields:
+          - name: custom_fields
+  - type: c
+    fields:
+      - name: number
+`
+	cfgs, err := ParseConfig([]byte(yaml))
+	require.NoError(t, err)
+	require.NoError(t, cfgs.Validate())
+
+	a := cfgs.Get("a")
+	require.NotNil(t, a)
+	require.Equal(t, 1, a.ReadVersion)
+	require.Equal(t, []int{1, 2}, a.SortedVersions())
+
+	v1 := a.GetVersion(1)
+	require.Len(t, v1.Fields, 1)
+	require.Equal(t, "searchField", v1.Fields[0].Name)
+	require.Len(t, v1.Relations, 1)
+	require.Equal(t, "c", v1.Relations[0].Resource)
+
+	v2 := a.GetVersion(2)
+	require.Len(t, v2.Fields, 1)
+	require.Empty(t, v2.Relations)
+	require.Len(t, v2.NestedBlocks, 1)
+	require.Equal(t, "operator_data", v2.NestedBlocks[0].Name)
+	require.Equal(t, "fiber_operator_id", v2.NestedBlocks[0].ScopeKey)
+}
+
+// TestParseConfig_UnversionedNestedBlocks verifies the sibling nestedBlocks
+// key also works on unversioned entries.
+func TestParseConfig_UnversionedNestedBlocks(t *testing.T) {
+	yaml := `
+resources:
+  - type: a
+    fields:
+      - name: name
+    nestedBlocks:
+      - name: operator_data
+        scopeKey: fiber_operator_id
+        fields:
+          - name: custom_fields
+`
+	cfgs, err := ParseConfig([]byte(yaml))
+	require.NoError(t, err)
+
+	blocks := cfgs.Get("a").GetVersion(1).NestedBlocks
+	require.Len(t, blocks, 1)
+	require.Equal(t, "operator_data", blocks[0].Name)
+}
+
+// TestParseConfig_VersionedNestedShape keeps the legacy nested shape working:
+// a versioned entry whose fields key is a {fields, relations, nestedBlocks}
+// object.
+func TestParseConfig_VersionedNestedShape(t *testing.T) {
+	yaml := `
+resources:
+  - type: a
+    version: 2
+    fields:
+      fields:
+        - name: searchField
+      relations:
+        - resource: c
+          join: { local: id, foreign: a_id }
+          fields:
+            - name: number
+  - type: c
+    fields:
+      - name: number
+`
+	cfgs, err := ParseConfig([]byte(yaml))
+	require.NoError(t, err)
+
+	v2 := cfgs.Get("a").GetVersion(2)
+	require.Len(t, v2.Fields, 1)
+	require.Len(t, v2.Relations, 1)
+	require.Equal(t, "c", v2.Relations[0].Resource)
+}
+
+// TestParseConfig_NestedShapeWithSiblingKeysRejected: mixing the nested shape
+// with sibling relations/nestedBlocks is ambiguous — previously the sibling
+// keys were silently dropped; now it is a load error.
+func TestParseConfig_NestedShapeWithSiblingKeysRejected(t *testing.T) {
+	yaml := `
+resources:
+  - type: a
+    version: 2
+    fields:
+      fields:
+        - name: searchField
+    relations:
+      - resource: c
+        join: { local: id, foreign: a_id }
+        fields:
+          - name: number
+`
+	_, err := ParseConfig([]byte(yaml))
+	require.ErrorContains(t, err, "both")
+}

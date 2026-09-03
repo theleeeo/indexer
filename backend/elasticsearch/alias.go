@@ -50,47 +50,6 @@ func (c *Client) CreateAlias(ctx context.Context, aliasName, indexName string) e
 	return nil
 }
 
-// SwitchAlias atomically moves an alias from one index to another.
-func (c *Client) SwitchAlias(ctx context.Context, aliasName, fromIndex, toIndex string) error {
-	body := map[string]any{
-		"actions": []any{
-			map[string]any{
-				"remove": map[string]any{
-					"index": fromIndex,
-					"alias": aliasName,
-				},
-			},
-			map[string]any{
-				"add": map[string]any{
-					"index": toIndex,
-					"alias": aliasName,
-				},
-			},
-		},
-	}
-
-	b, err := json.Marshal(body)
-	if err != nil {
-		return fmt.Errorf("marshal alias body: %w", err)
-	}
-
-	res, err := c.es.Indices.UpdateAliases(
-		bytes.NewReader(b),
-		c.es.Indices.UpdateAliases.WithContext(ctx),
-	)
-	if err != nil {
-		return fmt.Errorf("update aliases: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		raw, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("switch alias error: %s %s", res.Status(), string(raw))
-	}
-
-	return nil
-}
-
 // GetAlias returns the concrete index name that the alias currently points to.
 // Returns empty string and no error if the alias does not exist.
 func (c *Client) GetAlias(ctx context.Context, aliasName string) (string, error) {
@@ -212,23 +171,4 @@ func (c *Client) CountDocs(ctx context.Context, indexName string) (int64, error)
 		return 0, fmt.Errorf("decode count response: %w", err)
 	}
 	return decoded.Count, nil
-}
-
-// DeleteIndex deletes an Elasticsearch index.
-func (c *Client) DeleteIndex(ctx context.Context, indexName string) error {
-	res, err := c.es.Indices.Delete(
-		[]string{indexName},
-		c.es.Indices.Delete.WithContext(ctx),
-	)
-	if err != nil {
-		return fmt.Errorf("delete index: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.IsError() {
-		raw, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("delete index error: %s %s", res.Status(), string(raw))
-	}
-
-	return nil
 }
