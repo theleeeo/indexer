@@ -349,6 +349,38 @@ func TestBuildPlanForVersion_FetchAll_MultiplePages(t *testing.T) {
 	require.Equal(t, "3", docs[2].Root.Id)
 }
 
+func TestBuildPlanForVersion_FetchAll_StartsAtRequestPageToken(t *testing.T) {
+	prov := newMockProvider()
+	prov.pageSize = 2
+	prov.listed["product"] = []source.ListedResource{
+		{ID: "1", Data: map[string]any{"id": "1", "title": "A"}},
+		{ID: "2", Data: map[string]any{"id": "2", "title": "B"}},
+		{ID: "3", Data: map[string]any{"id": "3", "title": "C"}},
+		{ID: "4", Data: map[string]any{"id": "4", "title": "D"}},
+	}
+
+	fields := []resource.FieldConfig{{Name: "title"}}
+	vc := &resource.VersionConfig{Fields: fields}
+	plan := buildPlanForVersion(prov, "product", vc, nil)
+
+	ch := plan.Execute(context.Background(), projection.BuildRequest{
+		ResourceType: "product",
+		ResourceID:   "",
+		PageToken:    "3", // resume mid-walk: page tokens in mockProvider are resource IDs
+	})
+
+	var ids []string
+	for r := range ch {
+		require.NoError(t, r.Err)
+		for _, d := range r.Items {
+			ids = append(ids, d.Root.Id)
+		}
+	}
+
+	require.Equal(t, []string{"3", "4"}, ids,
+		"a walk started from a page token must skip everything before it")
+}
+
 func TestBuildPlanForVersion_FetchAll_Empty(t *testing.T) {
 	prov := newMockProvider()
 	// No resources listed for this type.

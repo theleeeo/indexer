@@ -12,6 +12,12 @@ type BuildRequest struct {
 	ResourceType string
 	ResourceID   string
 	Metadata     map[string]string
+
+	// PageToken starts an all-of-type walk (ResourceID == "") mid-listing:
+	// the walk's first fetch uses it in place of the first page. Empty means
+	// the beginning. Ignored for single-resource builds. Set by core when
+	// resuming a rebuild walk from a RebuildCursor.
+	PageToken string
 }
 
 // BuildDoc is the intermediate document flowing through the aggregation plan.

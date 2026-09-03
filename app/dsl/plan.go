@@ -248,7 +248,9 @@ func fetchAllResources(
 	fields []resource.FieldConfig,
 	params aggregation.FetchParameters[projection.BuildRequest],
 ) (aggregation.FetchResult[projection.BuildDoc], error) {
-	var pageToken string
+	// The first fetch honors a caller-supplied start token (a resumed rebuild
+	// walk); after that the provider's own next-page tokens drive the loop.
+	pageToken := params.Request.PageToken
 	if params.NextPageToken != nil {
 		pageToken = params.NextPageToken.(string)
 	}
