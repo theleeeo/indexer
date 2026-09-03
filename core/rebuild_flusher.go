@@ -91,6 +91,11 @@ type rebuildFlusher struct {
 	pending []pendingItem
 	state   map[string]*pendingResource
 	failed  int
+	// afterFlush, when set, runs after every successful flush of a non-empty
+	// chunk. rebuildAll checkpoints the walk cursor here: right after a flush,
+	// everything queued before the last completed page boundary is durably
+	// written, so that boundary is safe to resume from.
+	afterFlush func()
 }
 
 func newRebuildFlusher(idx *Indexer, resourceType string, metadata map[string]string) *rebuildFlusher {
@@ -258,6 +263,10 @@ func (f *rebuildFlusher) flush(ctx context.Context) error {
 				slog.String("id", it.ID), slog.String("error", err.Error()))
 		}
 		delete(f.state, it.ID)
+	}
+
+	if f.afterFlush != nil {
+		f.afterFlush()
 	}
 	return nil
 }

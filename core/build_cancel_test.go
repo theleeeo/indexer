@@ -93,7 +93,7 @@ func TestRebuildAll_CancelledContext_AbortsDocLoop(t *testing.T) {
 		Store: store,
 	})
 
-	err := idx.rebuild(ctx, RebuildArgs{ResourceType: "product"})
+	err := idx.rebuild(ctx, RebuildArgs{ResourceType: "product"}, rebuildResume{})
 
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("expected context.Canceled, got %v", err)
