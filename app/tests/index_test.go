@@ -1097,15 +1097,24 @@ func (t *TestSuite) Test_ConcurrentRequests_SameResource_BlockedOlderCannotOverw
 // The child updates are modelled in the source with versioned relations (not in
 // Notification metadata) so drift detection can compare observed vs stored
 // versions — the mechanism that actually drives convergence in production.
+//
+// Field values are single letter/digit runs ("av2", not "a_v2") on purpose. The
+// searchable surfaces are n-grammed with token_chars letter+digit and min_gram
+// 2, so "_" splits the text and a one-character component like the "a" in
+// "a_v2" yields no gram at all. The infix clause then requires only {v2}, which
+// a sibling child's "b_v2" also satisfies — the superseded-value assertions
+// below would pass or fail on gram collisions between children rather than on
+// convergence. Dropping the separator makes the junction trigram ("av2") the
+// discriminator, so each child's values are distinguishable.
 func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdatesConverge() {
 	t.setResourceConfig(RelatedResourceConfig)
 
 	// Initial graph: c/1 -> a/1, c/1 -> b/1, all at version 1.
-	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "a_v1"})
-	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "b_v1"})
-	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "c_base"})
-	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "a_v1"}, Version: 1}})
-	t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "b_v1"}, Version: 1}})
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "av1"})
+	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "bv1"})
+	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "cbase"})
+	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "av1"}, Version: 1}})
+	t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "bv1"}, Version: 1}})
 
 	for _, n := range []core.Notification{
 		{ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated, Version: 1},
@@ -1127,8 +1136,8 @@ func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdates
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "a_v2"})
-		t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "a_v2"}, Version: 2}})
+		t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "av2"})
+		t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "av2"}, Version: 2}})
 		<-start
 		errCh <- t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "a", ResourceID: "1", Kind: core.ChangeUpdated, Version: 2,
@@ -1138,8 +1147,8 @@ func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdates
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "b_v2"})
-		t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "b_v2"}, Version: 2}})
+		t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "bv2"})
+		t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "bv2"}, Version: 2}})
 		<-start
 		errCh <- t.idx.RegisterChange(t.T().Context(), core.Notification{
 			ResourceType: "b", ResourceID: "1", Kind: core.ChangeUpdated, Version: 2,
@@ -1154,8 +1163,8 @@ func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdates
 	}
 
 	// A final update to a. This is the value c must ultimately reflect for a.
-	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "a_v3"})
-	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "a_v3"}, Version: 3}})
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "av3"})
+	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "av3"}, Version: 3}})
 	t.Require().NoError(t.idx.RegisterChange(t.T().Context(), core.Notification{
 		ResourceType: "a", ResourceID: "1", Kind: core.ChangeUpdated, Version: 3,
 	}))
@@ -1169,23 +1178,23 @@ func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdates
 
 	aRels := sourceList(resp.Hits[0].Source, "a")
 	t.Require().Len(aRels, 1)
-	t.Require().Equal("a_v3", fieldStr(aRels[0], "f1"))
+	t.Require().Equal("av3", fieldStr(aRels[0], "f1"))
 
 	bRels := sourceList(resp.Hits[0].Source, "b")
 	t.Require().Len(bRels, 1)
-	t.Require().Equal("b_v2", fieldStr(bRels[0], "f1"))
+	t.Require().Equal("bv2", fieldStr(bRels[0], "f1"))
 
 	// The latest child values are searchable on c.
-	latestA, err := t.idx.Search(t.T().Context(), core.SearchRequest{Resource: "c", Query: "a_v3"})
+	latestA, err := t.idx.Search(t.T().Context(), core.SearchRequest{Resource: "c", Query: "av3"})
 	t.Require().NoError(err)
 	t.Require().Len(latestA.Hits, 1)
 
-	latestB, err := t.idx.Search(t.T().Context(), core.SearchRequest{Resource: "c", Query: "b_v2"})
+	latestB, err := t.idx.Search(t.T().Context(), core.SearchRequest{Resource: "c", Query: "bv2"})
 	t.Require().NoError(err)
 	t.Require().Len(latestB.Hits, 1)
 
 	// Superseded child values are gone.
-	for _, stale := range []string{"a_v1", "a_v2", "b_v1"} {
+	for _, stale := range []string{"av1", "av2", "bv1"} {
 		staleResp, err := t.idx.Search(t.T().Context(), core.SearchRequest{Resource: "c", Query: stale})
 		t.Require().NoError(err)
 		t.Require().Lenf(staleResp.Hits, 0, "stale value %q should not be searchable on c", stale)
@@ -1198,16 +1207,19 @@ func (t *TestSuite) Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdates
 // persisted. RegisterChange for the child sees no parent edge to fan out to,
 // so without drift detection the parent would index permanently-stale child
 // data. The drift check in buildOne re-enqueues the parent on detection.
+//
+// Values are separator-free ("av1", not "a_v1") for the n-gram reason spelled
+// out on Test_ConcurrentRequests_RelatedParent_ConcurrentChildUpdatesConverge.
 func (t *TestSuite) Test_RaceCondition_ChildUpdatedDuringParentBuild() {
 	t.setResourceConfig(RelatedResourceConfig)
 
 	// Initial graph: c/1 -> a/1, c/1 -> b/1.
-	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "a_v1"})
-	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "b_v1"})
-	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "c_v1"})
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "av1"})
+	t.fakeProvider.SetResource("b", "1", map[string]any{"id": "1", "f1": "bv1"})
+	t.fakeProvider.SetResource("c", "1", map[string]any{"id": "1", "f1": "cv1"})
 	// Use versioned relations so drift detection can compare observed vs stored.
-	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "a_v1"}, Version: 1}})
-	t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "b_v1"}, Version: 1}})
+	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "av1"}, Version: 1}})
+	t.fakeProvider.SetRelatedVersioned("b", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "bv1"}, Version: 1}})
 
 	for _, n := range []core.Notification{
 		{ResourceType: "a", ResourceID: "1", Kind: core.ChangeCreated, Version: 1},
@@ -1242,8 +1254,8 @@ func (t *TestSuite) Test_RaceCondition_ChildUpdatedDuringParentBuild() {
 	// version 2 in the source and notify. The c->a edge was already removed at
 	// the start of c's build, so this notification finds no parents and cannot
 	// fan out to c.
-	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "a_v2"})
-	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "a_v2"}, Version: 2}})
+	t.fakeProvider.SetResource("a", "1", map[string]any{"id": "1", "f1": "av2"})
+	t.fakeProvider.SetRelatedVersioned("a", []string{"1"}, []source.RelatedResource{{ID: "1", Data: map[string]any{"id": "1", "f1": "av2"}, Version: 2}})
 
 	t.Require().NoError(t.idx.RegisterChange(t.T().Context(), core.Notification{
 		ResourceType: "a",
@@ -1266,12 +1278,12 @@ func (t *TestSuite) Test_RaceCondition_ChildUpdatedDuringParentBuild() {
 	aRels := sourceList(resp.Hits[0].Source, "a")
 	t.Require().Len(aRels, 1)
 	t.Require().Equal("1", fieldStr(aRels[0], "id"))
-	t.Require().Equal("a_v2", fieldStr(aRels[0], "f1"))
+	t.Require().Equal("av2", fieldStr(aRels[0], "f1"))
 
 	// Search for new A field works
 	resp, err = t.idx.Search(t.T().Context(), core.SearchRequest{
 		Resource: "c",
-		Query:    "a_v2",
+		Query:    "av2",
 	})
 	t.Require().NoError(err)
 	t.Require().Len(resp.Hits, 1)
@@ -1280,7 +1292,7 @@ func (t *TestSuite) Test_RaceCondition_ChildUpdatedDuringParentBuild() {
 	// Search for old A field does not work
 	staleResp, err := t.idx.Search(t.T().Context(), core.SearchRequest{
 		Resource: "c",
-		Query:    "a_v1",
+		Query:    "av1",
 	})
 	t.Require().NoError(err)
 	t.Require().Len(staleResp.Hits, 0)

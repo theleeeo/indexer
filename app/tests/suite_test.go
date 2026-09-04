@@ -356,6 +356,13 @@ type TestSuite struct {
 	st           *postgres.Store
 }
 
+// primaryTier marks a fixture field as feeding the primary `search_primary`
+// surface. An omitted selector resolves to SearchTierNone, which keeps the
+// field out of full-text search entirely — a document built from such a config
+// carries no `search_primary`, so a free-text Search can never match it. Every
+// field the suite asserts on by free-text Query must therefore declare a tier.
+var primaryTier = resource.QueryConfig{Search: resource.SearchTierPrimary}
+
 var DefaultResourceConfig = resource.Configs{
 	{
 		Resource: "a",
@@ -363,16 +370,16 @@ var DefaultResourceConfig = resource.Configs{
 			{
 				Version: 1,
 				Fields: []resource.FieldConfig{
-					{Name: "field1"},
-					{Name: "field2"},
+					{Name: "field1", Query: primaryTier},
+					{Name: "field2", Query: primaryTier},
 				},
 				Relations: []resource.RelationConfig{
 					{
 						Resource: "b",
 						Join:     resource.JoinConfig{Local: "id", Foreign: "a_id"},
 						Fields: []resource.FieldConfig{
-							{Name: "field1"},
-							{Name: "field2"},
+							{Name: "field1", Query: primaryTier},
+							{Name: "field2", Query: primaryTier},
 						},
 					},
 				},
@@ -385,8 +392,8 @@ var DefaultResourceConfig = resource.Configs{
 			{
 				Version: 1,
 				Fields: []resource.FieldConfig{
-					{Name: "field1"},
-					{Name: "field2"},
+					{Name: "field1", Query: primaryTier},
+					{Name: "field2", Query: primaryTier},
 				},
 				Relations: []resource.RelationConfig{},
 			},
@@ -401,13 +408,13 @@ var RelatedResourceConfig = resource.Configs{
 			{
 				Version: 1,
 				Fields: []resource.FieldConfig{
-					{Name: "f1"},
+					{Name: "f1", Query: primaryTier},
 				},
 				Relations: []resource.RelationConfig{
 					{
 						Resource: "b",
 						Join:     resource.JoinConfig{Local: "id", Foreign: "a_id"},
-						Fields:   []resource.FieldConfig{{Name: "f1"}},
+						Fields:   []resource.FieldConfig{{Name: "f1", Query: primaryTier}},
 					},
 				},
 			},
@@ -419,13 +426,13 @@ var RelatedResourceConfig = resource.Configs{
 			{
 				Version: 1,
 				Fields: []resource.FieldConfig{
-					{Name: "f1"},
+					{Name: "f1", Query: primaryTier},
 				},
 				Relations: []resource.RelationConfig{
 					{
 						Resource: "a",
 						Join:     resource.JoinConfig{Local: "id", Foreign: "b_id"},
-						Fields:   []resource.FieldConfig{{Name: "f1"}},
+						Fields:   []resource.FieldConfig{{Name: "f1", Query: primaryTier}},
 					},
 				},
 			},
@@ -437,18 +444,18 @@ var RelatedResourceConfig = resource.Configs{
 			{
 				Version: 1,
 				Fields: []resource.FieldConfig{
-					{Name: "f1"},
+					{Name: "f1", Query: primaryTier},
 				},
 				Relations: []resource.RelationConfig{
 					{
 						Resource: "a",
 						Join:     resource.JoinConfig{Local: "id", Foreign: "c_id"},
-						Fields:   []resource.FieldConfig{{Name: "f1"}},
+						Fields:   []resource.FieldConfig{{Name: "f1", Query: primaryTier}},
 					},
 					{
 						Resource: "b",
 						Join:     resource.JoinConfig{Local: "id", Foreign: "c_id"},
-						Fields:   []resource.FieldConfig{{Name: "f1"}},
+						Fields:   []resource.FieldConfig{{Name: "f1", Query: primaryTier}},
 					},
 				},
 			},
