@@ -62,7 +62,7 @@ only `aggregation` and `app` remain separate modules.
 2. `core.Indexer.RegisterChange` updates Postgres state and finds affected Parent Resources via the Relation graph
 3. For every root (the changed Resource + affected Parents), `core` **marks it stale** in Postgres (`MarkStale`), then submits an **inline build** to a bounded in-process worker pool
 4. A build executes a `projection.Plan` (which calls the `source.Provider`), writes to ES via `SearchBackend` with the Build Sequence as `external_gte`, updates the Relation graph, and clears the stale mark (`ClearStale`, guarded by the seq captured at `BeginBuild`)
-5. **Slow lane (Temporal):** the `StaleSweep` workflow (schedule `laika-stale-sweep`) rebuilds anything stale past a threshold; explicit rebuilds run as `RebuildWalk` workflows. Both live in `core` on the `laika-indexer` task queue. Temporal being down degrades recovery latency only — never hot-path throughput or correctness.
+5. **Slow lane (Temporal):** the `StaleSweep` workflow (schedule `laika-stale-sweep`) rebuilds anything stale past a threshold; explicit rebuilds run as `RebuildWalk` workflows. Both live in `core` on the `laika-indexer` task queue. A single-active-plan walk (single-version type, or a version-targeted backfill) checkpoints a `RebuildCursor` into its activity's heartbeat details, so a retried attempt resumes instead of restarting; multi-plan walks restart from scratch ([ADR 0011](docs/adr/0011-resumable-rebuild-walks-via-heartbeat-cursors.md)). Temporal being down degrades recovery latency only — never hot-path throughput or correctness.
 
 Search path: `app/server/SearcherServer` → `core.Indexer.Search` → `SearchBackend.Search`
 
@@ -104,6 +104,7 @@ Both `Store` and `SearchBackend` have exactly one implementation each; the inter
 - **All-of-Type Rebuild path**: `BuildRequest.ResourceID == ""` triggers `ListResources` pagination — the Rebuild path that walks every Resource of a Type.
 - **Plans encapsulate data fetching**: `core.Indexer` only executes Plans; it never calls `source.Provider` directly. Library users supply their own Plans.
 - **Resource configs are validated at the boundary**: `core.New` and `SetPlans` apply defaults and validate the resource config set, refusing an invalid one (an empty set is legal — rejecting it is app policy, enforced by the YAML loader). Everything past that boundary *assumes* the invariants hold — every resource has ≥1 version, `ReadVersionConfig()` never returns nil, relations are consistent — so do not add defensive nil guards for them. Callers must not mutate the configs after handing them over.
+- **Checkpoints step only over settled work**: a `RebuildCursor` is reported only by single-active-plan walks, only after a successful flush, and only for fully consumed page boundaries — every resource behind it is settled, or durably marked stale for the sweep. Multi-plan walks never checkpoint and ignore cursors: cross-plan settlement makes their intermediate positions non-durable ([ADR 0011](docs/adr/0011-resumable-rebuild-walks-via-heartbeat-cursors.md)).
 
 ### Configuration
 

@@ -97,7 +97,9 @@ the `laika-indexer` task queue. There is one implementation of the safety net.
   activity (`RebuildNow`); an all-of-type walk (`ResourceID == ""` →
   `ListResources` pagination) is a heartbeating activity that Temporal retries
   from scratch on another instance if one dies — correct because Rebuilds are
-  idempotent. Resumable cursors via continue-as-new are a future refinement.
+  idempotent. Resumable cursors landed in
+  [ADR 0011](./0011-resumable-rebuild-walks-via-heartbeat-cursors.md) — via
+  activity heartbeat details rather than continue-as-new.
 
 ### Failure isolation
 
