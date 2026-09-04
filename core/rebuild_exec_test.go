@@ -820,6 +820,15 @@ func (e *cancelStoppingExecuter) Execute(ctx context.Context, _ projection.Build
 	go func() {
 		defer close(ch)
 		for _, p := range e.pages {
+			// Checked before the page is offered, not only inside the select:
+			// a select whose receive and whose ctx.Done() are both ready picks
+			// between them uniformly, so a cancelled walk could still be handed
+			// the next page and the test would only fail against the bug about
+			// half the time. Refusing to offer anything once cancelled makes
+			// the unwalked remainder — and therefore the red — deterministic.
+			if ctx.Err() != nil {
+				return
+			}
 			select {
 			case ch <- p:
 			case <-ctx.Done():
