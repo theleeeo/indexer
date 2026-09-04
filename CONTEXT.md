@@ -61,6 +61,9 @@ A resource row flagged `deleted = true` (with `version` reset to `0`) whose Elas
 **Rebuild**:
 The reset path: produce and write documents for one, many, or all Resources of a Type without honouring prior state. Used to populate a newly-added Schema Version, to recover from corruption, or to reset documents to a new shape. Always wins over any concurrent Build because it stamps a fresh Build Sequence.
 
+**Rebuild cursor**:
+The durable position of an all-of-type [[rebuild]] walk: a `{plan version, page token}` pair meaning every Resource listed by the pages before that token has settled — its [[document]]s written and its [[stale mark]] cleared — or is durably marked stale for the [[sweep]]. Carried in the `RunRebuild` activity's Temporal heartbeat details, so a retried attempt resumes there instead of walking again from the head. Only a walk with exactly one active [[plan]] has such a position — a single-version Type, or a version-targeted backfill — and it records one only at a page boundary it has fully consumed and flushed; a multi-plan walk has none and restarts from scratch. The page token must mean the same place when it is redeemed as when it was written, which is a property of the upstream listing, not something the indexer can enforce (ADR 0011).
+
 **Document**:
 The denormalised search artifact written to Elasticsearch — the result of a Build or a Rebuild. One Document per (Resource, Schema Version) pair.
 

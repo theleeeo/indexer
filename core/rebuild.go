@@ -23,6 +23,12 @@ type ResourceSelector struct {
 // written and its stale mark cleared, or it is durably marked stale for the
 // sweep. An empty PageToken means the start of PlanVersion's walk. A walk
 // resumed from a cursor re-enters the listing at PageToken (ADR 0011).
+//
+// PageToken must identify a position that is stable across attempts — a cursor
+// is redeemed minutes to hours after it was recorded. Keyset or last-ID tokens
+// qualify; an offset token does not, because upstream deletions in between
+// shift later rows forward and the resumed walk then starts past resources it
+// never walked, leaving them un-rebuilt and unmarked.
 type RebuildCursor struct {
 	PlanVersion int    `json:"plan_version"`
 	PageToken   string `json:"page_token"`
@@ -69,6 +75,11 @@ func (idx *Indexer) RebuildNow(ctx context.Context, selectors []ResourceSelector
 // resuming past it whose remaining listing omits it would leave it with wiped
 // edges and no stale mark. Such walks, and targeted (by-ID) rebuilds, ignore
 // start and never checkpoint — they restart from scratch, as before (ADR 0011).
+//
+// Resuming also requires the plan's Executer to honour
+// projection.BuildRequest.PageToken: one that ignores it restarts from the head
+// of the listing on every resume. That is safe — a full re-walk settles
+// everything it touches — but the walk is not actually resumable.
 func (idx *Indexer) RebuildNowResumable(ctx context.Context, sel ResourceSelector, start *RebuildCursor, checkpoint func(RebuildCursor)) error {
 	if err := idx.validateSelectors([]ResourceSelector{sel}); err != nil {
 		return err
