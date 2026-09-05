@@ -66,9 +66,10 @@ type FederatedSearchResponse struct {
 
 // FederatedSearchParams is the backend-level description of a federated query.
 // Core resolves Resource Types into index/alias terms so the backend stays
-// type-agnostic: it searches the FilterGroups' aliases as a single multi-index
-// query and reports results keyed by concrete index, which core maps back to
-// Types.
+// type-agnostic: it searches the FilterGroups' aliases — as a single
+// multi-index query or a per-Type fan-out, the backend's choice — and reports
+// results keyed by concrete index (counts may be keyed by alias), which core
+// maps back to Types.
 type FederatedSearchParams struct {
 	Query          string
 	Filters        []Filter           // global root fields.* filters, applied to all Types
@@ -89,8 +90,8 @@ type FederatedRawHit struct {
 }
 
 // FederatedSearchResult is the backend-level federated result. IndexCounts maps
-// each concrete index to its matching-document count; core folds those into
-// per-Resource-Type counts.
+// each concrete index (or read alias, on the fan-out execution) to its
+// matching-document count; core folds those into per-Resource-Type counts.
 type FederatedSearchResult struct {
 	Total       int64
 	Hits        []FederatedRawHit
@@ -108,11 +109,13 @@ func (idx *Indexer) FederatedSearch(ctx context.Context, req FederatedSearchRequ
 // federatedSearchBase runs one query across a caller-supplied set of Resource Types
 // and returns a single relevance-ranked cross-type list (spec D3, D12, D13).
 //
-// It is a single multi-index query: per-Type document visibility is enforced by
-// the per-Type filters a federated middleware supplies on the request
-// (ResourceFilters), combined as per-index filter groups (buildIndexFilterGroups),
-// not by fanning out one query per Type. The backend applies dfs_query_then_fetch
-// so cross-type scores share global term statistics and are genuinely comparable.
+// Per-Type document visibility is enforced by the per-Type filters a federated
+// middleware supplies on the request (ResourceFilters), combined as per-index
+// filter groups (buildIndexFilterGroups). How the backend executes those groups
+// is its own concern: by default a single multi-index query with
+// dfs_query_then_fetch, so cross-type scores share global term statistics and
+// are genuinely comparable; the Elasticsearch backend also offers experimental
+// modes (plain query_then_fetch, per-Type fan-out) behind a toggle.
 func (idx *Indexer) federatedSearchBase(ctx context.Context, req FederatedSearchRequest) (FederatedSearchResponse, error) {
 	if len(req.Resources) == 0 {
 		return FederatedSearchResponse{}, &InvalidArgumentError{Msg: "at least one resource is required"}
@@ -150,6 +153,11 @@ func (idx *Indexer) federatedSearchBase(ctx context.Context, req FederatedSearch
 		for _, v := range r.SortedVersions() {
 			indexToResource[IndexName(name, v)] = name
 		}
+		// The backend's fan-out execution reports per-Type counts keyed by read
+		// alias (it queries one alias per Type and cannot split a count across
+		// that alias's concrete indices), so aliases resolve too. Hits always
+		// carry concrete index names regardless of execution mode.
+		indexToResource[AliasName(r.Resource)] = name
 	}
 
 	page, pageSize := normalizePaging(req.Page, req.PageSize)

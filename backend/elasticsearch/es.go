@@ -19,10 +19,61 @@ type Client struct {
 
 	// Temporary solution to control refresh behavior during tests
 	withRefresh bool
+
+	federatedExecution FederatedExecution
 }
 
-func New(client *esv8.Client, withRefresh bool) *Client {
-	return &Client{es: client, withRefresh: withRefresh}
+// FederatedExecution selects how FederatedSearch executes against the cluster.
+// It is an experiment toggle (ADR 0007 kept per-Type fan-out as a documented
+// future execution swap): all modes return the same hit membership and counts,
+// but they differ in scoring statistics and pagination cost.
+type FederatedExecution string
+
+const (
+	// FederatedSingleDFS is the default: one multi-index query with
+	// dfs_query_then_fetch, so cross-type BM25 scores share global term
+	// statistics (spec D13).
+	FederatedSingleDFS FederatedExecution = "single-dfs"
+	// FederatedSingle is the same single multi-index query with the ES default
+	// query_then_fetch: scores use per-shard-local term statistics. With
+	// single-shard indices this scores exactly like FederatedFanout, making it
+	// the cheap way to evaluate fan-out ranking quality before paying for the
+	// fan-out execution.
+	FederatedSingle FederatedExecution = "single"
+	// FederatedFanout issues one sub-search per Type via _msearch and merges
+	// client-side; see federatedFanout for the trade-offs.
+	FederatedFanout FederatedExecution = "fanout"
+)
+
+// ParseFederatedExecution maps a config string to a FederatedExecution; empty
+// selects the default (FederatedSingleDFS).
+func ParseFederatedExecution(s string) (FederatedExecution, error) {
+	switch mode := FederatedExecution(s); mode {
+	case "":
+		return FederatedSingleDFS, nil
+	case FederatedSingleDFS, FederatedSingle, FederatedFanout:
+		return mode, nil
+	default:
+		return "", fmt.Errorf("unknown federated execution mode %q (want %q, %q or %q)",
+			s, FederatedSingleDFS, FederatedSingle, FederatedFanout)
+	}
+}
+
+// Option configures optional Client behavior.
+type Option func(*Client)
+
+// WithFederatedExecution selects the Federated Search execution mode. The
+// default is FederatedSingleDFS.
+func WithFederatedExecution(mode FederatedExecution) Option {
+	return func(c *Client) { c.federatedExecution = mode }
+}
+
+func New(client *esv8.Client, withRefresh bool, opts ...Option) *Client {
+	c := &Client{es: client, withRefresh: withRefresh, federatedExecution: FederatedSingleDFS}
+	for _, o := range opts {
+		o(c)
+	}
+	return c
 }
 
 // Dial constructs a Client connected to the given Elasticsearch address(es).

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/theleeeo/laika/core"
 	"github.com/theleeeo/laika/core/resource"
 )
@@ -148,16 +149,34 @@ func (c *Client) Search(ctx context.Context, req core.SearchRequest, indexAlias 
 	return out, nil
 }
 
-// federatedSearchType is the ES search_type for Federated Search. DFS gathers
-// global term statistics across all queried indices before scoring so cross-type
-// BM25 scores are comparable (spec D13). Kept as a single constant so the
-// documented future experiment — dropping to plain query_then_fetch — is a
-// one-line flip.
+// federatedSearchType is the ES search_type for the default single-query
+// Federated Search execution (FederatedSingleDFS). DFS gathers global term
+// statistics across all queried indices before scoring so cross-type BM25
+// scores are comparable (spec D13). The documented experiments — dropping to
+// plain query_then_fetch, or fanning out one sub-search per Type — are the
+// other FederatedExecution modes.
 const federatedSearchType = "dfs_query_then_fetch"
 
-// FederatedSearch runs a single multi-index query across the FilterGroups'
-// aliases and returns results keyed by concrete index (spec D3, D12, D13).
+// FederatedSearch dispatches on the Client's FederatedExecution mode: a single
+// multi-index query with global (DFS) or index-local term statistics, or a
+// per-Type fan-out merged client-side. All modes return the same hit membership
+// and counts; scoring statistics and pagination cost differ (see
+// FederatedExecution).
 func (c *Client) FederatedSearch(ctx context.Context, p core.FederatedSearchParams) (core.FederatedSearchResult, error) {
+	switch c.federatedExecution {
+	case FederatedFanout:
+		return c.federatedFanout(ctx, p)
+	case FederatedSingle:
+		return c.federatedSingle(ctx, p, "")
+	default:
+		return c.federatedSingle(ctx, p, federatedSearchType)
+	}
+}
+
+// federatedSingle runs a single multi-index query across the FilterGroups'
+// aliases and returns results keyed by concrete index (spec D3, D12, D13).
+// searchType "" leaves the cluster default (query_then_fetch).
+func (c *Client) federatedSingle(ctx context.Context, p core.FederatedSearchParams, searchType string) (core.FederatedSearchResult, error) {
 	indices := make([]string, 0, len(p.FilterGroups))
 	for _, g := range p.FilterGroups {
 		indices = append(indices, g.Alias)
@@ -211,12 +230,15 @@ func (c *Client) FederatedSearch(ctx context.Context, p core.FederatedSearchPara
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
-	res, err := c.es.Search(
+	searchOpts := []func(*esapi.SearchRequest){
 		c.es.Search.WithContext(ctx),
 		c.es.Search.WithIndex(indices...),
 		c.es.Search.WithBody(bytes.NewReader(b)),
-		c.es.Search.WithSearchType(federatedSearchType),
-	)
+	}
+	if searchType != "" {
+		searchOpts = append(searchOpts, c.es.Search.WithSearchType(searchType))
+	}
+	res, err := c.es.Search(searchOpts...)
 	if err != nil {
 		return core.FederatedSearchResult{}, err
 	}
@@ -236,26 +258,7 @@ func (c *Client) FederatedSearch(ctx context.Context, p core.FederatedSearchPara
 	}
 
 	result := core.FederatedSearchResult{IndexCounts: map[string]int64{}}
-
-	hitsObj, _ := decoded["hits"].(map[string]any)
-	if t, ok := hitsObj["total"].(map[string]any); ok {
-		if v, ok := t["value"].(float64); ok {
-			result.Total = int64(v)
-		}
-	}
-	for _, h := range hitsObj["hits"].([]any) {
-		m, _ := h.(map[string]any)
-		index, _ := m["_index"].(string)
-		id, _ := m["_id"].(string)
-		score, _ := m["_score"].(float64)
-		src, _ := m["_source"].(map[string]any)
-		result.Hits = append(result.Hits, core.FederatedRawHit{
-			Index:  index,
-			ID:     id,
-			Score:  score,
-			Source: src,
-		})
-	}
+	result.Total, result.Hits = decodeFederatedHits(decoded)
 
 	if aggs, ok := decoded["aggregations"].(map[string]any); ok {
 		if perIndex, ok := aggs["per_index"].(map[string]any); ok {
@@ -271,6 +274,37 @@ func (c *Client) FederatedSearch(ctx context.Context, p core.FederatedSearchPara
 	}
 
 	return result, nil
+}
+
+// decodeFederatedHits extracts hits.total.value and the hit list from one
+// decoded ES search response body. Both federated executions use it: the
+// single query on its one response, the fan-out on each _msearch item.
+func decodeFederatedHits(decoded map[string]any) (int64, []core.FederatedRawHit) {
+	hitsObj, _ := decoded["hits"].(map[string]any)
+
+	var total int64
+	if t, ok := hitsObj["total"].(map[string]any); ok {
+		if v, ok := t["value"].(float64); ok {
+			total = int64(v)
+		}
+	}
+
+	hitList, _ := hitsObj["hits"].([]any)
+	hits := make([]core.FederatedRawHit, 0, len(hitList))
+	for _, h := range hitList {
+		m, _ := h.(map[string]any)
+		index, _ := m["_index"].(string)
+		id, _ := m["_id"].(string)
+		score, _ := m["_score"].(float64)
+		src, _ := m["_source"].(map[string]any)
+		hits = append(hits, core.FederatedRawHit{
+			Index:  index,
+			ID:     id,
+			Score:  score,
+			Source: src,
+		})
+	}
+	return total, hits
 }
 
 // buildFederatedTextQuery is the scoring core of a federated query: a document

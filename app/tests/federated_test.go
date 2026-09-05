@@ -317,3 +317,79 @@ func (t *TestSuite) Test_FederatedSearch_InfixMatches() {
 		t.Require().Equal("b1", resp.Hits[0].ID)
 	})
 }
+
+// Test_FederatedSearch_ExecutionModeParity runs the same federated query under
+// all three backend execution modes — the default single multi-index query with
+// DFS term statistics, the same query with index-local statistics, and the
+// per-Type fan-out merged client-side — and asserts they agree on hit
+// membership, per-Type counts, and totals. Only scores may differ between
+// modes, and paging must walk a stable, non-overlapping ranking in each.
+func (t *TestSuite) Test_FederatedSearch_ExecutionModeParity() {
+	t.setResourceConfig(DefaultResourceConfig)
+
+	t.indexRaw(core.IndexName("a", 1), "a1", map[string]any{"search_primary": "red widget deluxe"})
+	t.indexRaw(core.IndexName("a", 1), "a2", map[string]any{"search_primary": "widget assembly kit"})
+	t.indexRaw(core.IndexName("b", 1), "b1", map[string]any{"search_primary": "widget"})
+	t.indexRaw(core.IndexName("b", 1), "b2", map[string]any{"search_primary": "blue gadget"})
+
+	type outcome struct {
+		ids    map[string]bool
+		counts []core.ResourceCount
+		total  int64
+	}
+	results := map[elasticsearch.FederatedExecution]outcome{}
+
+	for _, mode := range []elasticsearch.FederatedExecution{
+		elasticsearch.FederatedSingleDFS,
+		elasticsearch.FederatedSingle,
+		elasticsearch.FederatedFanout,
+	} {
+		idx, err := core.New(core.Config{
+			Resources: DefaultResourceConfig,
+			ES:        elasticsearch.New(t.esClient, true, elasticsearch.WithFederatedExecution(mode)),
+		})
+		t.Require().NoErrorf(err, "mode %s", mode)
+
+		resp, err := idx.FederatedSearch(t.T().Context(), core.FederatedSearchRequest{
+			Query:     "widget",
+			Resources: []string{"a", "b"},
+		})
+		t.Require().NoErrorf(err, "mode %s", mode)
+
+		ids := map[string]bool{}
+		for _, h := range resp.Hits {
+			ids[h.Resource+"/"+h.ID] = true
+		}
+		results[mode] = outcome{ids: ids, counts: resp.Counts, total: resp.Total}
+
+		// Page through with size 1: the pages must be disjoint and cover
+		// exactly the unpaged set (deterministic ranking, no boundary drift).
+		seen := map[string]bool{}
+		for page := int32(0); ; page++ {
+			pr, err := idx.FederatedSearch(t.T().Context(), core.FederatedSearchRequest{
+				Query:     "widget",
+				Resources: []string{"a", "b"},
+				Page:      page,
+				PageSize:  1,
+			})
+			t.Require().NoErrorf(err, "mode %s page %d", mode, page)
+			if len(pr.Hits) == 0 {
+				break
+			}
+			t.Require().Lenf(pr.Hits, 1, "mode %s page %d", mode, page)
+			key := pr.Hits[0].Resource + "/" + pr.Hits[0].ID
+			t.Require().Falsef(seen[key], "mode %s: hit %s appeared on two pages", mode, key)
+			seen[key] = true
+		}
+		t.Require().Equalf(ids, seen, "mode %s: paged stream diverges from unpaged set", mode)
+	}
+
+	base := results[elasticsearch.FederatedSingleDFS]
+	t.Require().EqualValues(3, base.total)
+	t.Require().Equal([]core.ResourceCount{{Resource: "a", Count: 2}, {Resource: "b", Count: 1}}, base.counts)
+	for mode, got := range results {
+		t.Require().Equalf(base.ids, got.ids, "mode %s membership", mode)
+		t.Require().Equalf(base.counts, got.counts, "mode %s counts", mode)
+		t.Require().Equalf(base.total, got.total, "mode %s total", mode)
+	}
+}

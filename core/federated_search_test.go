@@ -136,6 +136,45 @@ func TestFederatedSearch_MapsIndexToResourceAndCounts(t *testing.T) {
 	}
 }
 
+// TestFederatedSearch_MapsAliasCountsToResources: the fan-out execution keys
+// IndexCounts by read alias rather than concrete index (it queries one alias
+// per Type and cannot split counts across that alias's indices); both resolve.
+func TestFederatedSearch_MapsAliasCountsToResources(t *testing.T) {
+	backend := &recordingBackend{
+		fedResponse: FederatedSearchResult{
+			Total: 3,
+			Hits: []FederatedRawHit{
+				{Index: IndexName("product", 1), ID: "p1", Score: 9.0},
+			},
+			IndexCounts: map[string]int64{
+				AliasName("product"): 2,
+				AliasName("order"):   1,
+			},
+		},
+	}
+	idx := newFederatedIndexerMW(backend, []string{"product", "order"})
+
+	resp, err := idx.FederatedSearch(context.Background(), FederatedSearchRequest{
+		Query:     "q",
+		Resources: []string{"product", "order"},
+	})
+	if err != nil {
+		t.Fatalf("FederatedSearch: %v", err)
+	}
+	if resp.Hits[0].Resource != "product" {
+		t.Errorf("hit resource = %q, want product (resolved from concrete index)", resp.Hits[0].Resource)
+	}
+	want := []ResourceCount{
+		{Resource: "product", Count: 2},
+		{Resource: "order", Count: 1},
+	}
+	for i, w := range want {
+		if resp.Counts[i] != w {
+			t.Errorf("count[%d] = %+v, want %+v", i, resp.Counts[i], w)
+		}
+	}
+}
+
 // newFederatedIndexerMW builds an Indexer with the given resource types (each
 // a single-version config with one text field and one keyword field) and
 // federated search middlewares.
