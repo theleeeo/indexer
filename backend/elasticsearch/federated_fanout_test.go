@@ -115,8 +115,8 @@ func TestFederatedFanout_LegShapePerType(t *testing.T) {
 		if body["from"] != float64(0) || body["size"] != float64(25) {
 			t.Errorf("leg %d paging = from %v size %v, want 0/25", i, body["from"], body["size"])
 		}
-		if body["track_total_hits"] != true {
-			t.Errorf("leg %d track_total_hits = %v, want true", i, body["track_total_hits"])
+		if v, ok := body["track_total_hits"]; ok {
+			t.Errorf("leg %d sets track_total_hits = %v; federated counts accept the ES default cap", i, v)
 		}
 		if _, ok := body["aggs"]; ok {
 			t.Errorf("leg %d carries aggs; counts come from hits.total", i)

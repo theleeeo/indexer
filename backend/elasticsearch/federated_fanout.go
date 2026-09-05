@@ -34,9 +34,12 @@ const fanoutMaxWindow = 10000
 // statistics and cross-Type comparability rests on the standardized search
 // fields rather than DFS. The merged ranking orders by score with a
 // deterministic (index, id) tie-break so page boundaries are stable. Counts
-// (spec D12) are each leg's exact hits.total, keyed by the group's alias (core
-// resolves aliases as well as concrete index names); a missing index empties
-// its own leg only, where the single query's 404 empties the whole response.
+// (spec D12) are each leg's hits.total, keyed by the group's alias (core
+// resolves aliases as well as concrete index names) — under ES's default
+// track_total_hits cap, the same looseness the single query's total has:
+// federated totals are tallies for a UI, not exact bookkeeping. A missing
+// index empties its own leg only, where the single query's 404 empties the
+// whole response.
 func (c *Client) federatedFanout(ctx context.Context, p core.FederatedSearchParams) (core.FederatedSearchResult, error) {
 	window := int(p.Page+1) * int(p.PageSize)
 	if window > fanoutMaxWindow {
@@ -151,8 +154,9 @@ func (c *Client) federatedFanout(ctx context.Context, p core.FederatedSearchPara
 // buildFanoutLegBody builds one Type's sub-search: the shared two-tier text
 // query plus the global filters and this group's own resolved filters. Every
 // leg fetches the full merged window from 0 — the merge needs each leg's
-// candidates for the requested page — with exact totals for the per-Type
-// counts (D12), which must not cap at ES's default track_total_hits threshold.
+// candidates for the requested page. hits.total feeds the per-Type counts
+// (D12) at ES's default track_total_hits accuracy; federated search does not
+// need exact totals.
 func buildFanoutLegBody(p core.FederatedSearchParams, g core.IndexFilterGroup, globalFilters []any, window int) (map[string]any, error) {
 	filter := slices.Clone(globalFilters)
 	for _, f := range g.Filters {
@@ -172,10 +176,9 @@ func buildFanoutLegBody(p core.FederatedSearchParams, g core.IndexFilterGroup, g
 	}
 
 	body := map[string]any{
-		"query":            map[string]any{"bool": boolQ},
-		"from":             0,
-		"size":             window,
-		"track_total_hits": true,
+		"query": map[string]any{"bool": boolQ},
+		"from":  0,
+		"size":  window,
 	}
 	if !p.IncludeSource {
 		body["_source"] = false
