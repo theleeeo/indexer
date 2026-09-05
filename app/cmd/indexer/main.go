@@ -62,7 +62,11 @@ func main() {
 		log.Fatalf("setting up es client: %v", err)
 	}
 
-	esClientImpl := elasticsearch.New(esClient, false)
+	fedExec, err := elasticsearch.ParseFederatedExecution(cfg.ES.FederatedExecution)
+	if err != nil {
+		log.Fatalf("es.federated_execution: %v", err)
+	}
+	esClientImpl := elasticsearch.New(esClient, false, elasticsearch.WithFederatedExecution(fedExec))
 
 	dbpool, err := pgxpool.New(context.Background(), cfg.PG.Addr)
 	if err != nil {

@@ -20,6 +20,7 @@ import (
 //	es.addrs            → ES_ADDRS  (comma-separated when set via env)
 //	es.username         → ES_USERNAME
 //	es.password         → ES_PASSWORD
+//	es.federated_execution → ES_FEDERATED_EXECUTION
 //	pg.addr             → PG_ADDR
 //	provider.addr       → PROVIDER_ADDR
 //	resource_config_path → RESOURCE_CONFIG_PATH
@@ -62,6 +63,10 @@ type esConfig struct {
 	Addrs    []string `mapstructure:"addrs"`
 	Username string   `mapstructure:"username"`
 	Password string   `mapstructure:"password"`
+	// FederatedExecution selects how Federated Search executes: "single-dfs"
+	// (default), "single", or "fanout". An experiment toggle — see
+	// elasticsearch.FederatedExecution. Empty means the default.
+	FederatedExecution string `mapstructure:"federated_execution"`
 }
 
 type pgConfig struct {
@@ -110,6 +115,7 @@ func loadAppConfig(configFilePath string) (appConfig, error) {
 	v.SetDefault("es.addrs", []string{"http://localhost:9200"})
 	v.SetDefault("es.username", "")
 	v.SetDefault("es.password", "")
+	v.SetDefault("es.federated_execution", "")
 	v.SetDefault("pg.addr", "postgres://user:pass@localhost:5432/indexer")
 	v.SetDefault("provider.addr", "")
 	v.SetDefault("resource_config_path", "resources.yml")

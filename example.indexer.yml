@@ -33,6 +33,11 @@ es:
     - "http://localhost:9200"
   username: ""
   password: ""
+  # Federated Search execution experiment (or env ES_FEDERATED_EXECUTION):
+  #   single-dfs (default) — one multi-index query, global DFS term statistics
+  #   single               — one multi-index query, index-local statistics
+  #   fanout               — one sub-search per Type via _msearch, merged client-side
+  # federated_execution: single-dfs
 
 pg:
   addr: "postgres://user:pass@localhost:5432/indexer"
